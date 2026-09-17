@@ -4,7 +4,7 @@ import type { BranchInfo, PullRequest } from "../lib/types";
 import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
 import { checkDot, dim, iconBtn, miniPill } from "./classes";
-import { Icon, useMenu } from "./ui";
+import { Icon, useMenu, type MenuItem } from "./ui";
 
 const SIDE_HEADER =
   "group flex h-7 cursor-pointer items-center gap-1.5 px-2 text-[10.5px] font-bold tracking-[0.06em] text-fg-dim uppercase select-none hover:text-fg";
@@ -91,9 +91,33 @@ function BranchItem({ b }: { b: BranchInfo }) {
   const last = b.name.split("/").slice(-1)[0];
   const prefix = b.name.slice(0, b.name.length - last.length);
 
+  /** upstream に追いついていないローカルブランチだけ pull を出す */
+  const behind = b.kind === "local" && b.upstream ? b.behind : 0;
+  /** HEAD 以外は fast-forward しかできないので、分岐していたら諦めてもらう */
+  const diverged = !b.isHead && b.ahead > 0;
+  const pullItems: MenuItem[] = !behind
+    ? []
+    : [
+        {
+          label: b.isHead
+            ? `プル (↓${behind})`
+            : diverged
+              ? `早送りできません (↑${b.ahead} ↓${behind})`
+              : `upstream へ早送り (↓${behind})`,
+          icon: "pull",
+          disabled: diverged,
+          onClick: () => act.pullBranch(b),
+        },
+        ...(b.isHead
+          ? [{ label: "リベースして pull", icon: "pull", onClick: () => act.pullBranch(b, true) }]
+          : []),
+        { separator: true },
+      ];
+
   const menu = (e: React.MouseEvent) => {
     e.preventDefault();
     openMenu(e, [
+      ...pullItems,
       {
         label: "チェックアウト",
         icon: "branch",

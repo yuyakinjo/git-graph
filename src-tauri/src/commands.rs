@@ -176,6 +176,23 @@ pub fn git_pull(dir: String, rebase: bool, autostash: bool) -> Result<String, St
     sh::git_log(&dir, &args)
 }
 
+/// checkout せずにローカルブランチを upstream へ早送りする。
+/// `git fetch <remote> <merge-ref>:<branch>` は fast-forward できるときだけ成功するので、
+/// 分岐しているブランチを黙って壊す心配がない。
+#[tauri::command]
+pub fn git_fast_forward(dir: String, branch: String) -> Result<String, String> {
+    let missing = || format!("{branch} に upstream が設定されていません");
+    let remote = sh::git(&dir, &["config", "--get", &format!("branch.{branch}.remote")])
+        .map_err(|_| missing())?;
+    let merge = sh::git(&dir, &["config", "--get", &format!("branch.{branch}.merge")])
+        .map_err(|_| missing())?;
+    let (remote, merge) = (remote.trim(), merge.trim());
+    if remote.is_empty() || merge.is_empty() {
+        return Err(missing());
+    }
+    sh::git_log(&dir, &["fetch", remote, &format!("{merge}:{branch}")])
+}
+
 #[tauri::command]
 pub fn git_push(
     dir: String,

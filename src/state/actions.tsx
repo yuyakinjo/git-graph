@@ -144,6 +144,15 @@ export function useActions() {
       await s.run(rebase ? "リベースして pull" : "プル", () => api.pull(dir, rebase, s.dirty));
     };
 
+    /**
+     * ブランチ一覧から pull する。
+     * HEAD なら通常の pull、それ以外は checkout せずに upstream へ早送りする。
+     */
+    const pullBranch = async (b: BranchInfo, rebase = false) => {
+      if (b.isHead) return pull(rebase);
+      await s.run(`${b.name} を ${b.upstream} に早送り`, () => api.fastForward(dir, b.name));
+    };
+
     // ---------------------------------------------------------- 4-5. add / commit
     const stage = (paths: string[]) =>
       s.run("ステージ", () => api.stage(dir, paths), { silentSuccess: true });
@@ -488,6 +497,7 @@ export function useActions() {
       stashDrop,
       fetch,
       pull,
+      pullBranch,
       stage,
       stageAll,
       unstage,

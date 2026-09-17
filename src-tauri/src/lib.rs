@@ -62,6 +62,7 @@ pub fn run() {
             commands::git_fetch,
             commands::git_pull,
             commands::git_push,
+            commands::git_fast_forward,
             commands::git_checkout,
             commands::git_checkout_remote,
             commands::git_create_branch,
