@@ -75,6 +75,20 @@ export function Settings() {
           </em>
         </div>
       </section>
+
+      <section className="settings-section">
+        <h3>作者アイコン</h3>
+        <p className="dialog-desc">
+          コミット作者のメールアドレスから gh CLI で GitHub のアバターを引いて表示します。
+          結果はディスクに残るので、同じ作者を何度も取りに行くことはありません。
+          アイコンを変えた人が古いままのときだけ、ここで消してください。
+        </p>
+        <div className="row settings-actions">
+          <button className="btn ghost" onClick={() => void s.clearAvatarCache()}>
+            <Icon name="fetch" size={14} /> キャッシュを消して取り直す
+          </button>
+        </div>
+      </section>
     </Modal>
   );
 }

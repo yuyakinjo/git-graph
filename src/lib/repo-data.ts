@@ -33,7 +33,11 @@ export interface BootData {
   snapshot: RepoSnapshot;
   gh: GhStatus | null;
   prs: PullRequest[];
+  avatars: AvatarMap;
 }
+
+/** コミット作者のメール (小文字) → GitHub アバター URL。null は解決できなかった作者。 */
+export type AvatarMap = Record<string, string | null>;
 
 export async function loadRepo(path: string): Promise<RepoSnapshot> {
   const repo = await api.repoOpen(path);
@@ -47,6 +51,24 @@ export async function loadRepo(path: string): Promise<RepoSnapshot> {
     api.worktreeLoad(root),
   ]);
   return { repo, graph, status, branches, tags, stashes, worktrees };
+}
+
+/**
+ * グラフに出てくる作者のアバターを引く。
+ * 同じメールは 1 件に畳んでから 1 回の invoke にまとめる。実際の解決とキャッシュ
+ * (プロセス内 + ディスク) は Rust 側が持つので、ここは毎回呼んでよい。
+ */
+export async function loadAvatars(root: string, graph: GraphData | null): Promise<AvatarMap> {
+  if (!graph) return {};
+  const seen = new Map<string, string>(); // email -> 手掛かりにするコミット SHA
+  for (const c of graph.commits) {
+    const email = c.authorEmail.trim().toLowerCase();
+    if (email && !seen.has(email)) seen.set(email, c.hash);
+  }
+  if (seen.size === 0) return {};
+  const queries = [...seen].map(([email, sha]) => ({ email, sha }));
+  // gh が無い / GitHub 以外のリポジトリなら諦めてイニシャル表示のままにする
+  return api.ghAvatars(root, queries).catch(() => ({}) as AvatarMap);
 }
 
 export async function loadPrs(root: string, gh: GhStatus | null): Promise<PullRequest[]> {
@@ -65,8 +87,12 @@ export async function bootApp(): Promise<BootData | null> {
     const snapshot = await loadRepo(path);
     const root = snapshot.repo.root;
     localStorage.setItem(LAST_KEY, root);
-    const gh = await api.ghStatus(root).catch(() => null);
-    return { snapshot, gh, prs: await loadPrs(root, gh) };
+    // gh status とアバター解決は独立しているので並べて走らせる
+    const [gh, avatars] = await Promise.all([
+      api.ghStatus(root).catch(() => null),
+      loadAvatars(root, snapshot.graph),
+    ]);
+    return { snapshot, gh, prs: await loadPrs(root, gh), avatars };
   } catch {
     localStorage.removeItem(LAST_KEY);
     return null;

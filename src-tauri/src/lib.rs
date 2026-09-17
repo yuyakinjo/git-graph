@@ -1,3 +1,4 @@
+mod avatar;
 mod commands;
 mod github;
 mod graph;
@@ -80,6 +81,8 @@ pub fn run() {
             commands::gh_pr_checkout,
             commands::gh_pr_merge,
             commands::gh_pr_template,
+            commands::gh_avatars,
+            commands::gh_avatars_clear,
             commands::scan_repos,
             commands::home_dir,
             commands::last_commit_message,

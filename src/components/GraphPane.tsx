@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useWindowEvent } from "../lib/effects";
-import { avatarColor, initials, laneColor, relativeTime } from "../lib/format";
+import { laneColor, relativeTime } from "../lib/format";
 import type { GraphCommit, GraphEdge, RefDeco } from "../lib/types";
 import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
+import { Avatar } from "./Avatar";
 import { Icon, useMenu } from "./ui";
 
 const ROW_H = 30;
@@ -295,9 +296,7 @@ export function GraphPane() {
           <span className="subject">{c.subject}</span>
         </div>
         <div className="col-author" title={`${c.authorName} <${c.authorEmail}>`}>
-          <span className="avatar" style={{ background: avatarColor(c.authorEmail || c.authorName) }}>
-            {initials(c.authorName)}
-          </span>
+          <Avatar name={c.authorName} email={c.authorEmail} />
           <span className="author-name">{c.authorName}</span>
         </div>
         <div className="col-sha mono">{c.short}</div>

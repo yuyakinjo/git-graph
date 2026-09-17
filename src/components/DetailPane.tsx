@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { api } from "../lib/api";
-import { absoluteTime, avatarColor, basename, dirname, initials, relativeTime } from "../lib/format";
+import { absoluteTime, basename, dirname, relativeTime } from "../lib/format";
 import type { DiffFile, FileEntry } from "../lib/types";
 import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
+import { Avatar } from "./Avatar";
 import { DiffView } from "./DiffView";
 import { Icon, useMenu } from "./ui";
 
@@ -286,12 +287,7 @@ function CommitPanel({ sha }: { sha: string }) {
     <div className="detail">
       <header className="detail-head">
         <div className="detail-title">
-          <span
-            className="avatar big"
-            style={{ background: avatarColor(detail.authorEmail || detail.authorName) }}
-          >
-            {initials(detail.authorName)}
-          </span>
+          <Avatar name={detail.authorName} email={detail.authorEmail} big />
           <div>
             <h3>{detail.subject}</h3>
             <div className="detail-sub">

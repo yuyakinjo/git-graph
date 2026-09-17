@@ -709,6 +709,8 @@ body.dragging {
 }
 
 .avatar {
+  position: relative;
+  overflow: hidden;
   width: 18px;
   height: 18px;
   border-radius: 50%;
@@ -724,6 +726,16 @@ body.dragging {
   width: 30px;
   height: 30px;
   font-size: 12px;
+}
+/* GitHub のアバター。イニシャルの上に重ねる (失敗時はイニシャルが残る) */
+.avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
 }
 
 .ref-badge {

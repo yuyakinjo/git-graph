@@ -1,5 +1,10 @@
-use serde_json::Value;
+use std::collections::HashMap;
+use std::path::PathBuf;
 
+use serde_json::Value;
+use tauri::Manager;
+
+use crate::avatar;
 use crate::github;
 use crate::graph;
 use crate::repo;
@@ -395,6 +400,31 @@ pub fn gh_pr_merge(
 #[tauri::command]
 pub fn gh_pr_template(dir: String) -> Result<Option<String>, String> {
     Ok(github::pr_template(&dir))
+}
+
+/// アバターキャッシュの置き場 (~/Library/Caches/dev.gitgraph.app/avatars.json など)
+fn avatar_cache_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| format!("キャッシュディレクトリを特定できません: {e}"))?;
+    Ok(dir.join("avatars.json"))
+}
+
+/// コミット作者のメール → GitHub アバター URL。解決できないものは null。
+/// 結果はディスクにキャッシュされるので、同じ作者で gh を何度も叩かない。
+#[tauri::command]
+pub fn gh_avatars(
+    app: tauri::AppHandle,
+    dir: String,
+    queries: Vec<avatar::AvatarQuery>,
+) -> Result<HashMap<String, Option<String>>, String> {
+    avatar::resolve(&dir, &avatar_cache_path(&app)?, queries)
+}
+
+#[tauri::command]
+pub fn gh_avatars_clear(app: tauri::AppHandle) -> Result<(), String> {
+    avatar::clear(&avatar_cache_path(&app)?)
 }
 
 // ------------------------------------------------------------------ misc

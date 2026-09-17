@@ -11,8 +11,10 @@ import { api } from "../lib/api";
 import { useInterval } from "../lib/effects";
 import {
   LAST_KEY,
+  loadAvatars,
   loadPrs,
   loadRepo,
+  type AvatarMap,
   type BootData,
   type RepoSnapshot,
 } from "../lib/repo-data";
@@ -102,6 +104,8 @@ export function useStoreValue(boot: BootData | null) {
   const [worktrees, setWorktrees] = useState<WorktreeInfo[]>(boot?.snapshot.worktrees ?? []);
   const [gh, setGh] = useState<GhStatus | null>(boot?.gh ?? null);
   const [prs, setPrs] = useState<PullRequest[]>(boot?.prs ?? []);
+  // 作者メール → GitHub アバター URL。リポジトリをまたいで持ち越す (解決済みは使い回す)。
+  const [avatars, setAvatars] = useState<AvatarMap>(boot?.avatars ?? {});
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   // 読み込み中のリポジトリのパス。押した直後から表示に出すための「仮のタブ」でもある。
@@ -153,6 +157,8 @@ export function useStoreValue(boot: BootData | null) {
   dirRef.current = dir;
   const ghRef = useRef(gh);
   ghRef.current = gh;
+  const graphRef = useRef(graph);
+  graphRef.current = graph;
   const selRef = useRef(selection);
   selRef.current = selection;
   const tabsRef = useRef(tabs);
@@ -249,6 +255,26 @@ export function useStoreValue(boot: BootData | null) {
     localStorage.setItem(LAST_KEY, snap.repo.root);
   }, []);
 
+  /** アバターは表示に必須ではないので待たずに走らせ、届いた時点で差し込む。 */
+  const refreshAvatars = useCallback((root: string, graph: GraphData | null) => {
+    void loadAvatars(root, graph).then((found) => {
+      if (Object.keys(found).length === 0) return;
+      setAvatars((prev) => ({ ...prev, ...found }));
+    });
+  }, []);
+
+  /** アバターのキャッシュを捨てて取り直す (設定から呼ぶ) */
+  const clearAvatarCache = useCallback(async () => {
+    try {
+      await api.ghAvatarsClear();
+      setAvatars({});
+      refreshAvatars(dirRef.current, graphRef.current);
+      toast({ kind: "success", title: "作者アイコンのキャッシュを消しました" });
+    } catch (e) {
+      toast({ kind: "error", title: "キャッシュを消せませんでした", detail: String(e) });
+    }
+  }, [refreshAvatars, toast]);
+
   const refreshPrs = useCallback(async () => {
     setPrs(await loadPrs(dirRef.current, ghRef.current));
   }, []);
@@ -261,6 +287,7 @@ export function useStoreValue(boot: BootData | null) {
       try {
         const snap = await loadRepo(root);
         applySnapshot(snap);
+        refreshAvatars(root, snap.graph);
         // WIP を見ている間は status の変化で差分も変わるので選択ファイルを引き直す
         if (selRef.current.kind === "wip") {
           const cur = fileRef.current;
@@ -278,7 +305,7 @@ export function useStoreValue(boot: BootData | null) {
         if (!opts.silent) setLoading(false);
       }
     },
-    [applySnapshot, openFile, refreshPrs, toast],
+    [applySnapshot, openFile, refreshAvatars, refreshPrs, toast],
   );
 
   const openRepo = useCallback(
@@ -288,6 +315,7 @@ export function useStoreValue(boot: BootData | null) {
       try {
         const snap = await loadRepo(path);
         applySnapshot(snap);
+        refreshAvatars(snap.repo.root, snap.graph);
         await select({ kind: "wip" });
         setRecent((prev) => {
           const next = [snap.repo.root, ...prev.filter((p) => p !== snap.repo.root)].slice(0, 8);
@@ -316,7 +344,7 @@ export function useStoreValue(boot: BootData | null) {
         setOpening(null);
       }
     },
-    [applySnapshot, refreshPrs, select, toast],
+    [applySnapshot, refreshAvatars, refreshPrs, select, toast],
   );
 
   const removeRecent = useCallback((path: string) => {
@@ -488,6 +516,8 @@ export function useStoreValue(boot: BootData | null) {
     worktrees,
     gh,
     prs,
+    avatars,
+    clearAvatarCache,
     selection,
     select,
     commit,

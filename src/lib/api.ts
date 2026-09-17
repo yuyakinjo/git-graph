@@ -99,4 +99,8 @@ export const api = {
   prMerge: (dir: string, number: number, method: string, deleteBranch: boolean) =>
     invoke<string>("gh_pr_merge", { dir, number, method, deleteBranch }),
   prTemplate: (dir: string) => invoke<string | null>("gh_pr_template", { dir }),
+  /** 作者のメール → アバター URL (Rust 側でディスクキャッシュ済み。null は解決不能) */
+  ghAvatars: (dir: string, queries: { email: string; sha: string }[]) =>
+    invoke<Record<string, string | null>>("gh_avatars", { dir, queries }),
+  ghAvatarsClear: () => invoke<void>("gh_avatars_clear"),
 };
