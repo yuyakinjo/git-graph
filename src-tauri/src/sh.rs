@@ -1,0 +1,129 @@
+use std::path::Path;
+use std::process::Command;
+
+/// GUI プロセスは PATH が最小限になりがちなので、よくあるインストール先を足しておく。
+/// (gh / git を Homebrew や asdf 経由で入れているケースを救う)
+fn patched_path() -> String {
+    let extra = [
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        "/usr/bin",
+        "/bin",
+        "/usr/sbin",
+        "/sbin",
+    ];
+    let current = std::env::var("PATH").unwrap_or_default();
+    let mut parts: Vec<String> = current.split(':').map(|s| s.to_string()).collect();
+    for e in extra {
+        if !parts.iter().any(|p| p == e) {
+            parts.push(e.to_string());
+        }
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        parts.push(format!("{home}/.local/bin"));
+    }
+    parts.join(":")
+}
+
+pub struct Out {
+    pub code: i32,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+impl Out {
+    pub fn ok(&self) -> bool {
+        self.code == 0
+    }
+    /// エラー表示用に stderr / stdout をまとめる
+    pub fn message(&self) -> String {
+        let mut s = String::new();
+        if !self.stderr.trim().is_empty() {
+            s.push_str(self.stderr.trim());
+        }
+        if !self.stdout.trim().is_empty() {
+            if !s.is_empty() {
+                s.push('\n');
+            }
+            s.push_str(self.stdout.trim());
+        }
+        if s.is_empty() {
+            s = format!("command exited with status {}", self.code);
+        }
+        s
+    }
+}
+
+pub fn exec<S: AsRef<str>>(cwd: &str, program: &str, args: &[S]) -> Result<Out, String> {
+    if !cwd.is_empty() && !Path::new(cwd).exists() {
+        return Err(format!("ディレクトリが存在しません: {cwd}"));
+    }
+    let mut cmd = Command::new(program);
+    for a in args {
+        cmd.arg(a.as_ref());
+    }
+    if !cwd.is_empty() {
+        cmd.current_dir(cwd);
+    }
+    cmd.env("PATH", patched_path());
+    // pager / エディタ / 対話プロンプトを完全に無効化する
+    cmd.env("GIT_PAGER", "cat");
+    cmd.env("PAGER", "cat");
+    cmd.env("GIT_TERMINAL_PROMPT", "0");
+    cmd.env("GIT_OPTIONAL_LOCKS", "0");
+    cmd.env("CLICOLOR", "0");
+    cmd.env("GH_PAGER", "cat");
+    cmd.env("GH_PROMPT_DISABLED", "1");
+    cmd.env("NO_COLOR", "1");
+
+    let output = cmd.output().map_err(|e| match e.kind() {
+        std::io::ErrorKind::NotFound => {
+            format!("`{program}` が見つかりません。インストールと PATH を確認してください。")
+        }
+        _ => format!("`{program}` の実行に失敗しました: {e}"),
+    })?;
+
+    Ok(Out {
+        code: output.status.code().unwrap_or(-1),
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+    })
+}
+
+/// git を実行し、成功時は stdout を返す
+pub fn git<S: AsRef<str>>(cwd: &str, args: &[S]) -> Result<String, String> {
+    let out = exec(cwd, "git", args)?;
+    if out.ok() {
+        Ok(out.stdout)
+    } else {
+        Err(out.message())
+    }
+}
+
+/// git を実行し、stdout + stderr をログとして返す (push/pull など進捗が stderr に出るもの)
+pub fn git_log<S: AsRef<str>>(cwd: &str, args: &[S]) -> Result<String, String> {
+    let out = exec(cwd, "git", args)?;
+    if out.ok() {
+        let mut s = out.stdout.trim().to_string();
+        if !out.stderr.trim().is_empty() {
+            if !s.is_empty() {
+                s.push('\n');
+            }
+            s.push_str(out.stderr.trim());
+        }
+        Ok(s)
+    } else {
+        Err(out.message())
+    }
+}
+
+/// gh CLI を実行
+pub fn gh<S: AsRef<str>>(cwd: &str, args: &[S]) -> Result<String, String> {
+    let out = exec(cwd, "gh", args)?;
+    if out.ok() {
+        Ok(out.stdout)
+    } else {
+        Err(out.message())
+    }
+}
+

@@ -1,0 +1,68 @@
+mod commands;
+mod github;
+mod graph;
+mod repo;
+mod sh;
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            if cfg!(debug_assertions) {
+                app.handle().plugin(
+                    tauri_plugin_log::Builder::default()
+                        .level(log::LevelFilter::Info)
+                        .build(),
+                )?;
+            }
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            commands::repo_open,
+            commands::graph_load,
+            commands::status_load,
+            commands::branches_load,
+            commands::tags_load,
+            commands::stash_load,
+            commands::worktree_load,
+            commands::commit_detail,
+            commands::wip_files,
+            commands::stash_files,
+            commands::diff_text,
+            commands::git_stage,
+            commands::git_stage_all,
+            commands::git_unstage,
+            commands::git_unstage_all,
+            commands::git_discard,
+            commands::git_commit,
+            commands::git_fetch,
+            commands::git_pull,
+            commands::git_push,
+            commands::git_checkout,
+            commands::git_checkout_remote,
+            commands::git_create_branch,
+            commands::git_delete_branch,
+            commands::git_delete_remote_branch,
+            commands::git_stash_push,
+            commands::git_stash_apply,
+            commands::git_stash_drop,
+            commands::git_worktree_add,
+            commands::git_worktree_remove,
+            commands::git_worktree_prune,
+            commands::gh_status,
+            commands::gh_pr_list,
+            commands::gh_pr_for_branch,
+            commands::gh_pr_view,
+            commands::gh_pr_create,
+            commands::gh_pr_checkout,
+            commands::gh_pr_merge,
+            commands::gh_pr_template,
+            commands::home_dir,
+            commands::last_commit_message,
+            commands::initial_repo,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
