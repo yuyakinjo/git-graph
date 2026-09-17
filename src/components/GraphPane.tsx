@@ -118,7 +118,7 @@ function RefBadge({
       }}
     >
       {deco.isHead && deco.kind === "head" ? (
-        <span className="h-[5px] w-[5px] rounded-full bg-current" />
+        <span className="h-1.25 w-1.25 rounded-full bg-current" />
       ) : null}
       <Icon name={icon} size={11} />
       {deco.name}
@@ -140,12 +140,12 @@ function TagCell({
   return (
     <div className={COL_TAGS}>
       <span
-        className="inline-flex h-[18px] cursor-default items-center gap-0.5 rounded-[9px] border border-amber-30 bg-amber-12 px-1 text-amber [&>svg]:flex-none"
+        className="inline-flex h-4.5 cursor-default items-center gap-0.5 rounded-[9px] border border-amber-30 bg-amber-12 px-1 text-amber [&>svg]:flex-none"
         title={tags.map((t) => t.name).join("\n")}
       >
         <Icon name="tag" size={12} />
         {tags.length > 1 ? <span className="text-[10px] font-bold">{tags.length}</span> : null}
-        <span className="absolute top-1/2 left-[calc(100%+6px)] hidden max-w-[460px] -translate-y-1/2 items-center gap-[5px] overflow-hidden rounded-lg border border-line bg-bg-3 px-1.5 py-1 whitespace-nowrap shadow-[0_6px_18px_rgba(0,0,0,0.45)] group-hover/tags:flex">
+        <span className="absolute top-1/2 left-[calc(100%+6px)] hidden max-w-115 -translate-y-1/2 items-center gap-1.25 overflow-hidden rounded-lg border border-line bg-bg-3 px-1.5 py-1 whitespace-nowrap shadow-[0_6px_18px_rgba(0,0,0,0.45)] group-hover/tags:flex">
           {tags.map((d) => (
             <RefBadge key={d.full} deco={d} onCheckout={() => onCheckout(d)} onMenu={onMenu(d)} />
           ))}
@@ -451,8 +451,8 @@ export function GraphPane() {
 
   return (
     <div className={PANE}>
-      <div className="flex h-[34px] flex-none items-center gap-2.5 border-b border-line bg-bg-1 px-2.5">
-        <div className="flex h-6 max-w-[340px] flex-1 items-center gap-1.5 rounded-xl border border-line bg-bg-2 px-2 text-fg-dim">
+      <div className="flex h-8.5 flex-none items-center gap-2.5 border-b border-line bg-bg-1 px-2.5">
+        <div className="flex h-6 max-w-85 flex-1 items-center gap-1.5 rounded-xl border border-line bg-bg-2 px-2 text-fg-dim">
           <Icon name="search" size={14} />
           <input
             className="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none"
@@ -467,7 +467,7 @@ export function GraphPane() {
           ) : null}
         </div>
         <ColumnMenu />
-        <div className="ml-auto flex text-[10.5px] tracking-[0.05em] text-fg-faint uppercase">
+        <div className="ml-auto flex text-[10.5px] tracking-wider text-fg-faint uppercase">
           {cols.author ? <span className={COL_AUTHOR}>作者</span> : null}
           {cols.sha ? <span className={COL_SHA}>SHA</span> : null}
           {cols.date ? <span className={COL_DATE}>日時</span> : null}
