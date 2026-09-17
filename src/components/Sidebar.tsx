@@ -7,7 +7,7 @@ import { checkDot, dim, iconBtn, miniPill } from "./classes";
 import { Icon, useMenu, type MenuItem } from "./ui";
 
 const SIDE_HEADER =
-  "group flex h-7 cursor-pointer items-center gap-1.5 px-2 text-[10.5px] font-bold tracking-[0.06em] text-fg-dim uppercase select-none hover:text-fg";
+  "group flex h-7 shrink-0 cursor-pointer items-center gap-1.5 px-2 text-[10.5px] font-bold tracking-[0.06em] text-fg-dim uppercase select-none hover:text-fg";
 
 const SIDE_ITEM = "flex h-[26px] cursor-default items-center gap-1.5 py-0 pr-2 pl-3.5 select-none";
 /** 選択中の行。ホバーの上書きが効かないよう、状態ごとに背景を出し分ける */
@@ -66,7 +66,7 @@ function Section({
 }) {
   const open = isOpen(id);
   return (
-    <section>
+    <section className={`flex flex-col first:mt-auto ${open ? "min-h-7 flex-1" : "shrink-0"}`}>
       <header className={SIDE_HEADER} onClick={() => toggle(id)}>
         <Icon name={open ? "chevronDown" : "chevronRight"} size={12} />
         <Icon name={icon} size={13} />
@@ -79,7 +79,7 @@ function Section({
           {action}
         </span>
       </header>
-      {open ? <div className="pb-1.5">{children}</div> : null}
+      {open ? <div className="min-h-0 overflow-y-auto pb-1.5">{children}</div> : null}
     </section>
   );
 }
@@ -223,7 +223,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
   const remotes = useMemo(() => s.branches.filter((b) => b.kind === "remote"), [s.branches]);
 
   return (
-    <aside className="h-full overflow-y-auto bg-bg-2 pt-1.5 pb-5">
+    <aside className="flex h-full flex-col overflow-y-auto bg-bg-2 pt-1.5 pb-5">
       <Section
         id="local"
         title="ローカル"
