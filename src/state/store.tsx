@@ -22,6 +22,7 @@ import type {
   DiffFile,
   GhStatus,
   GraphData,
+  ProjectEntry,
   PullRequest,
   RepoInfo,
   Selection,
@@ -51,6 +52,10 @@ const RECENT_KEY = "gitgraph.recent";
 const TABS_KEY = "gitgraph.tabs";
 const AUTOFETCH_KEY = "gitgraph.autofetch";
 const AUTOFETCH_MS = 180_000;
+// 設定 (Cmd+,) で決めるプロジェクト置き場と、その探索の深さ
+const ROOTS_KEY = "gitgraph.projectRoots";
+const DEPTH_KEY = "gitgraph.scanDepth";
+const DEFAULT_DEPTH = 3;
 
 function loadPaths(key: string): string[] {
   try {
@@ -99,6 +104,8 @@ export function useStoreValue(boot: BootData | null) {
   const [prs, setPrs] = useState<PullRequest[]>(boot?.prs ?? []);
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // 読み込み中のリポジトリのパス。押した直後から表示に出すための「仮のタブ」でもある。
+  const [opening, setOpening] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [recent, setRecent] = useState<string[]>(() => loadPaths(RECENT_KEY));
   // 開いているリポジトリのタブ。切り替えは openRepo での読み込み直し。
@@ -114,6 +121,15 @@ export function useStoreValue(boot: BootData | null) {
   const [autoFetch, setAutoFetch] = useState(
     () => localStorage.getItem(AUTOFETCH_KEY) !== "off",
   );
+
+  // ---- 設定 (プロジェクト置き場) と、そこから見つけたリポジトリ ----
+  const [projectRoots, setProjectRootsState] = useState<string[]>(() => loadPaths(ROOTS_KEY));
+  const [scanDepth, setScanDepthState] = useState<number>(
+    () => Number(localStorage.getItem(DEPTH_KEY)) || DEFAULT_DEPTH,
+  );
+  const [projects, setProjects] = useState<ProjectEntry[]>([]);
+  const [scanning, setScanning] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // ---- 選択 (どこを見ているか) と、その中身 ----
   const [selection, setSelection] = useState<Selection>({ kind: "wip" });
@@ -143,6 +159,11 @@ export function useStoreValue(boot: BootData | null) {
   tabsRef.current = tabs;
   const fileRef = useRef(file);
   fileRef.current = file;
+  const rootsRef = useRef(projectRoots);
+  rootsRef.current = projectRoots;
+  const depthRef = useRef(scanDepth);
+  depthRef.current = scanDepth;
+  const scanSeq = useRef(0);
 
   const toast = useCallback((t: Omit<Toast, "id">) => {
     const id = ++toastSeq.current;
@@ -263,6 +284,7 @@ export function useStoreValue(boot: BootData | null) {
   const openRepo = useCallback(
     async (path: string) => {
       setLoading(true);
+      setOpening(path);
       try {
         const snap = await loadRepo(path);
         applySnapshot(snap);
@@ -291,6 +313,7 @@ export function useStoreValue(boot: BootData | null) {
         toast({ kind: "error", title: "リポジトリを開けませんでした", detail: String(e) });
       } finally {
         setLoading(false);
+        setOpening(null);
       }
     },
     [applySnapshot, refreshPrs, select, toast],
@@ -402,6 +425,54 @@ export function useStoreValue(boot: BootData | null) {
     dir && autoFetch ? AUTOFETCH_MS : null,
   );
 
+  /** 登録したプロジェクト置き場を走査する。古い結果は連番で破棄する。 */
+  const scanProjects = useCallback(async () => {
+    const id = ++scanSeq.current;
+    const roots = rootsRef.current;
+    if (!roots.length) {
+      setProjects([]);
+      setScanning(false);
+      return;
+    }
+    setScanning(true);
+    try {
+      const found = await api.scanRepos(roots, depthRef.current);
+      if (scanSeq.current === id) setProjects(found);
+    } catch (e) {
+      if (scanSeq.current === id) {
+        toast({ kind: "error", title: "プロジェクトの検索に失敗しました", detail: String(e) });
+      }
+    } finally {
+      if (scanSeq.current === id) setScanning(false);
+    }
+  }, [toast]);
+
+  /** 設定の変更はそのまま保存し、続けて走査をやり直す。 */
+  const setProjectRoots = useCallback(
+    (roots: string[]) => {
+      const next = roots.filter((p, i) => p && roots.indexOf(p) === i);
+      rootsRef.current = next;
+      setProjectRootsState(next);
+      savePaths(ROOTS_KEY, next);
+      void scanProjects();
+    },
+    [scanProjects],
+  );
+
+  const setScanDepth = useCallback(
+    (depth: number) => {
+      const next = Math.min(6, Math.max(1, Math.trunc(depth) || DEFAULT_DEPTH));
+      depthRef.current = next;
+      setScanDepthState(next);
+      localStorage.setItem(DEPTH_KEY, String(next));
+      void scanProjects();
+    },
+    [scanProjects],
+  );
+
+  const openSettings = useCallback(() => setSettingsOpen(true), []);
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
+
   const headBranch = useMemo(() => branches.find((b) => b.isHead) ?? null, [branches]);
 
   const dirty = useMemo(() => hasChanges(status), [status]);
@@ -426,6 +497,7 @@ export function useStoreValue(boot: BootData | null) {
     diff,
     busy,
     loading,
+    opening,
     toasts,
     toast,
     dismissToast,
@@ -444,6 +516,16 @@ export function useStoreValue(boot: BootData | null) {
     dirty,
     autoFetch,
     toggleAutoFetch,
+    projectRoots,
+    setProjectRoots,
+    scanDepth,
+    setScanDepth,
+    projects,
+    scanning,
+    scanProjects,
+    settingsOpen,
+    openSettings,
+    closeSettings,
   };
 }
 

@@ -154,6 +154,16 @@ export interface PullRequest {
   statusCheckRollup?: { state?: string; conclusion?: string; status?: string; name?: string }[] | null;
 }
 
+/** 設定で登録したプロジェクト置き場から見つかった git リポジトリ。 */
+export interface ProjectEntry {
+  path: string;
+  name: string;
+  /** どの登録フォルダ配下か */
+  root: string;
+  /** root からの相対パス */
+  rel: string;
+}
+
 export type Selection =
   | { kind: "wip" }
   | { kind: "commit"; sha: string }

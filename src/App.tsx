@@ -2,10 +2,11 @@ import { useCallback, useRef, useState } from "react";
 import { DetailPane } from "./components/DetailPane";
 import { GraphPane } from "./components/GraphPane";
 import { PrModal } from "./components/PrModal";
+import { Settings } from "./components/Settings";
 import { Sidebar } from "./components/Sidebar";
 import { TitleBar } from "./components/TitleBar";
 import { StatusBar, Toolbar } from "./components/Toolbar";
-import { Icon } from "./components/ui";
+import { Icon, Spinner } from "./components/ui";
 import { api } from "./lib/api";
 import { useWindowEvent } from "./lib/effects";
 import type { PullRequest } from "./lib/types";
@@ -91,6 +92,19 @@ function Welcome() {
   );
 }
 
+/** リポジトリを開いている間の表示。重いリポジトリでも押した手応えが残るようにする。 */
+function Opening({ path }: { path: string }) {
+  return (
+    <div className="opening">
+      <Spinner size={20} />
+      <div className="opening-text">
+        <strong>{path.split("/").filter(Boolean).pop()}</strong>
+        <span className="mono">{path.replace(/^\/Users\/[^/]+/, "~")}</span>
+      </div>
+    </div>
+  );
+}
+
 function Toasts() {
   const s = useStore();
   return (
@@ -130,6 +144,9 @@ export default function App() {
     if (e.key === "o") {
       e.preventDefault();
       act.openFolder();
+    } else if (e.key === ",") {
+      e.preventDefault();
+      s.openSettings();
     } else if (e.key === "r") {
       e.preventDefault();
       s.refresh({ withGh: true });
@@ -164,6 +181,17 @@ export default function App() {
           <div style={{ width: detail.width, flex: "0 0 auto", minWidth: 0, display: "flex" }}>
             <DetailPane />
           </div>
+          {s.opening ? (
+            <div className="main-veil">
+              <Opening path={s.opening} />
+            </div>
+          ) : null}
+        </div>
+      ) : s.opening ? (
+        <div className="main">
+          <div className="main-veil solid">
+            <Opening path={s.opening} />
+          </div>
         </div>
       ) : (
         <Welcome />
@@ -171,6 +199,7 @@ export default function App() {
       <StatusBar />
       <Toasts />
       {pr ? <PrModal pr={pr} onClose={() => setPr(null)} /> : null}
+      {s.settingsOpen ? <Settings /> : null}
     </div>
   );
 }

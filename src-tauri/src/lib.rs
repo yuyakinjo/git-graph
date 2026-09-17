@@ -80,6 +80,7 @@ pub fn run() {
             commands::gh_pr_checkout,
             commands::gh_pr_merge,
             commands::gh_pr_template,
+            commands::scan_repos,
             commands::home_dir,
             commands::last_commit_message,
             commands::initial_repo,

@@ -101,6 +101,91 @@ pub fn info(path: &str) -> Result<RepoInfo, String> {
     })
 }
 
+// ---------------------------------------------------------------- scan
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectEntry {
+    pub path: String,
+    pub name: String,
+    /// どの登録フォルダの配下で見つかったか
+    pub root: String,
+    /// root からの相対パス (同名リポジトリの区別用)
+    pub rel: String,
+}
+
+/// 掘っても git リポジトリが出てこないディレクトリは早めに捨てる。
+const SKIP_DIRS: &[&str] = &[
+    "node_modules",
+    "vendor",
+    "target",
+    "dist",
+    "build",
+    "Library",
+    "Applications",
+];
+
+fn is_repo(dir: &std::path::Path) -> bool {
+    dir.join(".git").exists()
+}
+
+/// roots 配下を depth 段まで辿り、git リポジトリのディレクトリを集める。
+/// リポジトリを見つけたらその中には降りない (サブモジュールは対象外)。
+pub fn scan(roots: &[String], depth: usize) -> Vec<ProjectEntry> {
+    let mut out: Vec<ProjectEntry> = vec![];
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    for root in roots {
+        let root_path = std::path::Path::new(root);
+        if !root_path.is_dir() {
+            continue;
+        }
+        // (ディレクトリ, root からの深さ)
+        let mut stack: Vec<(std::path::PathBuf, usize)> = vec![(root_path.to_path_buf(), 0)];
+        while let Some((dir, level)) = stack.pop() {
+            if is_repo(&dir) {
+                let path = dir.to_string_lossy().to_string();
+                let rel = dir
+                    .strip_prefix(root_path)
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|_| path.clone());
+                if seen.insert(path.clone()) {
+                    out.push(ProjectEntry {
+                        name: dir
+                            .file_name()
+                            .map(|n| n.to_string_lossy().to_string())
+                            .unwrap_or_else(|| path.clone()),
+                        path,
+                        root: root.clone(),
+                        rel,
+                    });
+                }
+                continue;
+            }
+            if level >= depth {
+                continue;
+            }
+            let Ok(entries) = std::fs::read_dir(&dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let Ok(ft) = entry.file_type() else { continue };
+                if !ft.is_dir() {
+                    continue;
+                }
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.starts_with('.') || SKIP_DIRS.contains(&name.as_str()) {
+                    continue;
+                }
+                stack.push((entry.path(), level + 1));
+            }
+        }
+    }
+
+    out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()).then(a.path.cmp(&b.path)));
+    out
+}
+
 // ---------------------------------------------------------------- status
 
 #[derive(Serialize, Clone, Debug)]

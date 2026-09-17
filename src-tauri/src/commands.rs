@@ -399,6 +399,12 @@ pub fn gh_pr_template(dir: String) -> Result<Option<String>, String> {
 
 // ------------------------------------------------------------------ misc
 
+/// 設定で登録したプロジェクト置き場から git リポジトリを探す。
+#[tauri::command]
+pub fn scan_repos(roots: Vec<String>, depth: usize) -> Vec<repo::ProjectEntry> {
+    repo::scan(&roots, depth)
+}
+
 #[tauri::command]
 pub fn home_dir() -> String {
     std::env::var("HOME").unwrap_or_else(|_| "/".to_string())

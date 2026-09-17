@@ -5,6 +5,7 @@ import type {
   DiffFile,
   GhStatus,
   GraphData,
+  ProjectEntry,
   PullRequest,
   RepoInfo,
   StashInfo,
@@ -28,6 +29,8 @@ export const api = {
   diffText: (dir: string, kind: string, path: string, sha?: string, context = 3) =>
     invoke<string>("diff_text", { dir, kind, path, sha, context }),
   lastCommitMessage: (dir: string) => invoke<string>("last_commit_message", { dir }),
+  scanRepos: (roots: string[], depth: number) =>
+    invoke<ProjectEntry[]>("scan_repos", { roots, depth }),
   homeDir: () => invoke<string>("home_dir"),
   initialRepo: () => invoke<string | null>("initial_repo"),
 
