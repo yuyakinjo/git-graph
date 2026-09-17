@@ -43,8 +43,13 @@ const LANE_W = 16;
 const LANE_W_AVATAR = 26;
 const PAD_X = 14;
 const OVERSCAN = 12;
+/** 下端からこの行数まで近づいたら次のページを読む */
+const LOAD_MORE_ROWS = 24;
 /** アバターノードの半径 */
 const AVATAR_R = 9;
+// 路線図では線幅 (8px) と駅の外径 (10px) を近づける。
+const RAILWAY_LINE_W = 8;
+const RAILWAY_NODE_R = 4;
 const NO_COMMITS: GraphCommit[] = [];
 const NO_EDGES: GraphEdge[] = [];
 
@@ -52,15 +57,19 @@ const NO_EDGES: GraphEdge[] = [];
 const cxOf = (col: number, laneW: number) => PAD_X + col * laneW;
 const cy = (row: number) => row * ROW_H + ROW_H / 2;
 
-function edgePath(x1: number, y1: number, x2: number, y2: number): string {
+/**
+ * レーンをまたぐ線の描き方は 2 通り。
+ * - マージ (第二親以降): 子のすぐ下で取り込み元のレーンへ寄せ、そこを真下に下る。
+ *   親が子より左にいても、子のレーン (第一親がそのまま下る) と重ならない。
+ * - 枝が閉じる (第一親が別レーンで待っている): 自レーンを下り、親の直前で寄せる。
+ */
+function edgePath(x1: number, y1: number, x2: number, y2: number, isMerge: boolean): string {
   if (x1 === x2) return `M ${x1} ${y1} L ${x2} ${y2}`;
   const r = Math.min(ROW_H * 0.9, Math.abs(y2 - y1));
-  if (x2 > x1) {
-    // マージ: 子のすぐ下で右レーンへ寄せてから真下へ
+  if (isMerge) {
     const yc = y1 + r;
     return `M ${x1} ${y1} C ${x1} ${y1 + r * 0.55}, ${x2} ${yc - r * 0.55}, ${x2} ${yc} L ${x2} ${y2}`;
   }
-  // 枝が閉じる: 自レーンを下り、親の直前で左へ合流
   const ys = y2 - r;
   return `M ${x1} ${y1} L ${x1} ${ys} C ${x1} ${ys + r * 0.55}, ${x2} ${y2 - r * 0.55}, ${x2} ${y2}`;
 }
@@ -202,6 +211,17 @@ export function GraphPane() {
   const [scrollTop, setScrollTop] = useState(0);
   const [viewH, setViewH] = useState(600);
   const [query, setQuery] = useState("");
+  const loadMoreGraph = s.loadMoreGraph;
+
+  /** 下端に近づいたら続きを読む (無限スクロール)。store 側で二重実行は弾く。 */
+  const onScroll = useCallback(
+    (el: HTMLDivElement) => {
+      setScrollTop(el.scrollTop);
+      const rest = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (rest < ROW_H * LOAD_MORE_ROWS) void loadMoreGraph();
+    },
+    [loadMoreGraph],
+  );
 
   const commits = s.graph?.commits ?? NO_COMMITS;
   const edges = s.graph?.edges ?? NO_EDGES;
@@ -209,7 +229,9 @@ export function GraphPane() {
   const rowOffset = hasWip ? 1 : 0;
   const totalRows = commits.length + rowOffset;
   const cols = s.columns;
+  const isRailway = s.graphStyle === "japanese-railway";
   const showNodeAvatar = cols.nodeAvatar;
+  const lineWidth = isRailway ? RAILWAY_LINE_W : 1.8;
   const laneW = showNodeAvatar ? LANE_W_AVATAR : LANE_W;
   const cx = (col: number) => cxOf(col, laneW);
   const graphW = cols.graph
@@ -477,7 +499,7 @@ export function GraphPane() {
       <div
         className="relative flex-1 overflow-auto"
         ref={attachScroll}
-        onScroll={(e) => setScrollTop((e.target as HTMLDivElement).scrollTop)}
+        onScroll={(e) => onScroll(e.currentTarget)}
       >
         <div className="relative min-w-full" style={{ height: totalRows * ROW_H }}>
           <div className="absolute inset-0">{rows}</div>
@@ -501,10 +523,11 @@ export function GraphPane() {
                     cy(0),
                     cx(commits[headRow].column),
                     cy(headRow + rowOffset),
+                    false,
                   )}
                   stroke={laneColor(commits[headRow].column)}
-                  strokeWidth="1.8"
-                  strokeDasharray="3 3"
+                  strokeWidth={lineWidth}
+                  strokeDasharray={isRailway ? "5 4" : "3 3"}
                   fill="none"
                   opacity="0.75"
                 />
@@ -519,9 +542,11 @@ export function GraphPane() {
                       cy(e.fromRow + rowOffset),
                       cx(e.toCol),
                       cy(toRow + rowOffset),
+                      e.isMerge,
                     )}
                     stroke={laneColor(e.color)}
-                    strokeWidth="1.8"
+                    strokeWidth={lineWidth}
+                    strokeLinecap={isRailway ? "round" : undefined}
                     fill="none"
                     opacity={e.toRow < 0 ? 0.35 : 0.9}
                   />
@@ -531,7 +556,7 @@ export function GraphPane() {
                 <circle
                   cx={cx(headRow >= 0 ? commits[headRow].column : 0)}
                   cy={cy(0)}
-                  r="4.5"
+                  r={isRailway ? RAILWAY_NODE_R : 4.5}
                   fill="var(--color-bg-1)"
                   stroke={laneColor(headRow >= 0 ? commits[headRow].column : 0)}
                   strokeWidth="1.8"
@@ -614,10 +639,10 @@ export function GraphPane() {
                         <circle
                           cx={x}
                           cy={y}
-                          r={c.parents.length > 1 ? 4 : 4.5}
+                          r={isRailway ? RAILWAY_NODE_R : c.parents.length > 1 ? 4 : 4.5}
                           fill={isHead ? color : "var(--color-bg-1)"}
                           stroke={color}
-                          strokeWidth={isHead ? 3 : 2}
+                          strokeWidth={isRailway ? 2 : isHead ? 3 : 2}
                         />
                       )}
                     </g>
@@ -630,6 +655,7 @@ export function GraphPane() {
       {s.graph.truncated ? (
         <div className="flex-none border-t border-line px-3 py-1 text-[11px] text-fg-faint">
           直近 {commits.length} 件を表示しています
+          {s.loadingMore ? " — 続きを読み込み中…" : ""}
         </div>
       ) : null}
     </div>

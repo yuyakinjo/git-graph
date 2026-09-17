@@ -10,8 +10,7 @@ const shortPath = (p: string) => p.replace(/^\/Users\/[^/]+/, "~");
 const DEPTHS = [1, 2, 3, 4, 5, 6];
 
 /**
- * 設定 (Cmd+,)。今のところ「プロジェクトの場所」だけを扱う。
- * ここで登録したフォルダの配下を探して、タブの「+」の一覧に出す。
+ * 設定 (Cmd+,)。グラフの見た目、プロジェクトの場所、作者アイコンを扱う。
  */
 export function Settings() {
   const s = useStore();
@@ -24,6 +23,50 @@ export function Settings() {
 
   return (
     <Modal title="設定" width={560} onClose={s.closeSettings}>
+      <section>
+        <h3 className={SECTION_H3}>コミットグラフ</h3>
+        <div className={field}>
+          <label className={fieldLabel} htmlFor="graph-style">
+            スタイル
+          </label>
+          <select
+            className={`${fieldInput} font-sans text-[12.5px]`}
+            id="graph-style"
+            value={s.graphStyle}
+            onChange={(e) =>
+              s.setGraphStyle(
+                e.target.value === "japanese-railway" ? "japanese-railway" : "default",
+              )
+            }
+          >
+            <option value="default">標準（従来のスタイル）</option>
+            <option value="japanese-railway">Japanese railway style（日本の鉄道路線図）</option>
+          </select>
+          <em className={hint}>
+            太い路線と、線幅に近い大きさの駅の◯で表示します。
+            ノードの表示は、どちらのスタイルでもアバターと◯から選べます。
+          </em>
+        </div>
+        <div className={field}>
+          <label className={fieldLabel} htmlFor="graph-node">
+            ノードの表示
+          </label>
+          <select
+            className={`${fieldInput} font-sans text-[12.5px]`}
+            id="graph-node"
+            value={s.columns.nodeAvatar ? "avatar" : "circle"}
+            onChange={(e) => {
+              if ((e.target.value === "avatar") !== s.columns.nodeAvatar) {
+                s.toggleColumn("nodeAvatar");
+              }
+            }}
+          >
+            <option value="avatar">アバター</option>
+            <option value="circle">◯</option>
+          </select>
+        </div>
+      </section>
+
       <section>
         <h3 className={SECTION_H3}>プロジェクトの場所</h3>
         <p className={dialogDesc}>

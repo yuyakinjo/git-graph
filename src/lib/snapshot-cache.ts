@@ -15,6 +15,8 @@ export interface CachedRepo {
   snapshot: RepoSnapshot;
   /** snapshot の内容ハッシュ。これが変わった時だけ再描画する。 */
   hash: string;
+  /** このリポジトリで現在読み込んでいるコミット件数 (無限スクロールで増える) */
+  graphLimit: number;
   gh: GhStatus | null;
   prs: PullRequest[];
 }

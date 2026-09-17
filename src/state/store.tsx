@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState } fro
 import { api } from "../lib/api";
 import { useInterval } from "../lib/effects";
 import {
+  GRAPH_LIMIT,
+  GRAPH_PAGE,
   LAST_KEY,
   loadAvatars,
   loadPrs,
@@ -53,6 +55,8 @@ const DEPTH_KEY = "gitgraph.scanDepth";
 const DEFAULT_DEPTH = 3;
 // グラフ一覧の列。表示順もこの並びに合わせる。
 const COLS_KEY = "gitgraph.graphColumns";
+const GRAPH_STYLE_KEY = "gitgraph.graphStyle";
+export type GraphStyle = "default" | "japanese-railway";
 
 export const GRAPH_COLUMNS = [
   { key: "graph", label: "グラフ" },
@@ -138,6 +142,9 @@ export function useStoreValue(boot: BootData | null) {
   // 作者メール → GitHub アバター URL。リポジトリをまたいで持ち越す (解決済みは使い回す)。
   const [avatars, setAvatars] = useState<AvatarMap>(boot?.avatars ?? {});
   const [busy, setBusy] = useState<string | null>(null);
+  // グラフの読み込み件数。下端に近づくたびに GRAPH_PAGE 件ずつ増やす。
+  const [graphLimit, setGraphLimit] = useState(GRAPH_LIMIT);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(false);
   // 読み込み中のリポジトリのパス。押した直後から表示に出すための「仮のタブ」でもある。
   const [opening, setOpening] = useState<string | null>(null);
@@ -155,6 +162,9 @@ export function useStoreValue(boot: BootData | null) {
   const [tabDirty, setTabDirty] = useState<Record<string, boolean>>({});
   const [autoFetch, setAutoFetch] = useState(() => localStorage.getItem(AUTOFETCH_KEY) !== "off");
   const [columns, setColumns] = useState<GraphColumns>(loadColumns);
+  const [graphStyle, setGraphStyleState] = useState<GraphStyle>(() =>
+    localStorage.getItem(GRAPH_STYLE_KEY) === "japanese-railway" ? "japanese-railway" : "default",
+  );
 
   // ---- 設定 (プロジェクト置き場) と、そこから見つけたリポジトリ ----
   const [projectRoots, setProjectRootsState] = useState<string[]>(() => loadPaths(ROOTS_KEY));
@@ -195,6 +205,10 @@ export function useStoreValue(boot: BootData | null) {
   ghRef.current = gh;
   const graphRef = useRef(graph);
   graphRef.current = graph;
+  const graphLimitRef = useRef(graphLimit);
+  graphLimitRef.current = graphLimit;
+  /** 追加読み込みの二重実行ガード (state の反映を待たずに判定する) */
+  const moreRef = useRef(false);
   const selRef = useRef(selection);
   selRef.current = selection;
   const tabsRef = useRef(tabs);
@@ -220,6 +234,7 @@ export function useStoreValue(boot: BootData | null) {
       m.set(boot.snapshot.repo.root, {
         snapshot: boot.snapshot,
         hash: snapshotHash(boot.snapshot),
+        graphLimit: GRAPH_LIMIT,
         gh: boot.gh,
         prs: boot.prs,
       });
@@ -306,17 +321,20 @@ export function useStoreValue(boot: BootData | null) {
    * state を一切触らないので、再描画は起きない。
    */
   const applySnapshot = useCallback(
-    (snap: RepoSnapshot): boolean => {
+    (snap: RepoSnapshot, limit: number): boolean => {
       const root = snap.repo.root;
       const hash = snapshotHash(snap);
       const prev = cache.get(root);
       cache.set(root, {
         snapshot: snap,
         hash,
+        graphLimit: limit,
         gh: prev?.gh ?? null,
         prs: prev?.prs ?? [],
       });
       dirRef.current = root;
+      graphLimitRef.current = limit;
+      setGraphLimit(limit);
       localStorage.setItem(LAST_KEY, root);
       if (shownRef.current === root && prev?.hash === hash) return false;
       shownRef.current = root;
@@ -376,14 +394,49 @@ export function useStoreValue(boot: BootData | null) {
     if (!same) setPrs(next);
   }, [cache]);
 
+  /**
+   * グラフの続きを読む (無限スクロール)。
+   * レーン (column) の割り当ては全件を通して決まるので、差分を足すのではなく
+   * 件数を増やして Rust 側に引き直させる。件数が少ないうちは十分速い。
+   */
+  const loadMoreGraph = useCallback(async () => {
+    const root = dirRef.current;
+    if (!root || moreRef.current || !graphRef.current?.truncated) return;
+    moreRef.current = true;
+    setLoadingMore(true);
+    const next = graphLimitRef.current + GRAPH_PAGE;
+    try {
+      const g = await api.graphLoad(root, next);
+      // 読んでいる間にタブが変わっていたら捨てる
+      if (dirRef.current !== root) return;
+      graphLimitRef.current = next;
+      setGraphLimit(next);
+      graphRef.current = g;
+      setGraph(g);
+      const entry = cache.get(root);
+      if (entry) {
+        entry.snapshot = { ...entry.snapshot, graph: g };
+        entry.hash = snapshotHash(entry.snapshot);
+        entry.graphLimit = next;
+      }
+      refreshAvatars(root, g);
+    } catch (e) {
+      toast({ kind: "error", title: "コミットを追加で読めませんでした", detail: String(e) });
+    } finally {
+      moreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [cache, refreshAvatars, toast]);
+
   const refresh = useCallback(
     async (opts: { silent?: boolean; withGh?: boolean; ifChanged?: boolean } = {}) => {
       const root = dirRef.current;
       if (!root) return;
       if (!opts.silent) setLoading(true);
       try {
-        const snap = await loadRepo(root);
-        const changed = applySnapshot(snap);
+        const limit = graphLimitRef.current;
+        const snap = await loadRepo(root, limit);
+        const changed = applySnapshot(snap, limit);
         // ifChanged (自動フェッチ) は、内容が変わっていなければ差分の引き直しもしない。
         // git 操作後の再読込では、status が同じでも作業ツリーの中身が変わっているので必ず引き直す。
         if (changed || !opts.ifChanged) {
@@ -411,9 +464,11 @@ export function useStoreValue(boot: BootData | null) {
     async (path: string) => {
       const id = ++openSeq.current;
       const cached = cache.get(path);
+      // タブを戻したときは、そのタブで読み進めていた件数のまま復元する
+      const limit = cached?.graphLimit ?? GRAPH_LIMIT;
       if (cached) {
         // キャッシュがあるタブは待たせずに描画する (この後で裏側から読み直す)
-        if (applySnapshot(cached.snapshot)) {
+        if (applySnapshot(cached.snapshot, limit)) {
           ghRef.current = cached.gh;
           setGh(cached.gh);
           setPrs(cached.prs);
@@ -426,11 +481,11 @@ export function useStoreValue(boot: BootData | null) {
         setOpening(path);
       }
       try {
-        const snap = await loadRepo(path);
+        const snap = await loadRepo(path, limit);
         // 読んでいる間に別のタブへ移っていたら捨てる
         if (openSeq.current !== id) return;
         // ハッシュが同じなら applySnapshot は何もしない = 選択も差分もそのまま
-        if (applySnapshot(snap)) {
+        if (applySnapshot(snap, limit)) {
           refreshAvatars(snap.repo.root, snap.graph);
           await select({ kind: "wip" });
         }
@@ -489,6 +544,8 @@ export function useStoreValue(boot: BootData | null) {
     setStashFiles([]);
     setFile(null);
     setDiff({ text: null, loading: false });
+    setGraphLimit(GRAPH_LIMIT);
+    graphLimitRef.current = GRAPH_LIMIT;
     dirRef.current = "";
     shownRef.current = "";
     ghRef.current = null;
@@ -633,6 +690,11 @@ export function useStoreValue(boot: BootData | null) {
     localStorage.setItem(COLS_KEY, JSON.stringify(DEFAULT_COLUMNS));
   }, []);
 
+  const setGraphStyle = useCallback((style: GraphStyle) => {
+    setGraphStyleState(style);
+    localStorage.setItem(GRAPH_STYLE_KEY, style);
+  }, []);
+
   const openSettings = useCallback(() => setSettingsOpen(true), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
@@ -662,6 +724,9 @@ export function useStoreValue(boot: BootData | null) {
     diff,
     busy,
     loading,
+    loadingMore,
+    graphLimit,
+    loadMoreGraph,
     opening,
     toasts,
     toast,
@@ -684,6 +749,8 @@ export function useStoreValue(boot: BootData | null) {
     columns,
     toggleColumn,
     resetColumns,
+    graphStyle,
+    setGraphStyle,
     projectRoots,
     setProjectRoots,
     scanDepth,

@@ -26,6 +26,8 @@ export interface GraphEdge {
   toRow: number; // -1 = 取得範囲外
   toCol: number;
   color: number;
+  /** 第二親以降 (マージの取り込み線) */
+  isMerge: boolean;
 }
 
 export interface GraphData {

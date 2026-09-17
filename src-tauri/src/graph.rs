@@ -39,6 +39,8 @@ pub struct GraphEdge {
     pub to_row: i64,
     pub to_col: usize,
     pub color: usize,
+    /// 第二親以降への線 (マージの取り込み)。子の直下でレーンを移る描き方にする。
+    pub is_merge: bool,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -203,18 +205,14 @@ pub fn load(dir: &str, limit: usize) -> Result<GraphData, String> {
             lanes[column] = None;
         }
 
-        // 第二親以降 (マージ) は右側の空きレーンに置く
+        // 第二親以降 (マージ) は空いているレーンへ左詰めで置く。
+        // 「子より右」に限ると、左が空いていても新しいレーンを足すことになり、
+        // 履歴を下るほどグラフ全体が右へ流れていく (マージの多いリポジトリで顕著)。
         for p in parents.iter().skip(1) {
             if lanes.iter().any(|l| l.as_deref() == Some(p.as_str())) {
                 continue;
             }
-            let idx = lanes
-                .iter()
-                .enumerate()
-                .skip(column + 1)
-                .find(|(_, l)| l.is_none())
-                .map(|(i, _)| i);
-            match idx {
+            match lanes.iter().position(|l| l.is_none()) {
                 Some(i) => lanes[i] = Some(p.clone()),
                 None => lanes.push(Some(p.clone())),
             }
@@ -247,6 +245,7 @@ pub fn load(dir: &str, limit: usize) -> Result<GraphData, String> {
                     to_col: *pcol,
                     // 第一親への線は自分のレーン色、マージ線は取り込み元の色
                     color: if i == 0 { c.column } else { *pcol },
+                    is_merge: i > 0,
                 }),
                 None => edges.push(GraphEdge {
                     from_row: c.row,
@@ -254,6 +253,7 @@ pub fn load(dir: &str, limit: usize) -> Result<GraphData, String> {
                     to_row: -1,
                     to_col: c.column,
                     color: c.column,
+                    is_merge: false,
                 }),
             }
         }

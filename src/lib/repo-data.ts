@@ -15,7 +15,10 @@ import type {
   WorktreeInfo,
 } from "./types";
 
-export const GRAPH_LIMIT = 800;
+/** 最初に読むコミット件数。足りない分は下端に近づいたときに追加で読む。 */
+export const GRAPH_LIMIT = 200;
+/** 追加読み込み 1 回分の件数 */
+export const GRAPH_PAGE = 200;
 export const LAST_KEY = "gitgraph.last";
 
 /** リポジトリ 1 つ分の読み取り結果。store の state はこれをそのまま反映する。 */
@@ -39,11 +42,11 @@ export interface BootData {
 /** コミット作者のメール (小文字) → GitHub アバター URL。null は解決できなかった作者。 */
 export type AvatarMap = Record<string, string | null>;
 
-export async function loadRepo(path: string): Promise<RepoSnapshot> {
+export async function loadRepo(path: string, limit = GRAPH_LIMIT): Promise<RepoSnapshot> {
   const repo = await api.repoOpen(path);
   const root = repo.root;
   const [graph, status, branches, tags, stashes, worktrees] = await Promise.all([
-    api.graphLoad(root, GRAPH_LIMIT),
+    api.graphLoad(root, limit),
     api.statusLoad(root),
     api.branchesLoad(root),
     api.tagsLoad(root),
