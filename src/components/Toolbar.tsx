@@ -106,17 +106,6 @@ export function Toolbar() {
             <Spinner /> {s.busy}
           </span>
         ) : null}
-        {s.repo ? (
-          <div className="head-info" title={s.repo.root}>
-            <Icon name={s.repo.detached ? "commit" : "branch"} size={13} />
-            <span className="head-branch">
-              {s.repo.detached ? `detached @ ${s.repo.headHash?.slice(0, 7) ?? ""}` : head?.name ?? s.repo.headBranch}
-            </span>
-            {head?.ahead ? <span className="mini-pill ahead">↑{head.ahead}</span> : null}
-            {head?.behind ? <span className="mini-pill behind">↓{head.behind}</span> : null}
-            {s.repo.isLinkedWorktree ? <span className="mini-pill">worktree</span> : null}
-          </div>
-        ) : null}
         <button
           className={`icon-btn ${s.autoFetch ? "active" : ""}`}
           title={`自動フェッチ: ${s.autoFetch ? "ON (3分間隔)" : "OFF"}`}

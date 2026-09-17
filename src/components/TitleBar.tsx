@@ -44,6 +44,14 @@ export function TitleBar() {
     void s.scanProjects();
   };
 
+  const head = s.headBranch;
+  const headLabel = s.repo?.detached
+    ? `detached @ ${s.repo.headHash?.slice(0, 7) ?? ""}`
+    : head?.name ?? s.repo?.headBranch ?? "";
+  const headTitle = [headLabel, head?.ahead ? `↑${head.ahead}` : "", head?.behind ? `↓${head.behind}` : ""]
+    .filter(Boolean)
+    .join(" ");
+
   const tabMenu = (e: React.MouseEvent, path: string) => {
     e.preventDefault();
     openMenu(e, [
@@ -81,6 +89,14 @@ export function TitleBar() {
             >
               {loading ? <Spinner size={12} /> : <Icon name="repo" size={13} />}
               <span className="rtab-name">{labels[path]}</span>
+              {/* チェックアウト中のブランチはアクティブなタブのリポジトリ名の横に出す */}
+              {active && !loading && s.repo ? (
+                <span className="rtab-branch" title={headTitle}>
+                  <Icon name={s.repo.detached ? "commit" : "branch"} size={11} />
+                  <span className="rtab-branch-name">{headLabel}</span>
+                  {s.repo.isLinkedWorktree ? <span className="mini-pill">worktree</span> : null}
+                </span>
+              ) : null}
               {s.tabDirty[path] ? <span className="rtab-dot" title="未コミットの変更あり" /> : null}
               <button
                 className="rtab-close"
