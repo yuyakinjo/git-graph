@@ -4,12 +4,33 @@ mod graph;
 mod repo;
 mod sh;
 
+use tauri::{Manager, WindowEvent};
+use tauri_plugin_window_state::{AppHandleExt, StateFlags};
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // ウィンドウのサイズ・位置を終了時に保存し、次回起動時に復元する。
+        // tauri.conf.json の width/height は初回起動時の既定値として使われる。
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            // window-state プラグインがディスクへ書くのはアプリの正常終了時だけで、
+            // `tauri dev` の Ctrl+C やウォッチャによる再起動では保存されない。
+            // ウィンドウを閉じた時とフォーカスを失った時にも書き出しておく。
+            if let Some(window) = app.get_webview_window("main") {
+                let handle = app.handle().clone();
+                window.on_window_event(move |event| {
+                    if matches!(
+                        event,
+                        WindowEvent::CloseRequested { .. } | WindowEvent::Focused(false)
+                    ) {
+                        let _ = handle.save_window_state(StateFlags::all());
+                    }
+                });
+            }
+
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
