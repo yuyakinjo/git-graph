@@ -23,8 +23,6 @@ const DETAIL_KEY = "gitgraph.detailW";
  */
 function usePaneWidth(initial: number, key: string, min: number, max: number, invert = false) {
   const [width, setWidth] = useState(() => Number(localStorage.getItem(key)) || initial);
-  const widthRef = useRef(width);
-  widthRef.current = width;
   const dragging = useRef(false);
 
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -49,9 +47,9 @@ function usePaneWidth(initial: number, key: string, min: number, max: number, in
       dragging.current = false;
       document.body.classList.remove("dragging");
       e.currentTarget.releasePointerCapture(e.pointerId);
-      localStorage.setItem(key, String(widthRef.current));
+      localStorage.setItem(key, String(width));
     },
-    [key],
+    [key, width],
   );
 
   return {

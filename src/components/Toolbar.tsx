@@ -1,7 +1,8 @@
 import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
 import { iconBtn } from "./classes";
-import { Icon, Spinner, useMenu } from "./ui";
+import { Icon, Spinner } from "./ui";
+import { useMenu } from "./ui-context";
 
 const TOOL_BASE =
   "flex h-[30px] cursor-pointer items-center gap-1.5 border-0 bg-transparent text-[12.5px] whitespace-nowrap not-disabled:hover:bg-bg-3 disabled:cursor-default disabled:opacity-40";

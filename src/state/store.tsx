@@ -1,12 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { useInterval } from "../lib/effects";
 import {
@@ -189,8 +181,14 @@ export function useStoreValue(boot: BootData | null) {
 
   const dir = repo?.root ?? "";
 
-  // 非同期処理から「今の値」を読むための参照。これらがあるおかげで
-  // 各アクションを依存ゼロの安定した関数に保てる (= 再購読が要らない)。
+  /**
+   * 非同期処理から「今の値」を読むための参照。これらがあるおかげで
+   * 各アクションを依存ゼロの安定した関数に保てる (= 再購読が要らない)。
+   * await をまたいだ後も、呼び出し時点ではなく「その時の最新」が読める。
+   *
+   * アクション内で state と同時に書き換えてよい (再描画を待たずに読めるように)。
+   * 描画中の書き換えは意図的なパターンなので react/refs は overrides で除外している。
+   */
   const dirRef = useRef(dir);
   dirRef.current = dir;
   const ghRef = useRef(gh);
@@ -701,15 +699,12 @@ export function useStoreValue(boot: BootData | null) {
 
 export type Store = ReturnType<typeof useStoreValue>;
 
-const Ctx = createContext<Store | null>(null);
-
-export function StoreProvider({ boot, children }: { boot: BootData | null; children: ReactNode }) {
-  const value = useStoreValue(boot);
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
-}
+// Provider 本体は StoreProvider.tsx。Fast Refresh を効かせるため
+// 「コンポーネントだけのファイル」と分けている (react/only-export-components)。
+export const StoreCtx = createContext<Store | null>(null);
 
 export function useStore(): Store {
-  const v = useContext(Ctx);
+  const v = useContext(StoreCtx);
   if (!v) throw new Error("StoreProvider の外で useStore が呼ばれました");
   return v;
 }

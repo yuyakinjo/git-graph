@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useStore } from "../state/store";
 import { RepoPicker } from "./RepoPicker";
 import { miniPill } from "./classes";
-import { Icon, Spinner, useMenu } from "./ui";
+import { Icon, Spinner } from "./ui";
+import { useMenu } from "./ui-context";
 
 const shortPath = (p: string) => p.replace(/^\/Users\/[^/]+/, "~");
 

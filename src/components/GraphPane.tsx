@@ -6,7 +6,8 @@ import { useActions } from "../state/actions";
 import { GRAPH_COLUMNS, useStore } from "../state/store";
 import { Avatar } from "./Avatar";
 import { ctxBackdrop, ctxIconGap, ctxItem, ctxSep, iconBtn, popMenu } from "./classes";
-import { Icon, useMenu } from "./ui";
+import { Icon } from "./ui";
+import { useMenu } from "./ui-context";
 
 /** 行と見出しで同じ幅を使うため、列のクラスは 1 か所にまとめる */
 const COL_REFS = "flex w-[190px] flex-none items-center gap-[5px] overflow-hidden pl-1.5";
@@ -240,11 +241,11 @@ export function GraphPane() {
     });
   }, []);
 
+  const headHash = s.repo?.headHash;
   const headRow = useMemo(() => {
-    if (!s.repo?.headHash) return -1;
-    const i = commits.findIndex((c) => c.hash === s.repo!.headHash);
-    return i;
-  }, [commits, s.repo?.headHash]);
+    if (!headHash) return -1;
+    return commits.findIndex((c) => c.hash === headHash);
+  }, [commits, headHash]);
 
   const matches = useMemo(() => findMatches(commits, query), [commits, query]);
 

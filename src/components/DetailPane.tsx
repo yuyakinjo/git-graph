@@ -7,7 +7,8 @@ import { useStore } from "../state/store";
 import { Avatar } from "./Avatar";
 import { DiffView } from "./DiffView";
 import { btn, fstatAdd, fstatDel, fstats, iconBtn } from "./classes";
-import { Icon, useMenu } from "./ui";
+import { Icon } from "./ui";
+import { useMenu } from "./ui-context";
 
 const DETAIL = "flex h-full min-w-0 flex-col";
 const DETAIL_HEAD = "flex-none border-b border-line px-3 py-2.5";
@@ -69,7 +70,7 @@ function FileRow({
       title={origPath ? `${origPath} → ${path}` : path}
     >
       <span
-        className={`w-[14px] flex-none text-center font-mono text-[10.5px] font-bold ${
+        className={`w-3.5 flex-none text-center font-mono text-[10.5px] font-bold ${
           FSTATUS_COLOR[status] ?? "text-fg-faint"
         }`}
       >
@@ -274,7 +275,7 @@ function WipPanel() {
 
       <div className="flex-none border-t border-line bg-bg-2 px-2.5 pt-2 pb-2.5">
         <textarea
-          className="w-full resize-y rounded-md border border-line bg-bg-1 px-[9px] py-[7px] font-[inherit] text-[12.5px] text-fg outline-none focus:border-accent"
+          className="w-full resize-y rounded-md border border-line bg-bg-1 px-2.25 py-1.75 font-[inherit] text-[12.5px] text-fg outline-none focus:border-accent"
           placeholder={
             stagedCount === 0 && changedCount > 0
               ? "コミットメッセージ (ステージ済みが無い場合はすべてステージしてコミットします)"
@@ -290,9 +291,9 @@ function WipPanel() {
           }}
         />
         <div className="mt-2 flex items-center justify-between gap-2.5">
-          <label className="flex cursor-pointer items-center gap-[7px] text-[11.5px] text-fg-dim">
+          <label className="flex cursor-pointer items-center gap-1.75 text-[11.5px] text-fg-dim">
             <input
-              className="h-[14px] w-[14px] accent-accent"
+              className="h-3.5 w-3.5 accent-accent"
               type="checkbox"
               checked={amend}
               onChange={(e) => toggleAmend(e.target.checked)}
@@ -382,7 +383,7 @@ function CommitPanel({ sha }: { sha: string }) {
       </header>
 
       {detail.body ? (
-        <pre className="m-0 max-h-[140px] flex-none overflow-auto border-b border-line px-3 py-2.5 font-[inherit] text-[12px] whitespace-pre-wrap text-fg-dim">
+        <pre className="m-0 max-h-35 flex-none overflow-auto border-b border-line px-3 py-2.5 font-[inherit] text-[12px] whitespace-pre-wrap text-fg-dim">
           {detail.body}
         </pre>
       ) : null}
@@ -397,7 +398,7 @@ function CommitPanel({ sha }: { sha: string }) {
           <em className={fstatDel}>-{totals.d}</em>
         </span>
       </div>
-      <div className="max-h-[38%] min-h-[80px] flex-auto overflow-y-auto">
+      <div className="max-h-[38%] min-h-20 flex-auto overflow-y-auto">
         {detail.files.map((f) => (
           <FileRow
             key={f.path}
@@ -465,7 +466,7 @@ function StashPanel({ refname, message }: { refname: string; message: string }) 
           </button>
         </div>
       </header>
-      <div className="max-h-[38%] min-h-[80px] flex-auto overflow-y-auto">
+      <div className="max-h-[38%] min-h-20 flex-auto overflow-y-auto">
         {files.map((f) => (
           <FileRow
             key={f.path}

@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { api } from "../lib/api";
-import { useDialogs } from "../components/ui";
+import { useDialogs } from "../components/ui-context";
 import { useStore } from "./store";
 import type { BranchInfo, PullRequest, StashInfo, WorktreeInfo } from "../lib/types";
 

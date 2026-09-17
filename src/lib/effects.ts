@@ -6,7 +6,13 @@
  */
 import { useEffect, useRef } from "react";
 
-/** 常に最新のハンドラを指す ref。購読の張り直しを避けるために使う。 */
+/**
+ * 常に最新の値を指す ref。購読の張り直しを避けるために使う。
+ *
+ * 描画中の ref 書き換えは react/refs の対象だが、購読を張り直さずに
+ * 「毎回最新のハンドラを呼ぶ」ための意図的なパターン (overrides で除外)。
+ * 読み取り側はイベントハンドラ・タイマー・非同期処理に限ること。
+ */
 function useLatest<T>(value: T) {
   const ref = useRef(value);
   ref.current = value;

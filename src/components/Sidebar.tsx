@@ -4,7 +4,8 @@ import type { BranchInfo, PullRequest } from "../lib/types";
 import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
 import { checkDot, dim, iconBtn, miniPill } from "./classes";
-import { Icon, useMenu, type MenuItem } from "./ui";
+import { Icon, type MenuItem } from "./ui";
+import { useMenu } from "./ui-context";
 
 const SIDE_HEADER =
   "group flex h-7 shrink-0 cursor-pointer items-center gap-1.5 px-2 text-[10.5px] font-bold tracking-[0.06em] text-fg-dim uppercase select-none hover:text-fg";

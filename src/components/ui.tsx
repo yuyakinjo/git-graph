@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useWindowEvent } from "../lib/effects";
+import { DialogCtx, MenuCtx, type DialogApi } from "./ui-context";
 import {
   btn,
   ctxBackdrop,
@@ -336,18 +337,6 @@ export interface ConfirmSpec {
 
 export type FormResult = Record<string, string | boolean>;
 
-interface DialogApi {
-  form: (spec: FormSpec) => Promise<FormResult | null>;
-  confirm: (spec: ConfirmSpec) => Promise<boolean>;
-}
-
-const DialogCtx = createContext<DialogApi | null>(null);
-export const useDialogs = () => {
-  const v = useContext(DialogCtx);
-  if (!v) throw new Error("DialogProvider が必要です");
-  return v;
-};
-
 function FormDialog({
   spec,
   resolve,
@@ -554,15 +543,6 @@ export interface MenuItem {
   disabled?: boolean;
   separator?: boolean;
 }
-
-const MenuCtx = createContext<
-  ((e: { clientX: number; clientY: number }, items: MenuItem[]) => void) | null
->(null);
-export const useMenu = () => {
-  const v = useContext(MenuCtx);
-  if (!v) throw new Error("MenuProvider が必要です");
-  return v;
-};
 
 export function MenuProvider({ children }: { children: ReactNode }) {
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
