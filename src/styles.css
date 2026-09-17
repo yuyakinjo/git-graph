@@ -110,6 +110,130 @@ body.dragging {
   flex-direction: column;
 }
 
+/* ---------------------------------------------------------------- titlebar (tabs) */
+
+/*
+ * titleBarStyle: Overlay なので、この帯はウィンドウ最上部に重なる。
+ * 左 98px は信号機ボタンのぶん (trafficLightPosition x:14 / 直径 14 / 間隔 20 で
+ * 右端が 78px) + ボタン 1 つ分の余白 20px。
+ *
+ * 信号機ボタンの縦位置は tauri.conf.json の trafficLightPosition.y で決まる。
+ * macOS 側はボタンを「高さ (ボタン高 14 + y)」の領域の中央に置くので、
+ * この帯の高さと揃える = y は (height - 14)。height を変えたら y も直すこと。
+ */
+.titlebar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  height: 40px;
+  padding-left: 98px;
+  background: var(--bg-0);
+  border-bottom: 1px solid var(--line);
+  user-select: none;
+}
+
+.titlebar-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.titlebar-tabs::-webkit-scrollbar {
+  height: 0;
+}
+
+/* ドラッグ可能な余白。タブが少ないときに残りの帯を掴めるようにする。 */
+.titlebar-drag {
+  flex: 1;
+  align-self: stretch;
+  min-width: 24px;
+}
+
+.rtab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 96px;
+  max-width: 190px;
+  height: 30px;
+  padding: 0 6px 0 10px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  color: var(--text-dim);
+  cursor: default;
+  font-size: 12.5px;
+}
+.rtab:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.rtab.active {
+  background: var(--bg-1);
+  border-color: var(--line);
+  color: var(--text);
+  font-weight: 600;
+}
+.rtab-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rtab-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+}
+.rtab-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+}
+.rtab:hover .rtab-close,
+.rtab.active .rtab-close {
+  opacity: 1;
+}
+.rtab-close:hover {
+  background: var(--bg-3);
+  color: var(--text);
+}
+
+.rtab-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  margin: 0 2px 2px;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.rtab-add:hover {
+  background: var(--bg-3);
+  color: var(--text);
+}
+
 /* ---------------------------------------------------------------- toolbar */
 
 .toolbar {
@@ -123,30 +247,6 @@ body.dragging {
   border-bottom: 1px solid var(--line);
 }
 
-.repo-btn {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  height: 30px;
-  padding: 0 10px;
-  max-width: 220px;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  color: var(--text);
-  cursor: pointer;
-  font-size: 13px;
-}
-.repo-btn:hover {
-  background: var(--bg-3);
-}
-.repo-name {
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .tool-group {
   display: flex;
   align-items: center;
@@ -154,6 +254,10 @@ body.dragging {
   padding-left: 6px;
   border-left: 1px solid var(--line);
   height: 30px;
+}
+.tool-group:first-child {
+  padding-left: 0;
+  border-left: 0;
 }
 
 .tool,

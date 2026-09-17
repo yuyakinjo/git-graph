@@ -48,16 +48,26 @@ export interface FileTarget {
 }
 
 const RECENT_KEY = "gitgraph.recent";
+const TABS_KEY = "gitgraph.tabs";
 const AUTOFETCH_KEY = "gitgraph.autofetch";
 const AUTOFETCH_MS = 180_000;
 
-function loadRecent(): string[] {
+function loadPaths(key: string): string[] {
   try {
-    const v = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
+    const v = JSON.parse(localStorage.getItem(key) ?? "[]");
     return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
   } catch {
     return [];
   }
+}
+
+function savePaths(key: string, paths: string[]) {
+  localStorage.setItem(key, JSON.stringify(paths));
+}
+
+function hasChanges(status: StatusData | null): boolean {
+  if (!status) return false;
+  return status.staged.length + status.unstaged.length + status.conflicts.length > 0;
 }
 
 /** 再読込後も同じファイルを選び続けるため、新しい status から対象を引き直す。 */
@@ -90,7 +100,17 @@ export function useStoreValue(boot: BootData | null) {
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [recent, setRecent] = useState<string[]>(loadRecent);
+  const [recent, setRecent] = useState<string[]>(() => loadPaths(RECENT_KEY));
+  // 開いているリポジトリのタブ。切り替えは openRepo での読み込み直し。
+  const [tabs, setTabs] = useState<string[]>(() => {
+    const saved = loadPaths(TABS_KEY);
+    const root = boot?.snapshot.repo.root;
+    const next = root && !saved.includes(root) ? [...saved, root] : saved;
+    if (next !== saved) savePaths(TABS_KEY, next);
+    return next;
+  });
+  // タブごとの「未コミット変更あり」。現在のタブ以外は最後に読んだ時点の情報。
+  const [tabDirty, setTabDirty] = useState<Record<string, boolean>>({});
   const [autoFetch, setAutoFetch] = useState(
     () => localStorage.getItem(AUTOFETCH_KEY) !== "off",
   );
@@ -119,6 +139,8 @@ export function useStoreValue(boot: BootData | null) {
   ghRef.current = gh;
   const selRef = useRef(selection);
   selRef.current = selection;
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
   const fileRef = useRef(file);
   fileRef.current = file;
 
@@ -202,6 +224,7 @@ export function useStoreValue(boot: BootData | null) {
     setStashes(snap.stashes);
     setWorktrees(snap.worktrees);
     dirRef.current = snap.repo.root;
+    setTabDirty((prev) => ({ ...prev, [snap.repo.root]: hasChanges(snap.status) }));
     localStorage.setItem(LAST_KEY, snap.repo.root);
   }, []);
 
@@ -246,9 +269,15 @@ export function useStoreValue(boot: BootData | null) {
         await select({ kind: "wip" });
         setRecent((prev) => {
           const next = [snap.repo.root, ...prev.filter((p) => p !== snap.repo.root)].slice(0, 8);
-          localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+          savePaths(RECENT_KEY, next);
           return next;
         });
+        if (!tabsRef.current.includes(snap.repo.root)) {
+          const nextTabs = [...tabsRef.current, snap.repo.root];
+          tabsRef.current = nextTabs;
+          setTabs(nextTabs);
+          savePaths(TABS_KEY, nextTabs);
+        }
         // gh CLI は遅いことがあるので待たずに走らせ、届いた時点で反映する
         api
           .ghStatus(snap.repo.root)
@@ -270,10 +299,61 @@ export function useStoreValue(boot: BootData | null) {
   const removeRecent = useCallback((path: string) => {
     setRecent((prev) => {
       const next = prev.filter((p) => p !== path);
-      localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+      savePaths(RECENT_KEY, next);
       return next;
     });
   }, []);
+
+  /** 最後のタブを閉じたときの状態。Welcome 画面に戻す。 */
+  const clearRepo = useCallback(() => {
+    setRepo(null);
+    setGraph(null);
+    setStatus(null);
+    setBranches([]);
+    setTags([]);
+    setStashes([]);
+    setWorktrees([]);
+    setGh(null);
+    setPrs([]);
+    setSelection({ kind: "wip" });
+    setCommit(null);
+    setStashFiles([]);
+    setFile(null);
+    setDiff({ text: null, loading: false });
+    dirRef.current = "";
+    ghRef.current = null;
+    selRef.current = { kind: "wip" };
+    fileRef.current = null;
+    localStorage.removeItem(LAST_KEY);
+  }, []);
+
+  /**
+   * タブを閉じる。表示中のタブが閉じられたら、残った左隣のタブを読み込み直して開く。
+   * (タブごとの状態は保持しない方針なので、切り替え = 再読み込み)
+   */
+  const closeTabs = useCallback(
+    async (paths: string[]) => {
+      const closing = new Set(paths);
+      const cur = tabsRef.current;
+      const next = cur.filter((p) => !closing.has(p));
+      if (next.length === cur.length) return;
+      tabsRef.current = next;
+      setTabs(next);
+      savePaths(TABS_KEY, next);
+      if (!closing.has(dirRef.current)) return;
+      const index = cur.indexOf(dirRef.current);
+      const neighbor =
+        cur
+          .slice(0, index)
+          .reverse()
+          .find((p) => !closing.has(p)) ?? next[0];
+      if (neighbor) await openRepo(neighbor);
+      else clearRepo();
+    },
+    [clearRepo, openRepo],
+  );
+
+  const closeTab = useCallback((path: string) => closeTabs([path]), [closeTabs]);
 
   /** git 操作の共通ラッパー: 実行 → トースト → 再読込 */
   const run = useCallback(
@@ -324,10 +404,7 @@ export function useStoreValue(boot: BootData | null) {
 
   const headBranch = useMemo(() => branches.find((b) => b.isHead) ?? null, [branches]);
 
-  const dirty = useMemo(() => {
-    if (!status) return false;
-    return status.staged.length + status.unstaged.length + status.conflicts.length > 0;
-  }, [status]);
+  const dirty = useMemo(() => hasChanges(status), [status]);
 
   return {
     repo,
@@ -354,6 +431,10 @@ export function useStoreValue(boot: BootData | null) {
     dismissToast,
     recent,
     removeRecent,
+    tabs,
+    tabDirty,
+    closeTab,
+    closeTabs,
     openRepo,
     refresh,
     refreshPrs,

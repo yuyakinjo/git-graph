@@ -8,28 +8,6 @@ export function Toolbar() {
   const openMenu = useMenu();
   const head = s.headBranch;
 
-  const repoMenu = (e: React.MouseEvent) => {
-    openMenu(e, [
-      { label: "リポジトリを開く...", icon: "folder", onClick: () => act.openFolder() },
-      ...(s.recent.length ? [{ separator: true } as const] : []),
-      ...s.recent.map((p) => ({
-        label: p.replace(/^\/Users\/[^/]+/, "~"),
-        icon: "repo",
-        onClick: () => s.openRepo(p),
-      })),
-      ...(s.repo
-        ? [
-            { separator: true } as const,
-            {
-              label: "パスをコピー",
-              icon: "copy",
-              onClick: () => navigator.clipboard.writeText(s.repo!.root).catch(() => undefined),
-            },
-          ]
-        : []),
-    ]);
-  };
-
   const pullMenu = (e: React.MouseEvent) =>
     openMenu(e, [
       { label: "プル (merge)", icon: "pull", onClick: () => act.pull(false) },
@@ -70,12 +48,6 @@ export function Toolbar() {
 
   return (
     <header className="toolbar">
-      <button className="repo-btn" onClick={repoMenu}>
-        <Icon name="repo" size={15} />
-        <span className="repo-name">{s.repo?.name ?? "リポジトリを開く"}</span>
-        <Icon name="chevronDown" size={12} />
-      </button>
-
       <div className="tool-group">
         <button className="tool" disabled={disabled} onClick={() => act.fetch()} title="git fetch --all --prune">
           <Icon name="fetch" />

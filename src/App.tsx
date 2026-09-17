@@ -3,6 +3,7 @@ import { DetailPane } from "./components/DetailPane";
 import { GraphPane } from "./components/GraphPane";
 import { PrModal } from "./components/PrModal";
 import { Sidebar } from "./components/Sidebar";
+import { TitleBar } from "./components/TitleBar";
 import { StatusBar, Toolbar } from "./components/Toolbar";
 import { Icon } from "./components/ui";
 import { api } from "./lib/api";
@@ -135,11 +136,22 @@ export default function App() {
     } else if (e.key === "s" && e.shiftKey) {
       e.preventDefault();
       act.stashPush();
+    } else if (e.key === "w") {
+      // タブがあるうちは Cmd+W をタブ閉じに使う (タブ 0 個なら通常のウィンドウ挙動)
+      if (!s.dir) return;
+      e.preventDefault();
+      s.closeTab(s.dir);
+    } else if (e.key >= "1" && e.key <= "9") {
+      const target = s.tabs[Number(e.key) - 1];
+      if (!target || target === s.dir) return;
+      e.preventDefault();
+      s.openRepo(target);
     }
   });
 
   return (
     <div className="app">
+      <TitleBar />
       <Toolbar />
       {s.repo ? (
         <div className="main">
