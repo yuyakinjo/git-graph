@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useWindowEvent } from "../lib/effects";
-import { laneColor, relativeTime } from "../lib/format";
+import { avatarColor, initials, laneColor, relativeTime } from "../lib/format";
 import type { GraphCommit, GraphEdge, RefDeco } from "../lib/types";
 import { useActions } from "../state/actions";
 import { GRAPH_COLUMNS, useStore } from "../state/store";
@@ -9,13 +9,17 @@ import { Icon, useMenu } from "./ui";
 
 const ROW_H = 30;
 const LANE_W = 16;
+// アバターを出すときはノードが太るぶんレーンも広げる
+const LANE_W_AVATAR = 26;
 const PAD_X = 14;
 const OVERSCAN = 12;
+/** アバターノードの半径 */
+const AVATAR_R = 9;
 const NO_COMMITS: GraphCommit[] = [];
 const NO_EDGES: GraphEdge[] = [];
 
 /** レーン位置 → x 座標 */
-const cx = (col: number) => PAD_X + col * LANE_W;
+const cxOf = (col: number, laneW: number) => PAD_X + col * laneW;
 const cy = (row: number) => row * ROW_H + ROW_H / 2;
 
 function edgePath(
@@ -166,6 +170,9 @@ export function GraphPane() {
   const rowOffset = hasWip ? 1 : 0;
   const totalRows = commits.length + rowOffset;
   const cols = s.columns;
+  const showNodeAvatar = cols.nodeAvatar;
+  const laneW = showNodeAvatar ? LANE_W_AVATAR : LANE_W;
+  const cx = (col: number) => cxOf(col, laneW);
   const graphW = cols.graph
     ? Math.min(Math.max(cx((s.graph?.maxColumn ?? 0) + 1) + 6, 56), 360)
     : 0;
@@ -427,6 +434,12 @@ export function GraphPane() {
               height={totalRows * ROW_H}
               style={{ height: totalRows * ROW_H }}
             >
+              {/* 単位円なので全アバターで使い回せる */}
+              <defs>
+                <clipPath id="node-avatar-clip" clipPathUnits="objectBoundingBox">
+                  <circle cx="0.5" cy="0.5" r="0.5" />
+                </clipPath>
+              </defs>
               {hasWip && headRow >= 0 ? (
                 <path
                   d={edgePath(
@@ -475,27 +488,78 @@ export function GraphPane() {
                 const isHead = c.hash === s.repo?.headHash;
                 const isSel = c.hash === selectedSha;
                 const color = laneColor(c.column);
+                const x = cx(c.column);
+                const y = cy(c.row + rowOffset);
+                const url = showNodeAvatar
+                  ? s.avatars[c.authorEmail.trim().toLowerCase()]
+                  : undefined;
                 return (
                   <g key={c.hash} opacity={matches && !matches.has(c.hash) ? 0.3 : 1}>
                     {isSel ? (
                       <circle
-                        cx={cx(c.column)}
-                        cy={cy(c.row + rowOffset)}
-                        r="8"
+                        cx={x}
+                        cy={y}
+                        r={showNodeAvatar ? AVATAR_R + 3.5 : 8}
                         fill="none"
                         stroke={color}
                         strokeWidth="1.2"
                         opacity="0.5"
                       />
                     ) : null}
-                    <circle
-                      cx={cx(c.column)}
-                      cy={cy(c.row + rowOffset)}
-                      r={c.parents.length > 1 ? 4 : 4.5}
-                      fill={isHead ? color : "var(--bg-1)"}
-                      stroke={color}
-                      strokeWidth={isHead ? 3 : 2}
-                    />
+                    {showNodeAvatar ? (
+                      <>
+                        {/* 画像が無い / 読めないときはこの地色 + イニシャルがそのまま見える */}
+                        <circle
+                          cx={x}
+                          cy={y}
+                          r={AVATAR_R}
+                          fill={avatarColor(c.authorEmail || c.authorName)}
+                        />
+                        <text className="node-avatar-text" x={x} y={y}>
+                          {initials(c.authorName)}
+                        </text>
+                        {url ? (
+                          <image
+                            href={url}
+                            x={x - AVATAR_R}
+                            y={y - AVATAR_R}
+                            width={AVATAR_R * 2}
+                            height={AVATAR_R * 2}
+                            preserveAspectRatio="xMidYMid slice"
+                            clipPath="url(#node-avatar-clip)"
+                          />
+                        ) : null}
+                        {/* レーン色の輪郭で枝の対応を保つ (マージは二重線) */}
+                        <circle
+                          cx={x}
+                          cy={y}
+                          r={AVATAR_R}
+                          fill="none"
+                          stroke={color}
+                          strokeWidth={isHead ? 2.5 : 1.8}
+                        />
+                        {c.parents.length > 1 ? (
+                          <circle
+                            cx={x}
+                            cy={y}
+                            r={AVATAR_R + 2}
+                            fill="none"
+                            stroke={color}
+                            strokeWidth="1"
+                            opacity="0.7"
+                          />
+                        ) : null}
+                      </>
+                    ) : (
+                      <circle
+                        cx={x}
+                        cy={y}
+                        r={c.parents.length > 1 ? 4 : 4.5}
+                        fill={isHead ? color : "var(--bg-1)"}
+                        stroke={color}
+                        strokeWidth={isHead ? 3 : 2}
+                      />
+                    )}
                   </g>
                 );
               })}
