@@ -1,13 +1,21 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { useWindowEvent } from "../lib/effects";
+
+/**
+ * 中に何も focus が無ければ自分に focus する ref コールバック。
+ * モジュール階層に置いて同一性を固定しているので mount 時に一度だけ走る。
+ */
+function focusIfEmpty(el: HTMLElement | null) {
+  if (el && !el.contains(document.activeElement)) el.focus({ preventScroll: true });
+}
+
+/** 最初のフィールドに focus する ref コールバック。 */
+function focusField(el: HTMLInputElement | HTMLTextAreaElement | null) {
+  if (!el) return;
+  el.focus();
+  if (el instanceof HTMLInputElement) el.select();
+}
 
 // ------------------------------------------------------------------ アイコン
 
@@ -83,19 +91,21 @@ export function Modal({
   footer?: ReactNode;
   width?: number;
 }) {
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [onClose]);
-
   return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
+    <div
+      className="modal-backdrop"
+      onMouseDown={onClose}
+      onKeyDown={(e) => {
+        if (e.key !== "Escape") return;
+        e.stopPropagation();
+        onClose();
+      }}
+    >
       <div
         className="modal"
         style={{ width }}
+        tabIndex={-1}
+        ref={focusIfEmpty}
         onMouseDown={(e) => e.stopPropagation()}
         role="dialog"
         aria-label={title}
@@ -172,13 +182,6 @@ function FormDialog({
     for (const f of spec.fields) init[f.name] = f.value ?? (f.type === "checkbox" ? false : "");
     return init;
   });
-  const firstRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
-
-  useEffect(() => {
-    firstRef.current?.focus();
-    if (firstRef.current instanceof HTMLInputElement) firstRef.current.select();
-  }, []);
-
   const missing = spec.fields.some(
     (f) => f.required && f.type !== "checkbox" && !String(values[f.name] ?? "").trim(),
   );
@@ -244,7 +247,7 @@ function FormDialog({
               {f.type === "textarea" ? (
                 <textarea
                   {...common}
-                  ref={i === 0 ? (el) => { firstRef.current = el; } : undefined}
+                  ref={i === 0 ? focusField : undefined}
                   rows={f.rows ?? 6}
                   className={f.mono ? "mono" : undefined}
                   placeholder={f.placeholder}
@@ -267,7 +270,7 @@ function FormDialog({
                 <div className="row">
                   <input
                     {...common}
-                    ref={i === 0 ? (el) => { firstRef.current = el; } : undefined}
+                    ref={i === 0 ? focusField : undefined}
                     className="mono"
                     placeholder={f.placeholder}
                     value={String(values[f.name] ?? "")}
@@ -280,7 +283,7 @@ function FormDialog({
               ) : (
                 <input
                   {...common}
-                  ref={i === 0 ? (el) => { firstRef.current = el; } : undefined}
+                  ref={i === 0 ? focusField : undefined}
                   className={f.mono ? "mono" : undefined}
                   placeholder={f.placeholder}
                   value={String(values[f.name] ?? "")}
@@ -397,19 +400,10 @@ export function MenuProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  useEffect(() => {
-    if (!menu) return;
-    const close = () => setMenu(null);
-    const key = (ev: KeyboardEvent) => ev.key === "Escape" && close();
-    window.addEventListener("mousedown", close);
-    window.addEventListener("resize", close);
-    window.addEventListener("keydown", key);
-    return () => {
-      window.removeEventListener("mousedown", close);
-      window.removeEventListener("resize", close);
-      window.removeEventListener("keydown", key);
-    };
-  }, [menu]);
+  const close = useCallback(() => setMenu(null), []);
+
+  // リサイズすると座標がずれるので閉じる (外側クリックと Escape は背面要素が処理する)
+  useWindowEvent("resize", () => setMenu((m) => (m ? null : m)));
 
   const items = menu?.items ?? [];
   const height = items.length * 28 + 12;
@@ -420,7 +414,18 @@ export function MenuProvider({ children }: { children: ReactNode }) {
     <MenuCtx.Provider value={openMenu}>
       {children}
       {menu ? (
-        <div className="ctx-menu" style={{ top, left }} onMouseDown={(e) => e.stopPropagation()}>
+        <div
+          className="ctx-backdrop"
+          tabIndex={-1}
+          ref={focusIfEmpty}
+          onMouseDown={close}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            close();
+          }}
+          onKeyDown={(e) => e.key === "Escape" && close()}
+        >
+          <div className="ctx-menu" style={{ top, left }} onMouseDown={(e) => e.stopPropagation()}>
           {items.map((it, i) =>
             it.separator ? (
               <div key={i} className="ctx-sep" />
@@ -430,7 +435,7 @@ export function MenuProvider({ children }: { children: ReactNode }) {
                 className={`ctx-item ${it.danger ? "danger" : ""}`}
                 disabled={it.disabled}
                 onClick={() => {
-                  setMenu(null);
+                  close();
                   it.onClick?.();
                 }}
               >
@@ -439,6 +444,7 @@ export function MenuProvider({ children }: { children: ReactNode }) {
               </button>
             ),
           )}
+          </div>
         </div>
       ) : null}
     </MenuCtx.Provider>

@@ -1,28 +1,12 @@
-import { useEffect, useState } from "react";
-import { api } from "../lib/api";
 import { relativeTime } from "../lib/format";
 import type { PullRequest } from "../lib/types";
 import { useActions } from "../state/actions";
-import { useStore } from "../state/store";
 import { Icon, Modal } from "./ui";
 
+/** 表示専用。詳細の取得は PR を開く側 (App) が行い、pr として渡ってくる。 */
 export function PrModal({ pr, onClose }: { pr: PullRequest; onClose: () => void }) {
-  const s = useStore();
   const act = useActions();
-  const [detail, setDetail] = useState<PullRequest | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    api
-      .prView(s.dir, pr.number)
-      .then((d) => alive && setDetail(d))
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, [pr.number, s.dir]);
-
-  const d = detail ?? pr;
+  const d = pr;
   const checks = d.statusCheckRollup ?? [];
 
   return (

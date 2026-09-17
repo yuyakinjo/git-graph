@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { absoluteTime, avatarColor, basename, dirname, initials, relativeTime } from "../lib/format";
-import type { CommitDetail, DiffFile, FileEntry } from "../lib/types";
+import type { DiffFile, FileEntry } from "../lib/types";
 import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
 import { DiffView } from "./DiffView";
@@ -56,36 +56,19 @@ function WipPanel() {
   const openMenu = useMenu();
   const [message, setMessage] = useState("");
   const [amend, setAmend] = useState(false);
-  const [sel, setSel] = useState<{ kind: "staged" | "unstaged" | "untracked"; path: string } | null>(null);
-  const [diff, setDiff] = useState<string | null>(null);
-  const [loadingDiff, setLoadingDiff] = useState(false);
+  const sel = s.file;
 
   const status = s.status;
   const stagedCount = status?.staged.length ?? 0;
   const changedCount = (status?.unstaged.length ?? 0) + (status?.conflicts.length ?? 0);
 
-  useEffect(() => {
-    if (!sel) {
-      setDiff(null);
-      return;
-    }
-    let alive = true;
-    setLoadingDiff(true);
-    api
-      .diffText(s.dir, sel.kind === "untracked" ? "untracked" : sel.kind, sel.path)
-      .then((d) => alive && setDiff(d))
-      .catch(() => alive && setDiff(""))
-      .finally(() => alive && setLoadingDiff(false));
-    return () => {
-      alive = false;
-    };
-  }, [sel, s.dir, status]);
-
-  useEffect(() => {
-    if (amend) {
-      api.lastCommitMessage(s.dir).then((m) => setMessage((cur) => cur || m)).catch(() => undefined);
-    }
-  }, [amend, s.dir]);
+  // amend を入れた瞬間に直前のメッセージを取りに行く (state を effect で追従させない)
+  const toggleAmend = async (next: boolean) => {
+    setAmend(next);
+    if (!next) return;
+    const last = await api.lastCommitMessage(s.dir).catch(() => "");
+    if (last) setMessage((cur) => cur || last);
+  };
 
   const fileMenu = (f: FileEntry, staged: boolean) => (e: React.MouseEvent) => {
     e.preventDefault();
@@ -134,8 +117,8 @@ function WipPanel() {
                 key={`c-${f.path}`}
                 path={f.path}
                 status="U"
-                selected={sel?.kind === "unstaged" && sel.path === f.path}
-                onClick={() => setSel({ kind: "unstaged", path: f.path })}
+                selected={sel?.source === "unstaged" && sel.path === f.path}
+                onClick={() => s.openFile({ source: "unstaged", path: f.path })}
                 onContextMenu={fileMenu(f, false)}
                 right={
                   <button
@@ -157,9 +140,9 @@ function WipPanel() {
                 path={f.path}
                 origPath={f.origPath}
                 status={f.untracked ? "?" : f.workStatus}
-                selected={sel?.kind !== "staged" && sel?.path === f.path}
+                selected={sel?.source !== "staged" && sel?.path === f.path}
                 onClick={() =>
-                  setSel({ kind: f.untracked ? "untracked" : "unstaged", path: f.path })
+                  s.openFile({ source: f.untracked ? "untracked" : "unstaged", path: f.path })
                 }
                 onContextMenu={fileMenu(f, false)}
                 right={
@@ -206,8 +189,8 @@ function WipPanel() {
                 path={f.path}
                 origPath={f.origPath}
                 status={f.indexStatus}
-                selected={sel?.kind === "staged" && sel.path === f.path}
-                onClick={() => setSel({ kind: "staged", path: f.path })}
+                selected={sel?.source === "staged" && sel.path === f.path}
+                onClick={() => s.openFile({ source: "staged", path: f.path })}
                 onContextMenu={fileMenu(f, true)}
                 right={
                   <button
@@ -230,7 +213,7 @@ function WipPanel() {
 
       <div className="diff-wrap">
         {sel ? <div className="diff-head mono">{sel.path}</div> : null}
-        <DiffView raw={diff} loading={loadingDiff} />
+        <DiffView raw={s.diff.text} loading={s.diff.loading} />
       </div>
 
       <div className="commit-box">
@@ -251,7 +234,7 @@ function WipPanel() {
         />
         <div className="commit-actions">
           <label className="check small">
-            <input type="checkbox" checked={amend} onChange={(e) => setAmend(e.target.checked)} />
+            <input type="checkbox" checked={amend} onChange={(e) => toggleAmend(e.target.checked)} />
             <span>直前のコミットを修正 (amend)</span>
           </label>
           <button
@@ -274,45 +257,9 @@ function CommitPanel({ sha }: { sha: string }) {
   const s = useStore();
   const act = useActions();
   const openMenu = useMenu();
-  const [detail, setDetail] = useState<CommitDetail | null>(null);
-  const [sel, setSel] = useState<string | null>(null);
-  const [diff, setDiff] = useState<string | null>(null);
-  const [loadingDiff, setLoadingDiff] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    setDetail(null);
-    setSel(null);
-    setDiff(null);
-    api
-      .commitDetail(s.dir, sha)
-      .then((d) => {
-        if (!alive) return;
-        setDetail(d);
-        if (d.files.length) setSel(d.files[0].path);
-      })
-      .catch((e) => s.toast({ kind: "error", title: "コミットを読み込めません", detail: String(e) }));
-    return () => {
-      alive = false;
-    };
-  }, [sha, s.dir]);
-
-  useEffect(() => {
-    if (!sel) {
-      setDiff(null);
-      return;
-    }
-    let alive = true;
-    setLoadingDiff(true);
-    api
-      .diffText(s.dir, "commit", sel, sha)
-      .then((d) => alive && setDiff(d))
-      .catch(() => alive && setDiff(""))
-      .finally(() => alive && setLoadingDiff(false));
-    return () => {
-      alive = false;
-    };
-  }, [sel, sha, s.dir]);
+  // 中身は選択時に store がまとめて読み込む。ここは受け取って描くだけ。
+  const detail = s.commit;
+  const sel = s.file?.source === "commit" ? s.file.path : null;
 
   const totals = useMemo(() => {
     const files = detail?.files ?? [];
@@ -390,7 +337,7 @@ function CommitPanel({ sha }: { sha: string }) {
             origPath={f.origPath}
             status={f.status}
             selected={sel === f.path}
-            onClick={() => setSel(f.path)}
+            onClick={() => s.openFile({ source: "commit", path: f.path, ref: sha })}
             onContextMenu={fileMenu(f)}
             stats={{ additions: f.additions, deletions: f.deletions }}
           />
@@ -400,7 +347,7 @@ function CommitPanel({ sha }: { sha: string }) {
 
       <div className="diff-wrap">
         {sel ? <div className="diff-head mono">{sel}</div> : null}
-        <DiffView raw={diff} loading={loadingDiff} />
+        <DiffView raw={s.diff.text} loading={s.diff.loading} />
       </div>
     </div>
   );
@@ -411,36 +358,8 @@ function CommitPanel({ sha }: { sha: string }) {
 function StashPanel({ refname, message }: { refname: string; message: string }) {
   const s = useStore();
   const act = useActions();
-  const [files, setFiles] = useState<DiffFile[]>([]);
-  const [sel, setSel] = useState<string | null>(null);
-  const [diff, setDiff] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    api
-      .stashFiles(s.dir, refname)
-      .then((f) => {
-        if (!alive) return;
-        setFiles(f);
-        setSel(f[0]?.path ?? null);
-      })
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, [refname, s.dir]);
-
-  useEffect(() => {
-    if (!sel) return;
-    let alive = true;
-    api
-      .diffText(s.dir, "stash", sel, refname)
-      .then((d) => alive && setDiff(d))
-      .catch(() => alive && setDiff(""));
-    return () => {
-      alive = false;
-    };
-  }, [sel, refname, s.dir]);
+  const files = s.stashFiles;
+  const sel = s.file?.source === "stash" ? s.file.path : null;
 
   const stash = s.stashes.find((x) => x.name === refname);
 
@@ -473,14 +392,14 @@ function StashPanel({ refname, message }: { refname: string; message: string }) 
             path={f.path}
             status={f.status}
             selected={sel === f.path}
-            onClick={() => setSel(f.path)}
+            onClick={() => s.openFile({ source: "stash", path: f.path, ref: refname })}
             stats={{ additions: f.additions, deletions: f.deletions }}
           />
         ))}
       </div>
       <div className="diff-wrap">
         {sel ? <div className="diff-head mono">{sel}</div> : null}
-        <DiffView raw={diff} />
+        <DiffView raw={s.diff.text} loading={s.diff.loading} />
       </div>
     </div>
   );
@@ -490,11 +409,15 @@ export function DetailPane() {
   const s = useStore();
   const sel = s.selection;
 
-  const content = useCallback(() => {
-    if (sel.kind === "wip") return <WipPanel />;
-    if (sel.kind === "commit") return <CommitPanel sha={sel.sha} />;
-    return <StashPanel refname={sel.refname} message={sel.message} />;
-  }, [sel]);
-
-  return <div className="pane detail-pane">{content()}</div>;
+  return (
+    <div className="pane detail-pane">
+      {sel.kind === "wip" ? (
+        <WipPanel />
+      ) : sel.kind === "commit" ? (
+        <CommitPanel sha={sel.sha} />
+      ) : (
+        <StashPanel refname={sel.refname} message={sel.message} />
+      )}
+    </div>
+  );
 }

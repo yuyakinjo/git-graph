@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { DetailPane } from "./components/DetailPane";
 import { GraphPane } from "./components/GraphPane";
 import { PrModal } from "./components/PrModal";
@@ -6,6 +6,7 @@ import { Sidebar } from "./components/Sidebar";
 import { StatusBar, Toolbar } from "./components/Toolbar";
 import { Icon } from "./components/ui";
 import { api } from "./lib/api";
+import { useWindowEvent } from "./lib/effects";
 import type { PullRequest } from "./lib/types";
 import { useActions } from "./state/actions";
 import { useStore } from "./state/store";
@@ -13,39 +14,47 @@ import { useStore } from "./state/store";
 const SIDEBAR_KEY = "gitgraph.sidebarW";
 const DETAIL_KEY = "gitgraph.detailW";
 
-function useDrag(initial: number, key: string, min: number, max: number, invert = false) {
-  const [w, setW] = useState(() => Number(localStorage.getItem(key)) || initial);
+/**
+ * スプリッタの幅。ポインタキャプチャを使うので window 購読は不要で、
+ * ドラッグ中のイベントはすべてスプリッタ要素自身に届く。
+ */
+function usePaneWidth(initial: number, key: string, min: number, max: number, invert = false) {
+  const [width, setWidth] = useState(() => Number(localStorage.getItem(key)) || initial);
+  const widthRef = useRef(width);
+  widthRef.current = width;
   const dragging = useRef(false);
 
-  const onMouseDown = useCallback(() => {
+  const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
     dragging.current = true;
     document.body.classList.add("dragging");
   }, []);
 
-  useEffect(() => {
-    const move = (e: MouseEvent) => {
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
       if (!dragging.current) return;
       const next = invert ? window.innerWidth - e.clientX : e.clientX;
-      setW(Math.min(max, Math.max(min, next)));
-    };
-    const up = () => {
+      setWidth(Math.min(max, Math.max(min, next)));
+    },
+    [invert, max, min],
+  );
+
+  const onPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
       if (!dragging.current) return;
       dragging.current = false;
       document.body.classList.remove("dragging");
-      setW((cur) => {
-        localStorage.setItem(key, String(cur));
-        return cur;
-      });
-    };
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
-    return () => {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", up);
-    };
-  }, [invert, key, max, min]);
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      localStorage.setItem(key, String(widthRef.current));
+    },
+    [key],
+  );
 
-  return { w, onMouseDown };
+  return {
+    width,
+    handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp },
+  };
 }
 
 function Welcome() {
@@ -102,60 +111,45 @@ export default function App() {
   const s = useStore();
   const act = useActions();
   const [pr, setPr] = useState<PullRequest | null>(null);
-  const sidebar = useDrag(248, SIDEBAR_KEY, 180, 420);
-  const detail = useDrag(520, DETAIL_KEY, 340, 900, true);
+  const sidebar = usePaneWidth(248, SIDEBAR_KEY, 180, 420);
+  const detail = usePaneWidth(520, DETAIL_KEY, 340, 900, true);
 
-  // 起動時: 前回開いていたリポジトリ、無ければ引数/カレントディレクトリを開く
-  const booted = useRef(false);
-  useEffect(() => {
-    if (booted.current) return;
-    booted.current = true;
-    (async () => {
-      const last = localStorage.getItem("gitgraph.last");
-      if (last) {
-        await s.openRepo(last);
-        return;
-      }
-      const initial = await api.initialRepo().catch(() => null);
-      if (initial) await s.openRepo(initial);
-    })();
-  }, [s]);
+  // 一覧の情報ですぐ開き、詳細が届いたら差し替える (取得はクリック起点)
+  const openPr = useCallback(
+    async (target: PullRequest) => {
+      setPr(target);
+      const full = await api.prView(s.dir, target.number).catch(() => null);
+      if (full) setPr((cur) => (cur?.number === target.number ? full : cur));
+    },
+    [s.dir],
+  );
 
-  useEffect(() => {
-    if (s.repo) localStorage.setItem("gitgraph.last", s.repo.root);
-  }, [s.repo]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const mod = e.metaKey || e.ctrlKey;
-      if (!mod) return;
-      if (e.key === "o") {
-        e.preventDefault();
-        act.openFolder();
-      } else if (e.key === "r") {
-        e.preventDefault();
-        s.refresh({ withGh: true });
-      } else if (e.key === "s" && e.shiftKey) {
-        e.preventDefault();
-        act.stashPush();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [act, s]);
+  useWindowEvent("keydown", (e) => {
+    if (!(e.metaKey || e.ctrlKey)) return;
+    if (e.key === "o") {
+      e.preventDefault();
+      act.openFolder();
+    } else if (e.key === "r") {
+      e.preventDefault();
+      s.refresh({ withGh: true });
+    } else if (e.key === "s" && e.shiftKey) {
+      e.preventDefault();
+      act.stashPush();
+    }
+  });
 
   return (
     <div className="app">
       <Toolbar />
       {s.repo ? (
         <div className="main">
-          <div style={{ width: sidebar.w, flex: "0 0 auto", minWidth: 0 }}>
-            <Sidebar onOpenPr={setPr} />
+          <div style={{ width: sidebar.width, flex: "0 0 auto", minWidth: 0 }}>
+            <Sidebar onOpenPr={openPr} />
           </div>
-          <div className="splitter" onMouseDown={sidebar.onMouseDown} />
+          <div className="splitter" {...sidebar.handlers} />
           <GraphPane />
-          <div className="splitter" onMouseDown={detail.onMouseDown} />
-          <div style={{ width: detail.w, flex: "0 0 auto", minWidth: 0, display: "flex" }}>
+          <div className="splitter" {...detail.handlers} />
+          <div style={{ width: detail.width, flex: "0 0 auto", minWidth: 0, display: "flex" }}>
             <DetailPane />
           </div>
         </div>

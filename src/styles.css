@@ -1478,3 +1478,11 @@ body.dragging {
   font-size: 11px;
   color: var(--text-dim);
 }
+
+/* コンテキストメニューの外側クリック / Escape を受ける透明レイヤー */
+.ctx-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  outline: none;
+}

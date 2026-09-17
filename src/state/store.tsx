@@ -2,15 +2,24 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 import { api } from "../lib/api";
+import { useInterval } from "../lib/effects";
+import {
+  LAST_KEY,
+  loadPrs,
+  loadRepo,
+  type BootData,
+  type RepoSnapshot,
+} from "../lib/repo-data";
 import type {
   BranchInfo,
+  CommitDetail,
+  DiffFile,
   GhStatus,
   GraphData,
   PullRequest,
@@ -29,9 +38,18 @@ export interface Toast {
   detail?: string;
 }
 
+/** 差分を取得するための対象。選択操作と同時に確定させる。 */
+export type DiffSource = "staged" | "unstaged" | "untracked" | "commit" | "stash";
+export interface FileTarget {
+  source: DiffSource;
+  path: string;
+  /** commit なら SHA、stash なら refname */
+  ref?: string;
+}
+
 const RECENT_KEY = "gitgraph.recent";
 const AUTOFETCH_KEY = "gitgraph.autofetch";
-const LIMIT = 800;
+const AUTOFETCH_MS = 180_000;
 
 function loadRecent(): string[] {
   try {
@@ -42,17 +60,33 @@ function loadRecent(): string[] {
   }
 }
 
-export function useStoreValue() {
-  const [repo, setRepo] = useState<RepoInfo | null>(null);
-  const [graph, setGraph] = useState<GraphData | null>(null);
-  const [status, setStatus] = useState<StatusData | null>(null);
-  const [branches, setBranches] = useState<BranchInfo[]>([]);
-  const [tags, setTags] = useState<TagInfo[]>([]);
-  const [stashes, setStashes] = useState<StashInfo[]>([]);
-  const [worktrees, setWorktrees] = useState<WorktreeInfo[]>([]);
-  const [gh, setGh] = useState<GhStatus | null>(null);
-  const [prs, setPrs] = useState<PullRequest[]>([]);
-  const [selection, setSelection] = useState<Selection>({ kind: "wip" });
+/** 再読込後も同じファイルを選び続けるため、新しい status から対象を引き直す。 */
+function resolveWipTarget(
+  status: StatusData | null,
+  path: string,
+  prefer: DiffSource,
+): FileTarget | null {
+  if (!status) return null;
+  const staged = status.staged.some((f) => f.path === path);
+  const work =
+    status.unstaged.find((f) => f.path === path) ?? status.conflicts.find((f) => f.path === path);
+  const workTarget: FileTarget | null = work
+    ? { source: work.untracked ? "untracked" : "unstaged", path }
+    : null;
+  if (prefer === "staged") return staged ? { source: "staged", path } : workTarget;
+  return workTarget ?? (staged ? { source: "staged", path } : null);
+}
+
+export function useStoreValue(boot: BootData | null) {
+  const [repo, setRepo] = useState<RepoInfo | null>(boot?.snapshot.repo ?? null);
+  const [graph, setGraph] = useState<GraphData | null>(boot?.snapshot.graph ?? null);
+  const [status, setStatus] = useState<StatusData | null>(boot?.snapshot.status ?? null);
+  const [branches, setBranches] = useState<BranchInfo[]>(boot?.snapshot.branches ?? []);
+  const [tags, setTags] = useState<TagInfo[]>(boot?.snapshot.tags ?? []);
+  const [stashes, setStashes] = useState<StashInfo[]>(boot?.snapshot.stashes ?? []);
+  const [worktrees, setWorktrees] = useState<WorktreeInfo[]>(boot?.snapshot.worktrees ?? []);
+  const [gh, setGh] = useState<GhStatus | null>(boot?.gh ?? null);
+  const [prs, setPrs] = useState<PullRequest[]>(boot?.prs ?? []);
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -60,9 +94,33 @@ export function useStoreValue() {
   const [autoFetch, setAutoFetch] = useState(
     () => localStorage.getItem(AUTOFETCH_KEY) !== "off",
   );
+
+  // ---- 選択 (どこを見ているか) と、その中身 ----
+  const [selection, setSelection] = useState<Selection>({ kind: "wip" });
+  const [commit, setCommit] = useState<CommitDetail | null>(null);
+  const [stashFiles, setStashFiles] = useState<DiffFile[]>([]);
+  const [file, setFile] = useState<FileTarget | null>(null);
+  const [diff, setDiff] = useState<{ text: string | null; loading: boolean }>({
+    text: null,
+    loading: false,
+  });
+
   const toastSeq = useRef(0);
+  const detailSeq = useRef(0);
+  const diffSeq = useRef(0);
 
   const dir = repo?.root ?? "";
+
+  // 非同期処理から「今の値」を読むための参照。これらがあるおかげで
+  // 各アクションを依存ゼロの安定した関数に保てる (= 再購読が要らない)。
+  const dirRef = useRef(dir);
+  dirRef.current = dir;
+  const ghRef = useRef(gh);
+  ghRef.current = gh;
+  const selRef = useRef(selection);
+  selRef.current = selection;
+  const fileRef = useRef(file);
+  fileRef.current = file;
 
   const toast = useCallback((t: Omit<Toast, "id">) => {
     const id = ++toastSeq.current;
@@ -75,95 +133,129 @@ export function useStoreValue() {
     setToasts((prev) => prev.filter((x) => x.id !== id));
   }, []);
 
-  const refreshGraph = useCallback(async (root: string) => {
-    const g = await api.graphLoad(root, LIMIT);
-    setGraph(g);
-  }, []);
-
-  const refreshStatus = useCallback(async (root: string) => {
-    setStatus(await api.statusLoad(root));
-  }, []);
-
-  const refreshPrs = useCallback(async (root: string, ghState: GhStatus | null) => {
-    if (!ghState?.authenticated || !ghState.repo) {
-      setPrs([]);
+  /** 差分を取得して表示する。古いレスポンスは連番で破棄する。 */
+  const openFile = useCallback(async (target: FileTarget | null) => {
+    setFile(target);
+    fileRef.current = target;
+    const id = ++diffSeq.current;
+    if (!target) {
+      setDiff({ text: null, loading: false });
       return;
     }
+    setDiff((d) => ({ text: d.text, loading: true }));
     try {
-      setPrs(await api.prList(root, "open", 30));
+      const text = await api.diffText(dirRef.current, target.source, target.path, target.ref);
+      if (diffSeq.current === id) setDiff({ text, loading: false });
     } catch {
-      setPrs([]);
+      if (diffSeq.current === id) setDiff({ text: "", loading: false });
     }
+  }, []);
+
+  /** 選択を変える唯一の入口。選択と同時にその中身も取りに行く。 */
+  const select = useCallback(
+    async (next: Selection) => {
+      setSelection(next);
+      selRef.current = next;
+      const id = ++detailSeq.current;
+      setCommit(null);
+      setStashFiles([]);
+      await openFile(null);
+
+      if (next.kind === "wip") return;
+
+      if (next.kind === "commit") {
+        try {
+          const d = await api.commitDetail(dirRef.current, next.sha);
+          if (detailSeq.current !== id) return;
+          setCommit(d);
+          await openFile(
+            d.files.length ? { source: "commit", path: d.files[0].path, ref: next.sha } : null,
+          );
+        } catch (e) {
+          if (detailSeq.current === id) {
+            toast({ kind: "error", title: "コミットを読み込めません", detail: String(e) });
+          }
+        }
+        return;
+      }
+
+      try {
+        const files = await api.stashFiles(dirRef.current, next.refname);
+        if (detailSeq.current !== id) return;
+        setStashFiles(files);
+        await openFile(
+          files.length ? { source: "stash", path: files[0].path, ref: next.refname } : null,
+        );
+      } catch {
+        /* stash が消えている場合などは空表示のままでよい */
+      }
+    },
+    [openFile, toast],
+  );
+
+  const applySnapshot = useCallback((snap: RepoSnapshot) => {
+    setRepo(snap.repo);
+    setGraph(snap.graph);
+    setStatus(snap.status);
+    setBranches(snap.branches);
+    setTags(snap.tags);
+    setStashes(snap.stashes);
+    setWorktrees(snap.worktrees);
+    dirRef.current = snap.repo.root;
+    localStorage.setItem(LAST_KEY, snap.repo.root);
+  }, []);
+
+  const refreshPrs = useCallback(async () => {
+    setPrs(await loadPrs(dirRef.current, ghRef.current));
   }, []);
 
   const refresh = useCallback(
     async (opts: { silent?: boolean; withGh?: boolean } = {}) => {
-      if (!dir) return;
+      const root = dirRef.current;
+      if (!root) return;
       if (!opts.silent) setLoading(true);
       try {
-        const [info, g, st, br, tg, sl, wt] = await Promise.all([
-          api.repoOpen(dir),
-          api.graphLoad(dir, LIMIT),
-          api.statusLoad(dir),
-          api.branchesLoad(dir),
-          api.tagsLoad(dir),
-          api.stashLoad(dir),
-          api.worktreeLoad(dir),
-        ]);
-        setRepo(info);
-        setGraph(g);
-        setStatus(st);
-        setBranches(br);
-        setTags(tg);
-        setStashes(sl);
-        setWorktrees(wt);
-        if (opts.withGh) {
-          const ghState = await api.ghStatus(dir);
-          setGh(ghState);
-          await refreshPrs(dir, ghState);
-        } else {
-          await refreshPrs(dir, gh);
+        const snap = await loadRepo(root);
+        applySnapshot(snap);
+        // WIP を見ている間は status の変化で差分も変わるので選択ファイルを引き直す
+        if (selRef.current.kind === "wip") {
+          const cur = fileRef.current;
+          await openFile(cur ? resolveWipTarget(snap.status, cur.path, cur.source) : null);
         }
+        if (opts.withGh) {
+          const ghState = await api.ghStatus(root).catch(() => null);
+          setGh(ghState);
+          ghRef.current = ghState;
+        }
+        await refreshPrs();
       } catch (e) {
         toast({ kind: "error", title: "リポジトリの読み込みに失敗しました", detail: String(e) });
       } finally {
         if (!opts.silent) setLoading(false);
       }
     },
-    [dir, gh, refreshPrs, toast],
+    [applySnapshot, openFile, refreshPrs, toast],
   );
 
   const openRepo = useCallback(
     async (path: string) => {
       setLoading(true);
       try {
-        const info = await api.repoOpen(path);
-        setRepo(info);
-        setSelection({ kind: "wip" });
-        const [g, st, br, tg, sl, wt] = await Promise.all([
-          api.graphLoad(info.root, LIMIT),
-          api.statusLoad(info.root),
-          api.branchesLoad(info.root),
-          api.tagsLoad(info.root),
-          api.stashLoad(info.root),
-          api.worktreeLoad(info.root),
-        ]);
-        setGraph(g);
-        setStatus(st);
-        setBranches(br);
-        setTags(tg);
-        setStashes(sl);
-        setWorktrees(wt);
+        const snap = await loadRepo(path);
+        applySnapshot(snap);
+        await select({ kind: "wip" });
         setRecent((prev) => {
-          const next = [info.root, ...prev.filter((p) => p !== info.root)].slice(0, 8);
+          const next = [snap.repo.root, ...prev.filter((p) => p !== snap.repo.root)].slice(0, 8);
           localStorage.setItem(RECENT_KEY, JSON.stringify(next));
           return next;
         });
+        // gh CLI は遅いことがあるので待たずに走らせ、届いた時点で反映する
         api
-          .ghStatus(info.root)
+          .ghStatus(snap.repo.root)
           .then((ghState) => {
             setGh(ghState);
-            return refreshPrs(info.root, ghState);
+            ghRef.current = ghState;
+            return refreshPrs();
           })
           .catch(() => undefined);
       } catch (e) {
@@ -172,7 +264,7 @@ export function useStoreValue() {
         setLoading(false);
       }
     },
-    [refreshPrs, toast],
+    [applySnapshot, refreshPrs, select, toast],
   );
 
   const removeRecent = useCallback((path: string) => {
@@ -219,24 +311,18 @@ export function useStoreValue() {
     });
   }, []);
 
-  // 自動フェッチ (3分間隔・サイレント)
-  useEffect(() => {
-    if (!dir || !autoFetch) return;
-    const timer = window.setInterval(async () => {
-      try {
-        await api.fetch(dir, true);
-        await refresh({ silent: true });
-      } catch {
-        /* オフライン時などは黙って無視 */
-      }
-    }, 180_000);
-    return () => window.clearInterval(timer);
-  }, [dir, autoFetch, refresh]);
-
-  const headBranch = useMemo(
-    () => branches.find((b) => b.isHead) ?? null,
-    [branches],
+  // 自動フェッチ (3分間隔・サイレント)。外部タイマーの購読なので効果として扱う。
+  useInterval(
+    () => {
+      api
+        .fetch(dirRef.current, true)
+        .then(() => refresh({ silent: true }))
+        .catch(() => undefined); // オフライン時などは黙って無視
+    },
+    dir && autoFetch ? AUTOFETCH_MS : null,
   );
+
+  const headBranch = useMemo(() => branches.find((b) => b.isHead) ?? null, [branches]);
 
   const dirty = useMemo(() => {
     if (!status) return false;
@@ -255,7 +341,12 @@ export function useStoreValue() {
     gh,
     prs,
     selection,
-    setSelection,
+    select,
+    commit,
+    stashFiles,
+    file,
+    openFile,
+    diff,
     busy,
     loading,
     toasts,
@@ -265,9 +356,7 @@ export function useStoreValue() {
     removeRecent,
     openRepo,
     refresh,
-    refreshGraph,
-    refreshStatus,
-    refreshPrs: () => refreshPrs(dir, gh),
+    refreshPrs,
     setGh,
     run,
     headBranch,
@@ -281,8 +370,14 @@ export type Store = ReturnType<typeof useStoreValue>;
 
 const Ctx = createContext<Store | null>(null);
 
-export function StoreProvider({ children }: { children: ReactNode }) {
-  const value = useStoreValue();
+export function StoreProvider({
+  boot,
+  children,
+}: {
+  boot: BootData | null;
+  children: ReactNode;
+}) {
+  const value = useStoreValue(boot);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

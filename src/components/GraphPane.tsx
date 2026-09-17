@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useWindowEvent } from "../lib/effects";
 import { avatarColor, initials, laneColor, relativeTime } from "../lib/format";
 import type { GraphCommit, GraphEdge, RefDeco } from "../lib/types";
 import { useActions } from "../state/actions";
@@ -32,6 +33,24 @@ function edgePath(
   // 枝が閉じる: 自レーンを下り、親の直前で左へ合流
   const ys = y2 - r;
   return `M ${x1} ${y1} L ${x1} ${ys} C ${x1} ${ys + r * 0.55}, ${x2} ${y2 - r * 0.55}, ${x2} ${y2}`;
+}
+
+/** 検索にヒットするコミットの集合。クエリが空なら null (絞り込みなし)。 */
+function findMatches(commits: GraphCommit[], query: string): Set<string> | null {
+  const q = query.trim().toLowerCase();
+  if (!q) return null;
+  const set = new Set<string>();
+  for (const c of commits) {
+    if (
+      c.subject.toLowerCase().includes(q) ||
+      c.authorName.toLowerCase().includes(q) ||
+      c.hash.startsWith(q) ||
+      c.refs.some((r) => r.name.toLowerCase().includes(q))
+    ) {
+      set.add(c.hash);
+    }
+  }
+  return set;
 }
 
 function RefBadge({
@@ -85,13 +104,29 @@ export function GraphPane() {
     360,
   );
 
-  useLayoutEffect(() => {
-    const el = scrollRef.current;
+  // ref コールバックで購読し、クリーンアップも同じ場所で返す (useEffect 不要)
+  const attachScroll = useCallback((el: HTMLDivElement | null) => {
+    scrollRef.current = el;
     if (!el) return;
+    setViewH(el.clientHeight);
     const ro = new ResizeObserver(() => setViewH(el.clientHeight));
     ro.observe(el);
-    setViewH(el.clientHeight);
-    return () => ro.disconnect();
+    return () => {
+      ro.disconnect();
+      scrollRef.current = null;
+    };
+  }, []);
+
+  /** 指定行が画面外なら見える位置までスクロールする。 */
+  const revealRow = useCallback((row: number, smooth = false) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const y = row * ROW_H;
+    if (y >= el.scrollTop && y <= el.scrollTop + el.clientHeight - ROW_H * 2) return;
+    el.scrollTo({
+      top: Math.max(0, y - el.clientHeight / (smooth ? 3 : 2)),
+      behavior: smooth ? "smooth" : "auto",
+    });
   }, []);
 
   const headRow = useMemo(() => {
@@ -100,35 +135,16 @@ export function GraphPane() {
     return i;
   }, [commits, s.repo?.headHash]);
 
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return null;
-    const set = new Set<string>();
-    for (const c of commits) {
-      if (
-        c.subject.toLowerCase().includes(q) ||
-        c.authorName.toLowerCase().includes(q) ||
-        c.hash.startsWith(q) ||
-        c.refs.some((r) => r.name.toLowerCase().includes(q))
-      ) {
-        set.add(c.hash);
-      }
-    }
-    return set;
-  }, [commits, query]);
+  const matches = useMemo(() => findMatches(commits, query), [commits, query]);
 
-  // 検索したら最初のヒットへスクロール
-  useEffect(() => {
-    if (!matches || matches.size === 0) return;
-    const idx = commits.findIndex((c) => matches.has(c.hash));
-    if (idx >= 0 && scrollRef.current) {
-      const y = (idx + rowOffset) * ROW_H;
-      const el = scrollRef.current;
-      if (y < el.scrollTop || y > el.scrollTop + el.clientHeight - ROW_H) {
-        el.scrollTo({ top: Math.max(0, y - el.clientHeight / 3), behavior: "smooth" });
-      }
-    }
-  }, [matches, commits, rowOffset]);
+  // 入力イベントを起点に「絞り込み + 最初のヒットへスクロール」をまとめて行う
+  const onQueryChange = (next: string) => {
+    setQuery(next);
+    const hits = findMatches(commits, next);
+    if (!hits?.size) return;
+    const idx = commits.findIndex((c) => hits.has(c.hash));
+    if (idx >= 0) revealRow(idx + rowOffset, true);
+  };
 
   const start = Math.max(0, Math.floor(scrollTop / ROW_H) - OVERSCAN);
   const end = Math.min(totalRows, Math.ceil((scrollTop + viewH) / ROW_H) + OVERSCAN);
@@ -202,32 +218,19 @@ export function GraphPane() {
   };
 
   // キーボードで選択移動
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "j" && e.key !== "k") return;
-      const down = e.key === "ArrowDown" || e.key === "j";
-      e.preventDefault();
-      const sel = s.selection;
-      const cur =
-        sel.kind === "commit" ? commits.findIndex((c) => c.hash === sel.sha) : -1;
-      let next = cur + (down ? 1 : -1);
-      if (!hasWip && next < 0) next = 0;
-      if (next >= commits.length) next = commits.length - 1;
-      if (next < 0) {
-        s.setSelection({ kind: "wip" });
-      } else {
-        s.setSelection({ kind: "commit", sha: commits[next].hash });
-      }
-      const y = (Math.max(next, 0) + rowOffset) * ROW_H;
-      const el = scrollRef.current;
-      if (el && (y < el.scrollTop || y > el.scrollTop + el.clientHeight - ROW_H * 2)) {
-        el.scrollTo({ top: Math.max(0, y - el.clientHeight / 2) });
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [commits, hasWip, rowOffset, s]);
+  useWindowEvent("keydown", (e) => {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "j" && e.key !== "k") return;
+    const down = e.key === "ArrowDown" || e.key === "j";
+    e.preventDefault();
+    const sel = s.selection;
+    const cur = sel.kind === "commit" ? commits.findIndex((c) => c.hash === sel.sha) : -1;
+    let next = cur + (down ? 1 : -1);
+    if (!hasWip && next < 0) next = 0;
+    if (next >= commits.length) next = commits.length - 1;
+    s.select(next < 0 ? { kind: "wip" } : { kind: "commit", sha: commits[next].hash });
+    revealRow(Math.max(next, 0) + rowOffset);
+  });
 
   if (!s.graph) return <div className="pane graph-pane empty" />;
 
@@ -243,7 +246,7 @@ export function GraphPane() {
           key="wip"
           className={`grow wip ${s.selection.kind === "wip" ? "selected" : ""}`}
           style={{ top: 0 }}
-          onClick={() => s.setSelection({ kind: "wip" })}
+          onClick={() => s.select({ kind: "wip" })}
         >
           <div className="col-msg" style={{ marginLeft: graphW }}>
             <span className="wip-label">未コミットの変更</span>
@@ -266,11 +269,11 @@ export function GraphPane() {
           headRow === c.row ? "is-head-row" : ""
         }`}
         style={{ top: r * ROW_H }}
-        onClick={() => s.setSelection({ kind: "commit", sha: c.hash })}
+        onClick={() => s.select({ kind: "commit", sha: c.hash })}
         onDoubleClick={() => act.checkout(c.hash, c.short)}
         onContextMenu={(e) => {
           e.preventDefault();
-          s.setSelection({ kind: "commit", sha: c.hash });
+          s.select({ kind: "commit", sha: c.hash });
           commitMenu(c)(e);
         }}
       >
@@ -311,7 +314,7 @@ export function GraphPane() {
           <input
             placeholder="コミット・作者・SHA を検索"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => onQueryChange(e.target.value)}
           />
           {query ? (
             <button className="icon-btn tiny" onClick={() => setQuery("")} title="クリア">
@@ -327,7 +330,7 @@ export function GraphPane() {
       </div>
       <div
         className="graph-scroll"
-        ref={scrollRef}
+        ref={attachScroll}
         onScroll={(e) => setScrollTop((e.target as HTMLDivElement).scrollTop)}
       >
         <div className="graph-canvas" style={{ height: totalRows * ROW_H }}>

@@ -106,7 +106,7 @@ function BranchItem({ b }: { b: BranchInfo }) {
     <div
       className={`side-item ${b.isHead ? "current" : ""}`}
       title={`${b.name}${b.upstream ? ` → ${b.upstream}` : ""}\n${b.subject}`}
-      onClick={() => s.setSelection({ kind: "commit", sha: b.hash })}
+      onClick={() => s.select({ kind: "commit", sha: b.hash })}
       onDoubleClick={() => (b.kind === "remote" ? act.checkoutRemote(b.name) : act.checkout(b.name))}
       onContextMenu={menu}
     >
@@ -261,7 +261,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
                 s.selection.kind === "stash" && s.selection.refname === st.name ? "current" : ""
               }`}
               title={`${st.name}\n${st.message}`}
-              onClick={() => s.setSelection({ kind: "stash", refname: st.name, message: st.message })}
+              onClick={() => s.select({ kind: "stash", refname: st.name, message: st.message })}
               onDoubleClick={() => act.stashApply(st, false)}
               onContextMenu={(e) => {
                 e.preventDefault();
@@ -350,7 +350,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
             key={t.name}
             className="side-item"
             title={t.name}
-            onClick={() => s.setSelection({ kind: "commit", sha: t.hash })}
+            onClick={() => s.select({ kind: "commit", sha: t.hash })}
             onDoubleClick={() => act.checkout(t.name)}
           >
             <span className="side-icon">
