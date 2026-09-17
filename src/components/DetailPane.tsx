@@ -3,10 +3,11 @@ import { api } from "../lib/api";
 import { absoluteTime, basename, dirname, relativeTime } from "../lib/format";
 import type { DiffFile, FileEntry } from "../lib/types";
 import { useActions } from "../state/actions";
+import type { FileTarget } from "../state/store";
 import { useStore } from "../state/store";
 import { Avatar } from "./Avatar";
 import { DiffView } from "./DiffView";
-import { btn, fstatAdd, fstatDel, fstats, iconBtn } from "./classes";
+import { FSTATUS_COLOR, btn, fstatAdd, fstatDel, fstats, iconBtn } from "./classes";
 import { Icon } from "./ui";
 import { useMenu } from "./ui-context";
 
@@ -31,16 +32,6 @@ const DIFF_HEAD =
 const FILE_ROW_BASE = "group flex h-6 cursor-default items-center gap-[7px] px-2.5 text-[12px]";
 const FILE_ROW_SELECTED = `${FILE_ROW_BASE} bg-accent-soft shadow-[inset_2px_0_0_var(--color-accent)]`;
 const FILE_ROW_PLAIN = `${FILE_ROW_BASE} hover:bg-bg-hover`;
-
-const FSTATUS_COLOR: Record<string, string> = {
-  A: "text-green",
-  M: "text-accent",
-  T: "text-accent",
-  D: "text-red",
-  R: "text-violet",
-  C: "text-violet",
-  U: "text-amber",
-};
 
 function FileRow({
   path,
@@ -102,6 +93,12 @@ function WipPanel() {
   const [message, setMessage] = useState("");
   const [amend, setAmend] = useState(false);
   const sel = s.file;
+
+  /** ファイル行のクリックは差分ダイアログを開く (下の差分ペインも同じ対象を出す) */
+  const open = (target: FileTarget) => {
+    void s.openFile(target);
+    s.setDiffModal(true);
+  };
 
   const status = s.status;
   const stagedCount = status?.staged.length ?? 0;
@@ -169,7 +166,7 @@ function WipPanel() {
                 path={f.path}
                 status="U"
                 selected={sel?.source === "unstaged" && sel.path === f.path}
-                onClick={() => s.openFile({ source: "unstaged", path: f.path })}
+                onClick={() => open({ source: "unstaged", path: f.path })}
                 onContextMenu={fileMenu(f, false)}
                 right={
                   <button
@@ -193,7 +190,7 @@ function WipPanel() {
                 status={f.untracked ? "?" : f.workStatus}
                 selected={sel?.source !== "staged" && sel?.path === f.path}
                 onClick={() =>
-                  s.openFile({ source: f.untracked ? "untracked" : "unstaged", path: f.path })
+                  open({ source: f.untracked ? "untracked" : "unstaged", path: f.path })
                 }
                 onContextMenu={fileMenu(f, false)}
                 right={
@@ -245,7 +242,7 @@ function WipPanel() {
                 origPath={f.origPath}
                 status={f.indexStatus}
                 selected={sel?.source === "staged" && sel.path === f.path}
-                onClick={() => s.openFile({ source: "staged", path: f.path })}
+                onClick={() => open({ source: "staged", path: f.path })}
                 onContextMenu={fileMenu(f, true)}
                 right={
                   <button
@@ -406,7 +403,10 @@ function CommitPanel({ sha }: { sha: string }) {
             origPath={f.origPath}
             status={f.status}
             selected={sel === f.path}
-            onClick={() => s.openFile({ source: "commit", path: f.path, ref: sha })}
+            onClick={() => {
+              void s.openFile({ source: "commit", path: f.path, ref: sha });
+              s.setDiffModal(true);
+            }}
             onContextMenu={fileMenu(f)}
             stats={{ additions: f.additions, deletions: f.deletions }}
           />
@@ -473,7 +473,10 @@ function StashPanel({ refname, message }: { refname: string; message: string }) 
             path={f.path}
             status={f.status}
             selected={sel === f.path}
-            onClick={() => s.openFile({ source: "stash", path: f.path, ref: refname })}
+            onClick={() => {
+              void s.openFile({ source: "stash", path: f.path, ref: refname });
+              s.setDiffModal(true);
+            }}
             stats={{ additions: f.additions, deletions: f.deletions }}
           />
         ))}

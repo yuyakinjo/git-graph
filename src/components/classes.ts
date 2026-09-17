@@ -130,3 +130,14 @@ export const field = "flex flex-col gap-[5px]";
 export const fieldLabel = "text-fg-dim text-[11.5px] font-semibold";
 export const fieldInput =
   "w-full bg-bg-1 border border-line rounded-md text-fg px-[9px] py-[7px] outline-none focus:border-accent";
+
+/** ファイル状態 (A/M/D/R...) の文字色。ファイル一覧はどこでも同じ色で出す。 */
+export const FSTATUS_COLOR: Record<string, string> = {
+  A: "text-green",
+  M: "text-accent",
+  T: "text-accent",
+  D: "text-red",
+  R: "text-violet",
+  C: "text-violet",
+  U: "text-amber",
+};

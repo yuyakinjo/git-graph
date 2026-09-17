@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { DetailPane } from "./components/DetailPane";
+import { DiffModal } from "./components/DiffModal";
 import { GraphPane } from "./components/GraphPane";
 import { PrModal } from "./components/PrModal";
 import { Settings } from "./components/Settings";
@@ -243,6 +244,7 @@ export default function App() {
       )}
       <StatusBar />
       <Toasts />
+      {s.diffModal ? <DiffModal /> : null}
       {pr ? <PrModal pr={pr} onClose={() => setPr(null)} /> : null}
       {s.settingsOpen ? <Settings /> : null}
     </div>

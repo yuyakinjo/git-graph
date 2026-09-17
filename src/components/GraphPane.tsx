@@ -369,6 +369,8 @@ export function GraphPane() {
   // キーボードで選択移動
   useWindowEvent("keydown", (e) => {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    // 差分ダイアログを開いている間は ↑↓ をファイル切り替えに譲る
+    if (s.diffModal) return;
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "j" && e.key !== "k") return;
     const down = e.key === "ArrowDown" || e.key === "j";
     e.preventDefault();

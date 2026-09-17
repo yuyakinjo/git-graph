@@ -138,6 +138,11 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M6 9.5l6 6 6-6" />
     </>
   ),
+  chevronUp: (
+    <>
+      <path d="M6 14.5l6-6 6 6" />
+    </>
+  ),
   dots: (
     <>
       <circle cx="6" cy="12" r="1.5" />

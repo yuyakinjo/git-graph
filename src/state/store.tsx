@@ -184,6 +184,8 @@ export function useStoreValue(boot: BootData | null) {
     text: null,
     loading: false,
   });
+  /** 差分を全画面のダイアログで見ているか (ファイル行のクリックで開く) */
+  const [diffModal, setDiffModal] = useState(false);
 
   const toastSeq = useRef(0);
   const detailSeq = useRef(0);
@@ -281,6 +283,7 @@ export function useStoreValue(boot: BootData | null) {
       const id = ++detailSeq.current;
       setCommit(null);
       setStashFiles([]);
+      setDiffModal(false);
       await openFile(null);
 
       if (next.kind === "wip") return;
@@ -722,6 +725,8 @@ export function useStoreValue(boot: BootData | null) {
     file,
     openFile,
     diff,
+    diffModal,
+    setDiffModal,
     busy,
     loading,
     loadingMore,
