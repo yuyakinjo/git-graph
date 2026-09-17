@@ -18,6 +18,7 @@ import {
   type BootData,
   type RepoSnapshot,
 } from "../lib/repo-data";
+import { snapshotHash, type CachedRepo } from "../lib/snapshot-cache";
 import type {
   BranchInfo,
   CommitDetail,
@@ -103,6 +104,11 @@ function loadPaths(key: string): string[] {
 
 function savePaths(key: string, paths: string[]) {
   localStorage.setItem(key, JSON.stringify(paths));
+}
+
+/** 内容が同じかを雑に比べる。state を差し替えるかどうかの判定だけに使う。 */
+function sameJson(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function hasChanges(status: StatusData | null): boolean {
@@ -202,6 +208,28 @@ export function useStoreValue(boot: BootData | null) {
   const depthRef = useRef(scanDepth);
   depthRef.current = scanDepth;
   const scanSeq = useRef(0);
+  const openSeq = useRef(0);
+
+  /**
+   * リポジトリ (root) ごとの読み取り結果 + 内容ハッシュ。
+   * タブを閉じるまで持ち続け、切り替え時は「先に描画 → 裏で読み直し →
+   * ハッシュが変わっていれば差し替え」に使う。
+   * (useState の遅延初期化。ハッシュ計算を毎レンダーで走らせたくないので useRef は使わない)
+   */
+  const [cache] = useState<Map<string, CachedRepo>>(() => {
+    const m = new Map<string, CachedRepo>();
+    if (boot) {
+      m.set(boot.snapshot.repo.root, {
+        snapshot: boot.snapshot,
+        hash: snapshotHash(boot.snapshot),
+        gh: boot.gh,
+        prs: boot.prs,
+      });
+    }
+    return m;
+  });
+  /** いま state に載っているリポジトリ。ハッシュ比較はこれと合わせて見る。 */
+  const shownRef = useRef<string>(boot?.snapshot.repo.root ?? "");
 
   const toast = useCallback((t: Omit<Toast, "id">) => {
     const id = ++toastSeq.current;
@@ -274,18 +302,51 @@ export function useStoreValue(boot: BootData | null) {
     [openFile, toast],
   );
 
-  const applySnapshot = useCallback((snap: RepoSnapshot) => {
-    setRepo(snap.repo);
-    setGraph(snap.graph);
-    setStatus(snap.status);
-    setBranches(snap.branches);
-    setTags(snap.tags);
-    setStashes(snap.stashes);
-    setWorktrees(snap.worktrees);
-    dirRef.current = snap.repo.root;
-    setTabDirty((prev) => ({ ...prev, [snap.repo.root]: hasChanges(snap.status) }));
-    localStorage.setItem(LAST_KEY, snap.repo.root);
-  }, []);
+  /**
+   * スナップショットを state に反映し、キャッシュを更新する。
+   * 返り値は「描画が変わったか」。表示中のリポジトリで内容ハッシュも同じなら
+   * state を一切触らないので、再描画は起きない。
+   */
+  const applySnapshot = useCallback(
+    (snap: RepoSnapshot): boolean => {
+      const root = snap.repo.root;
+      const hash = snapshotHash(snap);
+      const prev = cache.get(root);
+      cache.set(root, {
+        snapshot: snap,
+        hash,
+        gh: prev?.gh ?? null,
+        prs: prev?.prs ?? [],
+      });
+      dirRef.current = root;
+      localStorage.setItem(LAST_KEY, root);
+      if (shownRef.current === root && prev?.hash === hash) return false;
+      shownRef.current = root;
+      setRepo(snap.repo);
+      setGraph(snap.graph);
+      setStatus(snap.status);
+      setBranches(snap.branches);
+      setTags(snap.tags);
+      setStashes(snap.stashes);
+      setWorktrees(snap.worktrees);
+      const dirtyNow = hasChanges(snap.status);
+      setTabDirty((d) => (d[root] === dirtyNow ? d : { ...d, [root]: dirtyNow }));
+      return true;
+    },
+    [cache],
+  );
+
+  /** gh status をキャッシュに覚えつつ、変わっていれば state にも反映する。 */
+  const applyGh = useCallback(
+    (root: string, ghState: GhStatus | null) => {
+      const entry = cache.get(root);
+      if (entry) entry.gh = ghState;
+      if (shownRef.current !== root || sameJson(ghRef.current, ghState)) return;
+      ghRef.current = ghState;
+      setGh(ghState);
+    },
+    [cache],
+  );
 
   /** アバターは表示に必須ではないので待たずに走らせ、届いた時点で差し込む。 */
   const refreshAvatars = useCallback((root: string, graph: GraphData | null) => {
@@ -308,27 +369,35 @@ export function useStoreValue(boot: BootData | null) {
   }, [refreshAvatars, toast]);
 
   const refreshPrs = useCallback(async () => {
-    setPrs(await loadPrs(dirRef.current, ghRef.current));
-  }, []);
+    const root = dirRef.current;
+    const next = await loadPrs(root, ghRef.current);
+    const entry = cache.get(root);
+    const same = entry ? sameJson(entry.prs, next) : false;
+    if (entry) entry.prs = next;
+    // 中身が同じ PR 一覧で state を差し替えると、それだけで一覧が再描画される
+    if (!same) setPrs(next);
+  }, [cache]);
 
   const refresh = useCallback(
-    async (opts: { silent?: boolean; withGh?: boolean } = {}) => {
+    async (opts: { silent?: boolean; withGh?: boolean; ifChanged?: boolean } = {}) => {
       const root = dirRef.current;
       if (!root) return;
       if (!opts.silent) setLoading(true);
       try {
         const snap = await loadRepo(root);
-        applySnapshot(snap);
-        refreshAvatars(root, snap.graph);
-        // WIP を見ている間は status の変化で差分も変わるので選択ファイルを引き直す
-        if (selRef.current.kind === "wip") {
-          const cur = fileRef.current;
-          await openFile(cur ? resolveWipTarget(snap.status, cur.path, cur.source) : null);
+        const changed = applySnapshot(snap);
+        // ifChanged (自動フェッチ) は、内容が変わっていなければ差分の引き直しもしない。
+        // git 操作後の再読込では、status が同じでも作業ツリーの中身が変わっているので必ず引き直す。
+        if (changed || !opts.ifChanged) {
+          refreshAvatars(root, snap.graph);
+          // WIP を見ている間は status の変化で差分も変わるので選択ファイルを引き直す
+          if (selRef.current.kind === "wip") {
+            const cur = fileRef.current;
+            await openFile(cur ? resolveWipTarget(snap.status, cur.path, cur.source) : null);
+          }
         }
         if (opts.withGh) {
-          const ghState = await api.ghStatus(root).catch(() => null);
-          setGh(ghState);
-          ghRef.current = ghState;
+          applyGh(root, await api.ghStatus(root).catch(() => null));
         }
         await refreshPrs();
       } catch (e) {
@@ -337,18 +406,36 @@ export function useStoreValue(boot: BootData | null) {
         if (!opts.silent) setLoading(false);
       }
     },
-    [applySnapshot, openFile, refreshAvatars, refreshPrs, toast],
+    [applyGh, applySnapshot, openFile, refreshAvatars, refreshPrs, toast],
   );
 
   const openRepo = useCallback(
     async (path: string) => {
-      setLoading(true);
-      setOpening(path);
+      const id = ++openSeq.current;
+      const cached = cache.get(path);
+      if (cached) {
+        // キャッシュがあるタブは待たせずに描画する (この後で裏側から読み直す)
+        if (applySnapshot(cached.snapshot)) {
+          ghRef.current = cached.gh;
+          setGh(cached.gh);
+          setPrs(cached.prs);
+          refreshAvatars(path, cached.snapshot.graph);
+          await select({ kind: "wip" });
+        }
+      } else {
+        // キャッシュが無い時だけ「読み込み中」を出す (タブは連番ガードで追い越せる)
+        setLoading(true);
+        setOpening(path);
+      }
       try {
         const snap = await loadRepo(path);
-        applySnapshot(snap);
-        refreshAvatars(snap.repo.root, snap.graph);
-        await select({ kind: "wip" });
+        // 読んでいる間に別のタブへ移っていたら捨てる
+        if (openSeq.current !== id) return;
+        // ハッシュが同じなら applySnapshot は何もしない = 選択も差分もそのまま
+        if (applySnapshot(snap)) {
+          refreshAvatars(snap.repo.root, snap.graph);
+          await select({ kind: "wip" });
+        }
         setRecent((prev) => {
           const next = [snap.repo.root, ...prev.filter((p) => p !== snap.repo.root)].slice(0, 8);
           savePaths(RECENT_KEY, next);
@@ -364,19 +451,20 @@ export function useStoreValue(boot: BootData | null) {
         api
           .ghStatus(snap.repo.root)
           .then((ghState) => {
-            setGh(ghState);
-            ghRef.current = ghState;
-            return refreshPrs();
+            applyGh(snap.repo.root, ghState);
+            if (openSeq.current === id) return refreshPrs();
           })
           .catch(() => undefined);
       } catch (e) {
         toast({ kind: "error", title: "リポジトリを開けませんでした", detail: String(e) });
       } finally {
-        setLoading(false);
-        setOpening(null);
+        if (openSeq.current === id) {
+          setLoading(false);
+          setOpening(null);
+        }
       }
     },
-    [applySnapshot, refreshAvatars, refreshPrs, select, toast],
+    [applyGh, applySnapshot, cache, refreshAvatars, refreshPrs, select, toast],
   );
 
   const removeRecent = useCallback((path: string) => {
@@ -404,6 +492,7 @@ export function useStoreValue(boot: BootData | null) {
     setFile(null);
     setDiff({ text: null, loading: false });
     dirRef.current = "";
+    shownRef.current = "";
     ghRef.current = null;
     selRef.current = { kind: "wip" };
     fileRef.current = null;
@@ -423,6 +512,8 @@ export function useStoreValue(boot: BootData | null) {
       tabsRef.current = next;
       setTabs(next);
       savePaths(TABS_KEY, next);
+      // 閉じたタブのキャッシュは捨てる (開き直したら読み直す)
+      for (const p of closing) cache.delete(p);
       if (!closing.has(dirRef.current)) return;
       const index = cur.indexOf(dirRef.current);
       const neighbor =
@@ -433,7 +524,7 @@ export function useStoreValue(boot: BootData | null) {
       if (neighbor) await openRepo(neighbor);
       else clearRepo();
     },
-    [clearRepo, openRepo],
+    [cache, clearRepo, openRepo],
   );
 
   const closeTab = useCallback((path: string) => closeTabs([path]), [closeTabs]);
@@ -479,7 +570,7 @@ export function useStoreValue(boot: BootData | null) {
     () => {
       api
         .fetch(dirRef.current, true)
-        .then(() => refresh({ silent: true }))
+        .then(() => refresh({ silent: true, ifChanged: true }))
         .catch(() => undefined); // オフライン時などは黙って無視
     },
     dir && autoFetch ? AUTOFETCH_MS : null,

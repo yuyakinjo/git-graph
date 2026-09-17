@@ -12,7 +12,8 @@ import { Icon, useMenu } from "./ui";
 const COL_REFS = "flex w-[190px] flex-none items-center gap-[5px] overflow-hidden pl-1.5";
 const COL_TAGS = "group/tags relative flex w-8 flex-none items-center";
 const COL_MSG = "flex min-w-0 flex-auto items-center gap-[5px] overflow-hidden pl-1.5";
-const COL_AUTHOR = "flex w-[170px] flex-none items-center gap-1.5 overflow-hidden text-[12px] text-fg-dim";
+const COL_AUTHOR =
+  "flex w-[170px] flex-none items-center gap-1.5 overflow-hidden text-[12px] text-fg-dim";
 const COL_SHA = "w-[74px] flex-none text-fg-faint";
 const COL_DATE = "w-[92px] flex-none text-right text-[11.5px] text-fg-faint";
 
@@ -116,7 +117,9 @@ function RefBadge({
         onMenu(e);
       }}
     >
-      {deco.isHead && deco.kind === "head" ? <span className="h-[5px] w-[5px] rounded-full bg-current" /> : null}
+      {deco.isHead && deco.kind === "head" ? (
+        <span className="h-[5px] w-[5px] rounded-full bg-current" />
+      ) : null}
       <Icon name={icon} size={11} />
       {deco.name}
     </span>
@@ -567,7 +570,11 @@ export function GraphPane() {
                             r={AVATAR_R}
                             fill={avatarColor(c.authorEmail || c.authorName)}
                           />
-                          <text className="svg-initials fill-white text-[8px] font-bold select-none" x={x} y={y}>
+                          <text
+                            className="svg-initials fill-white text-[8px] font-bold select-none"
+                            x={x}
+                            y={y}
+                          >
                             {initials(c.authorName)}
                           </text>
                           {url ? (

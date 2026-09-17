@@ -272,7 +272,11 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         isOpen={isOpen}
         toggle={toggle}
         action={
-          <button className={iconBtn({ tiny: true })} title="PR を作成" onClick={() => act.prCreate()}>
+          <button
+            className={iconBtn({ tiny: true })}
+            title="PR を作成"
+            onClick={() => act.prCreate()}
+          >
             <Icon name="plus" size={13} />
           </button>
         }
@@ -313,39 +317,43 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
           s.stashes.map((st) => {
             const current = s.selection.kind === "stash" && s.selection.refname === st.name;
             return (
-            <div
-              key={st.name}
-              className={current ? SIDE_ITEM_CURRENT : SIDE_ITEM_PLAIN}
-              title={`${st.name}\n${st.message}`}
-              onClick={() => s.select({ kind: "stash", refname: st.name, message: st.message })}
-              onDoubleClick={() => act.stashApply(st, false)}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                openMenu(e, [
-                  {
-                    label: "適用 (apply)",
-                    icon: "check",
-                    onClick: () => act.stashApply(st, false),
-                  },
-                  { label: "ポップ (pop)", icon: "stash", onClick: () => act.stashApply(st, true) },
-                  { separator: true },
-                  {
-                    label: "破棄 (drop)",
-                    icon: "trash",
-                    danger: true,
-                    onClick: () => act.stashDrop(st),
-                  },
-                ]);
-              }}
-            >
-              <span className={sideIcon(current)}>
-                <Icon name="stash" size={13} />
-              </span>
-              <span className={sideLabel(current)}>{st.message}</span>
-              <span className="flex-none text-[10.5px] text-fg-faint">
-                {relativeTime(st.createdAt)}
-              </span>
-            </div>
+              <div
+                key={st.name}
+                className={current ? SIDE_ITEM_CURRENT : SIDE_ITEM_PLAIN}
+                title={`${st.name}\n${st.message}`}
+                onClick={() => s.select({ kind: "stash", refname: st.name, message: st.message })}
+                onDoubleClick={() => act.stashApply(st, false)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  openMenu(e, [
+                    {
+                      label: "適用 (apply)",
+                      icon: "check",
+                      onClick: () => act.stashApply(st, false),
+                    },
+                    {
+                      label: "ポップ (pop)",
+                      icon: "stash",
+                      onClick: () => act.stashApply(st, true),
+                    },
+                    { separator: true },
+                    {
+                      label: "破棄 (drop)",
+                      icon: "trash",
+                      danger: true,
+                      onClick: () => act.stashDrop(st),
+                    },
+                  ]);
+                }}
+              >
+                <span className={sideIcon(current)}>
+                  <Icon name="stash" size={13} />
+                </span>
+                <span className={sideLabel(current)}>{st.message}</span>
+                <span className="flex-none text-[10.5px] text-fg-faint">
+                  {relativeTime(st.createdAt)}
+                </span>
+              </div>
             );
           })
         )}

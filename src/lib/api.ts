@@ -48,8 +48,7 @@ export const api = {
   pull: (dir: string, rebase: boolean, autostash: boolean) =>
     invoke<string>("git_pull", { dir, rebase, autostash }),
   /** checkout せずにローカルブランチを upstream へ早送りする */
-  fastForward: (dir: string, branch: string) =>
-    invoke<string>("git_fast_forward", { dir, branch }),
+  fastForward: (dir: string, branch: string) => invoke<string>("git_fast_forward", { dir, branch }),
   push: (
     dir: string,
     opts: {
