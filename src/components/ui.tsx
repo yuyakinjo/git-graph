@@ -47,6 +47,7 @@ const PATHS: Record<string, ReactNode> = {
   amend: <><path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1" /><path d="M20.5 4.5v4h-4" /><path d="M12 8v4l3 2" /></>,
   merge: <><circle cx="6.5" cy="5.5" r="2.2" /><circle cx="6.5" cy="18.5" r="2.2" /><circle cx="17.5" cy="9" r="2.2" /><path d="M6.5 7.7v8.6" /><path d="M15.4 10.6c-1.5 3.2-8.9 2-8.9 7.2" /></>,
   clock: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3.2 2" /></>,
+  columns: <><rect x="3.5" y="4.5" width="17" height="15" rx="2" /><path d="M9.5 4.5v15" /><path d="M15.5 4.5v15" /></>,
 };
 
 export function Icon({

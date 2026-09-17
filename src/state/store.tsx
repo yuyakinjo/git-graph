@@ -58,6 +58,39 @@ const AUTOFETCH_MS = 180_000;
 const ROOTS_KEY = "gitgraph.projectRoots";
 const DEPTH_KEY = "gitgraph.scanDepth";
 const DEFAULT_DEPTH = 3;
+// グラフ一覧の列。表示順もこの並びに合わせる。
+const COLS_KEY = "gitgraph.graphColumns";
+
+export const GRAPH_COLUMNS = [
+  { key: "graph", label: "グラフ" },
+  { key: "refs", label: "ブランチ" },
+  { key: "tags", label: "タグ" },
+  { key: "subject", label: "メッセージ" },
+  { key: "author", label: "作者" },
+  { key: "sha", label: "SHA" },
+  { key: "date", label: "日時" },
+] as const;
+
+export type GraphColumnKey = (typeof GRAPH_COLUMNS)[number]["key"];
+export type GraphColumns = Record<GraphColumnKey, boolean>;
+
+const DEFAULT_COLUMNS = Object.fromEntries(
+  GRAPH_COLUMNS.map((c) => [c.key, true]),
+) as GraphColumns;
+
+function loadColumns(): GraphColumns {
+  const next = { ...DEFAULT_COLUMNS };
+  try {
+    const saved = JSON.parse(localStorage.getItem(COLS_KEY) ?? "{}");
+    if (!saved || typeof saved !== "object") return next;
+    for (const c of GRAPH_COLUMNS) {
+      if (typeof saved[c.key] === "boolean") next[c.key] = saved[c.key];
+    }
+  } catch {
+    /* 壊れていれば既定 (全表示) に戻す */
+  }
+  return next;
+}
 
 function loadPaths(key: string): string[] {
   try {
@@ -125,6 +158,7 @@ export function useStoreValue(boot: BootData | null) {
   const [autoFetch, setAutoFetch] = useState(
     () => localStorage.getItem(AUTOFETCH_KEY) !== "off",
   );
+  const [columns, setColumns] = useState<GraphColumns>(loadColumns);
 
   // ---- 設定 (プロジェクト置き場) と、そこから見つけたリポジトリ ----
   const [projectRoots, setProjectRootsState] = useState<string[]>(() => loadPaths(ROOTS_KEY));
@@ -498,6 +532,20 @@ export function useStoreValue(boot: BootData | null) {
     [scanProjects],
   );
 
+  /** 列の表示・非表示。切り替えるたびに保存する。 */
+  const toggleColumn = useCallback((key: GraphColumnKey) => {
+    setColumns((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      localStorage.setItem(COLS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const resetColumns = useCallback(() => {
+    setColumns({ ...DEFAULT_COLUMNS });
+    localStorage.setItem(COLS_KEY, JSON.stringify(DEFAULT_COLUMNS));
+  }, []);
+
   const openSettings = useCallback(() => setSettingsOpen(true), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
@@ -546,6 +594,9 @@ export function useStoreValue(boot: BootData | null) {
     dirty,
     autoFetch,
     toggleAutoFetch,
+    columns,
+    toggleColumn,
+    resetColumns,
     projectRoots,
     setProjectRoots,
     scanDepth,

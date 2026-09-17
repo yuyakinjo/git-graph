@@ -3,7 +3,7 @@ import { useWindowEvent } from "../lib/effects";
 import { laneColor, relativeTime } from "../lib/format";
 import type { GraphCommit, GraphEdge, RefDeco } from "../lib/types";
 import { useActions } from "../state/actions";
-import { useStore } from "../state/store";
+import { GRAPH_COLUMNS, useStore } from "../state/store";
 import { Avatar } from "./Avatar";
 import { Icon, useMenu } from "./ui";
 
@@ -86,6 +86,71 @@ function RefBadge({
   );
 }
 
+/** タグ列。アイコンだけを置き、ホバーで中身 (タグのバッジ) を開く。 */
+function TagCell({
+  tags,
+  onCheckout,
+  onMenu,
+}: {
+  tags: RefDeco[];
+  onCheckout: (d: RefDeco) => void;
+  onMenu: (d: RefDeco) => (e: React.MouseEvent) => void;
+}) {
+  if (!tags.length) return <div className="col-tags" />;
+  return (
+    <div className="col-tags">
+      <span className="tag-chip" title={tags.map((t) => t.name).join("\n")}>
+        <Icon name="tag" size={12} />
+        {tags.length > 1 ? <span className="tag-n">{tags.length}</span> : null}
+        <span className="tag-pop">
+          {tags.map((d) => (
+            <RefBadge
+              key={d.full}
+              deco={d}
+              onCheckout={() => onCheckout(d)}
+              onMenu={onMenu(d)}
+            />
+          ))}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+/** 列の表示・非表示を選ぶポップオーバー。 */
+function ColumnMenu() {
+  const s = useStore();
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <button className="icon-btn tiny" title="表示する列" onClick={() => setOpen(true)}>
+        <Icon name="columns" size={14} />
+      </button>
+    );
+  }
+  return (
+    <span className="col-menu-wrap">
+      <button className="icon-btn tiny on" title="表示する列" onClick={() => setOpen(false)}>
+        <Icon name="columns" size={14} />
+      </button>
+      <div className="ctx-backdrop" onMouseDown={() => setOpen(false)} />
+      <div className="col-menu" onMouseDown={(e) => e.stopPropagation()}>
+        {GRAPH_COLUMNS.map((c) => (
+          <button key={c.key} className="ctx-item" onClick={() => s.toggleColumn(c.key)}>
+            {s.columns[c.key] ? <Icon name="check" size={14} /> : <span className="ctx-icon-gap" />}
+            <span>{c.label}</span>
+          </button>
+        ))}
+        <div className="ctx-sep" />
+        <button className="ctx-item" onClick={s.resetColumns}>
+          <span className="ctx-icon-gap" />
+          <span>すべて表示</span>
+        </button>
+      </div>
+    </span>
+  );
+}
+
 export function GraphPane() {
   const s = useStore();
   const act = useActions();
@@ -100,10 +165,10 @@ export function GraphPane() {
   const hasWip = s.dirty;
   const rowOffset = hasWip ? 1 : 0;
   const totalRows = commits.length + rowOffset;
-  const graphW = Math.min(
-    Math.max(cx((s.graph?.maxColumn ?? 0) + 1) + 6, 56),
-    360,
-  );
+  const cols = s.columns;
+  const graphW = cols.graph
+    ? Math.min(Math.max(cx((s.graph?.maxColumn ?? 0) + 1) + 6, 56), 360)
+    : 0;
 
   // ref コールバックで購読し、クリーンアップも同じ場所で返す (useEffect 不要)
   const attachScroll = useCallback((el: HTMLDivElement | null) => {
@@ -179,6 +244,9 @@ export function GraphPane() {
     ]);
   };
 
+  const checkoutRef = (deco: RefDeco) =>
+    deco.kind === "remote" ? act.checkoutRemote(deco.name) : act.checkout(deco.name);
+
   const refMenu = (deco: RefDeco) => (e: React.MouseEvent) => {
     if (deco.kind === "head") {
       const branch = s.branches.find((b) => b.name === deco.name && b.kind === "local");
@@ -249,13 +317,16 @@ export function GraphPane() {
           style={{ top: 0 }}
           onClick={() => s.select({ kind: "wip" })}
         >
-          <div className="col-msg" style={{ marginLeft: graphW }}>
+          {cols.graph ? <div className="col-graph" style={{ width: graphW }} /> : null}
+          {cols.refs ? <div className="col-refs" /> : null}
+          {cols.tags ? <div className="col-tags" /> : null}
+          <div className="col-msg">
             <span className="wip-label">未コミットの変更</span>
             <span className="wip-count">{count} ファイル</span>
           </div>
-          <div className="col-author" />
-          <div className="col-sha" />
-          <div className="col-date" />
+          {cols.author ? <div className="col-author" /> : null}
+          {cols.sha ? <div className="col-sha" /> : null}
+          {cols.date ? <div className="col-date" /> : null}
         </div>,
       );
       continue;
@@ -278,29 +349,43 @@ export function GraphPane() {
           commitMenu(c)(e);
         }}
       >
-        <div className="col-msg" style={{ marginLeft: graphW }}>
-          {c.refs.length ? (
-            <span className="refs">
-              {c.refs.map((d) => (
+        {cols.graph ? <div className="col-graph" style={{ width: graphW }} /> : null}
+        {cols.refs ? (
+          <div className="col-refs">
+            {c.refs
+              .filter((d) => d.kind !== "tag")
+              .map((d) => (
                 <RefBadge
                   key={`${d.kind}:${d.full}`}
                   deco={d}
-                  onCheckout={() =>
-                    d.kind === "remote" ? act.checkoutRemote(d.name) : act.checkout(d.name)
-                  }
+                  onCheckout={() => checkoutRef(d)}
                   onMenu={refMenu(d)}
                 />
               ))}
-            </span>
-          ) : null}
-          <span className="subject">{c.subject}</span>
-        </div>
-        <div className="col-author" title={`${c.authorName} <${c.authorEmail}>`}>
-          <Avatar name={c.authorName} email={c.authorEmail} />
-          <span className="author-name">{c.authorName}</span>
-        </div>
-        <div className="col-sha mono">{c.short}</div>
-        <div className="col-date">{relativeTime(c.timestamp)}</div>
+          </div>
+        ) : null}
+        {cols.tags ? (
+          <TagCell
+            tags={c.refs.filter((d) => d.kind === "tag")}
+            onCheckout={checkoutRef}
+            onMenu={refMenu}
+          />
+        ) : null}
+        {cols.subject ? (
+          <div className="col-msg">
+            <span className="subject">{c.subject}</span>
+          </div>
+        ) : (
+          <div className="col-fill" />
+        )}
+        {cols.author ? (
+          <div className="col-author" title={`${c.authorName} <${c.authorEmail}>`}>
+            <Avatar name={c.authorName} email={c.authorEmail} />
+            <span className="author-name">{c.authorName}</span>
+          </div>
+        ) : null}
+        {cols.sha ? <div className="col-sha mono">{c.short}</div> : null}
+        {cols.date ? <div className="col-date">{relativeTime(c.timestamp)}</div> : null}
       </div>,
     );
   }
@@ -321,10 +406,11 @@ export function GraphPane() {
             </button>
           ) : null}
         </div>
+        <ColumnMenu />
         <div className="graph-head-cols">
-          <span className="col-author">作者</span>
-          <span className="col-sha">SHA</span>
-          <span className="col-date">日時</span>
+          {cols.author ? <span className="col-author">作者</span> : null}
+          {cols.sha ? <span className="col-sha">SHA</span> : null}
+          {cols.date ? <span className="col-date">日時</span> : null}
         </div>
       </div>
       <div
@@ -334,85 +420,87 @@ export function GraphPane() {
       >
         <div className="graph-canvas" style={{ height: totalRows * ROW_H }}>
           <div className="graph-rows">{rows}</div>
-          <svg
-            className="graph-svg"
-            width={graphW}
-            height={totalRows * ROW_H}
-            style={{ height: totalRows * ROW_H }}
-          >
-            {hasWip && headRow >= 0 ? (
-              <path
-                d={edgePath(
-                  cx(commits[headRow].column),
-                  cy(0),
-                  cx(commits[headRow].column),
-                  cy(headRow + rowOffset),
-                )}
-                stroke={laneColor(commits[headRow].column)}
-                strokeWidth="1.8"
-                strokeDasharray="3 3"
-                fill="none"
-                opacity="0.75"
-              />
-            ) : null}
-            {visibleEdges.map((e, i) => {
-              const toRow = e.toRow < 0 ? commits.length : e.toRow;
-              return (
+          {cols.graph ? (
+            <svg
+              className="graph-svg"
+              width={graphW}
+              height={totalRows * ROW_H}
+              style={{ height: totalRows * ROW_H }}
+            >
+              {hasWip && headRow >= 0 ? (
                 <path
-                  key={i}
                   d={edgePath(
-                    cx(e.fromCol),
-                    cy(e.fromRow + rowOffset),
-                    cx(e.toCol),
-                    cy(toRow + rowOffset),
+                    cx(commits[headRow].column),
+                    cy(0),
+                    cx(commits[headRow].column),
+                    cy(headRow + rowOffset),
                   )}
-                  stroke={laneColor(e.color)}
+                  stroke={laneColor(commits[headRow].column)}
                   strokeWidth="1.8"
+                  strokeDasharray="3 3"
                   fill="none"
-                  opacity={e.toRow < 0 ? 0.35 : 0.9}
+                  opacity="0.75"
                 />
-              );
-            })}
-            {hasWip && start === 0 ? (
-              <circle
-                cx={cx(headRow >= 0 ? commits[headRow].column : 0)}
-                cy={cy(0)}
-                r="4.5"
-                fill="var(--bg-1)"
-                stroke={laneColor(headRow >= 0 ? commits[headRow].column : 0)}
-                strokeWidth="1.8"
-                strokeDasharray="2.5 2"
-              />
-            ) : null}
-            {commits.slice(Math.max(0, start - rowOffset), Math.max(0, end - rowOffset)).map((c) => {
-              const isHead = c.hash === s.repo?.headHash;
-              const isSel = c.hash === selectedSha;
-              const color = laneColor(c.column);
-              return (
-                <g key={c.hash} opacity={matches && !matches.has(c.hash) ? 0.3 : 1}>
-                  {isSel ? (
+              ) : null}
+              {visibleEdges.map((e, i) => {
+                const toRow = e.toRow < 0 ? commits.length : e.toRow;
+                return (
+                  <path
+                    key={i}
+                    d={edgePath(
+                      cx(e.fromCol),
+                      cy(e.fromRow + rowOffset),
+                      cx(e.toCol),
+                      cy(toRow + rowOffset),
+                    )}
+                    stroke={laneColor(e.color)}
+                    strokeWidth="1.8"
+                    fill="none"
+                    opacity={e.toRow < 0 ? 0.35 : 0.9}
+                  />
+                );
+              })}
+              {hasWip && start === 0 ? (
+                <circle
+                  cx={cx(headRow >= 0 ? commits[headRow].column : 0)}
+                  cy={cy(0)}
+                  r="4.5"
+                  fill="var(--bg-1)"
+                  stroke={laneColor(headRow >= 0 ? commits[headRow].column : 0)}
+                  strokeWidth="1.8"
+                  strokeDasharray="2.5 2"
+                />
+              ) : null}
+              {commits.slice(Math.max(0, start - rowOffset), Math.max(0, end - rowOffset)).map((c) => {
+                const isHead = c.hash === s.repo?.headHash;
+                const isSel = c.hash === selectedSha;
+                const color = laneColor(c.column);
+                return (
+                  <g key={c.hash} opacity={matches && !matches.has(c.hash) ? 0.3 : 1}>
+                    {isSel ? (
+                      <circle
+                        cx={cx(c.column)}
+                        cy={cy(c.row + rowOffset)}
+                        r="8"
+                        fill="none"
+                        stroke={color}
+                        strokeWidth="1.2"
+                        opacity="0.5"
+                      />
+                    ) : null}
                     <circle
                       cx={cx(c.column)}
                       cy={cy(c.row + rowOffset)}
-                      r="8"
-                      fill="none"
+                      r={c.parents.length > 1 ? 4 : 4.5}
+                      fill={isHead ? color : "var(--bg-1)"}
                       stroke={color}
-                      strokeWidth="1.2"
-                      opacity="0.5"
+                      strokeWidth={isHead ? 3 : 2}
                     />
-                  ) : null}
-                  <circle
-                    cx={cx(c.column)}
-                    cy={cy(c.row + rowOffset)}
-                    r={c.parents.length > 1 ? 4 : 4.5}
-                    fill={isHead ? color : "var(--bg-1)"}
-                    stroke={color}
-                    strokeWidth={isHead ? 3 : 2}
-                  />
-                </g>
-              );
-            })}
-          </svg>
+                  </g>
+                );
+              })}
+            </svg>
+          ) : null}
         </div>
       </div>
       {s.graph.truncated ? (
