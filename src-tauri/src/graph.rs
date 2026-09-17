@@ -61,6 +61,11 @@ fn parse_refs(deco: &str) -> Vec<RefDeco> {
             Some(rest) => (true, rest.trim().to_string()),
             None => (item == "HEAD", item.to_string()),
         };
+        // `--decorate=full` の %D はタグを "tag: refs/tags/x" の形で出すので前置きを落とす
+        let full = match full.strip_prefix("tag: ") {
+            Some(rest) => rest.trim().to_string(),
+            None => full,
+        };
         if full == "HEAD" {
             out.push(RefDeco {
                 kind: "other".into(),

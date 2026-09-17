@@ -702,7 +702,7 @@ body.dragging {
   overflow: hidden;
 }
 .col-tags {
-  width: 26px;
+  width: 32px;
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -720,6 +720,9 @@ body.dragging {
   border: 1px solid rgba(251, 191, 36, 0.3);
   color: var(--amber);
   cursor: default;
+}
+.tag-chip svg {
+  flex: 0 0 auto;
 }
 .tag-n {
   font-size: 10px;

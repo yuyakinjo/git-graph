@@ -353,7 +353,7 @@ export function GraphPane() {
         {cols.refs ? (
           <div className="col-refs">
             {c.refs
-              .filter((d) => d.kind !== "tag")
+              .filter((d) => d.kind !== "tag" || !cols.tags)
               .map((d) => (
                 <RefBadge
                   key={`${d.kind}:${d.full}`}
