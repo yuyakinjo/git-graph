@@ -107,7 +107,9 @@ function BranchItem({ b }: { b: BranchInfo }) {
       className={`side-item ${b.isHead ? "current" : ""}`}
       title={`${b.name}${b.upstream ? ` → ${b.upstream}` : ""}\n${b.subject}`}
       onClick={() => s.select({ kind: "commit", sha: b.hash })}
-      onDoubleClick={() => (b.kind === "remote" ? act.checkoutRemote(b.name) : act.checkout(b.name))}
+      onDoubleClick={() =>
+        b.kind === "remote" ? act.checkoutRemote(b.name) : act.checkout(b.name)
+      }
       onContextMenu={menu}
     >
       <span className="side-icon">
@@ -134,7 +136,9 @@ function PrItem({ pr, onOpen }: { pr: PullRequest; onOpen: (pr: PullRequest) => 
   const openMenu = useMenu();
   const checks = pr.statusCheckRollup ?? [];
   const failed = checks.some((c) => c.conclusion === "FAILURE" || c.state === "FAILURE");
-  const pending = checks.some((c) => c.status === "IN_PROGRESS" || c.status === "QUEUED" || c.state === "PENDING");
+  const pending = checks.some(
+    (c) => c.status === "IN_PROGRESS" || c.status === "QUEUED" || c.state === "PENDING",
+  );
   const dot = failed ? "fail" : pending ? "pending" : checks.length ? "pass" : "none";
   return (
     <div
@@ -184,7 +188,11 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         isOpen={isOpen}
         toggle={toggle}
         action={
-          <button className="icon-btn tiny" title="ブランチを作成" onClick={() => act.createBranch()}>
+          <button
+            className="icon-btn tiny"
+            title="ブランチを作成"
+            onClick={() => act.createBranch()}
+          >
             <Icon name="plus" size={13} />
           </button>
         }
@@ -246,7 +254,11 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         isOpen={isOpen}
         toggle={toggle}
         action={
-          <button className="icon-btn tiny" title="変更をスタッシュ" onClick={() => act.stashPush()}>
+          <button
+            className="icon-btn tiny"
+            title="変更をスタッシュ"
+            onClick={() => act.stashPush()}
+          >
             <Icon name="plus" size={13} />
           </button>
         }
@@ -266,10 +278,19 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
               onContextMenu={(e) => {
                 e.preventDefault();
                 openMenu(e, [
-                  { label: "適用 (apply)", icon: "check", onClick: () => act.stashApply(st, false) },
+                  {
+                    label: "適用 (apply)",
+                    icon: "check",
+                    onClick: () => act.stashApply(st, false),
+                  },
                   { label: "ポップ (pop)", icon: "stash", onClick: () => act.stashApply(st, true) },
                   { separator: true },
-                  { label: "破棄 (drop)", icon: "trash", danger: true, onClick: () => act.stashDrop(st) },
+                  {
+                    label: "破棄 (drop)",
+                    icon: "trash",
+                    danger: true,
+                    onClick: () => act.stashDrop(st),
+                  },
                 ]);
               }}
             >
@@ -291,7 +312,11 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         isOpen={isOpen}
         toggle={toggle}
         action={
-          <button className="icon-btn tiny" title="worktree を追加" onClick={() => act.worktreeAdd()}>
+          <button
+            className="icon-btn tiny"
+            title="worktree を追加"
+            onClick={() => act.worktreeAdd()}
+          >
             <Icon name="plus" size={13} />
           </button>
         }
@@ -344,7 +369,14 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         ) : null}
       </Section>
 
-      <Section id="tag" title="タグ" icon="tag" count={s.tags.length} isOpen={isOpen} toggle={toggle}>
+      <Section
+        id="tag"
+        title="タグ"
+        icon="tag"
+        count={s.tags.length}
+        isOpen={isOpen}
+        toggle={toggle}
+      >
         {s.tags.slice(0, 50).map((t) => (
           <div
             key={t.name}

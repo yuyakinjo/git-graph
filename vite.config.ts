@@ -1,9 +1,10 @@
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 // Tauri 前提の設定: 固定ポート・HMR ポート・ソースマップ
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   clearScreen: false,
   server: {
     port: 1420,

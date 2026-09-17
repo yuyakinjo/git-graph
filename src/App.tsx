@@ -6,6 +6,7 @@ import { Settings } from "./components/Settings";
 import { Sidebar } from "./components/Sidebar";
 import { TitleBar } from "./components/TitleBar";
 import { StatusBar, Toolbar } from "./components/Toolbar";
+import { btn, iconBtn } from "./components/classes";
 import { Icon, Spinner } from "./components/ui";
 import { api } from "./lib/api";
 import { useWindowEvent } from "./lib/effects";
@@ -63,24 +64,37 @@ function Welcome() {
   const s = useStore();
   const act = useActions();
   return (
-    <div className="welcome">
-      <div className="welcome-card">
-        <h1>Git Graph</h1>
-        <p>シンプルな操作に絞った git GUI。GitHub 操作は gh CLI を使います。</p>
-        <button className="btn primary big" onClick={() => act.openFolder()}>
+    <div className="flex flex-1 items-center justify-center bg-[radial-gradient(circle_at_30%_10%,#1d2735_0%,var(--color-bg-1)_60%)]">
+      <div className="w-[480px] max-w-[88vw] text-center">
+        <h1 className="mx-0 mt-0 mb-1.5 text-[26px] tracking-[-0.01em]">Git Graph</h1>
+        <p className="mx-0 mt-0 mb-5 text-fg-dim">
+          シンプルな操作に絞った git GUI。GitHub 操作は gh CLI を使います。
+        </p>
+        <button className={btn("primary", "big")} onClick={() => act.openFolder()}>
           <Icon name="folder" size={16} /> リポジトリを開く
         </button>
         {s.recent.length ? (
-          <div className="recent">
-            <h2>最近開いたリポジトリ</h2>
+          <div className="mt-[26px] text-left">
+            <h2 className="mx-0 mt-0 mb-1.5 text-[11px] tracking-[0.06em] text-fg-faint uppercase">
+              最近開いたリポジトリ
+            </h2>
             {s.recent.map((p) => (
-              <div key={p} className="recent-item">
-                <button className="recent-open" onClick={() => s.openRepo(p)}>
+              <div key={p} className="flex items-center gap-1">
+                <button
+                  className="flex h-[30px] min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2 text-left text-fg hover:bg-bg-2"
+                  onClick={() => s.openRepo(p)}
+                >
                   <Icon name="repo" size={14} />
-                  <span className="recent-name">{p.split("/").pop()}</span>
-                  <span className="recent-path mono">{p.replace(/^\/Users\/[^/]+/, "~")}</span>
+                  <span className="flex-none font-semibold">{p.split("/").pop()}</span>
+                  <span className="overflow-hidden font-mono text-[12px] text-ellipsis whitespace-nowrap text-fg-faint">
+                    {p.replace(/^\/Users\/[^/]+/, "~")}
+                  </span>
                 </button>
-                <button className="icon-btn tiny" title="一覧から削除" onClick={() => s.removeRecent(p)}>
+                <button
+                  className={iconBtn({ tiny: true })}
+                  title="一覧から削除"
+                  onClick={() => s.removeRecent(p)}
+                >
                   <Icon name="x" size={12} />
                 </button>
               </div>
@@ -95,32 +109,65 @@ function Welcome() {
 /** リポジトリを開いている間の表示。重いリポジトリでも押した手応えが残るようにする。 */
 function Opening({ path }: { path: string }) {
   return (
-    <div className="opening">
+    <div className="flex items-center gap-3 rounded-[10px] border border-line bg-bg-2 px-[18px] py-3.5 shadow-[0_18px_44px_rgba(0,0,0,0.45)]">
       <Spinner size={20} />
-      <div className="opening-text">
-        <strong>{path.split("/").filter(Boolean).pop()}</strong>
-        <span className="mono">{path.replace(/^\/Users\/[^/]+/, "~")}</span>
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <strong className="text-[13px]">{path.split("/").filter(Boolean).pop()}</strong>
+        <span className="font-mono text-[11px] text-fg-faint">
+          {path.replace(/^\/Users\/[^/]+/, "~")}
+        </span>
       </div>
     </div>
   );
 }
 
+/** トーストの左端の線とアイコンの色を種類ごとに切り替える。 */
+const TOAST_EDGE: Record<string, string> = {
+  success: "border-l-green",
+  error: "border-l-red",
+  info: "border-l-accent",
+};
+const TOAST_ICON: Record<string, string> = {
+  success: "text-green",
+  error: "text-red",
+  info: "text-accent",
+};
+
 function Toasts() {
   const s = useStore();
   return (
-    <div className="toasts">
+    <div className="fixed right-3.5 bottom-[34px] z-[90] flex max-w-[420px] flex-col gap-2">
       {s.toasts.map((t) => (
-        <div key={t.id} className={`toast ${t.kind}`} onClick={() => s.dismissToast(t.id)}>
-          <Icon name={t.kind === "error" ? "x" : t.kind === "success" ? "check" : "commit"} size={14} />
+        <div
+          key={t.id}
+          className={`flex animate-toast-in cursor-pointer gap-[9px] rounded-lg border border-pop-line border-l-[3px] bg-pop px-3 py-2.5 shadow-[0_12px_30px_rgba(0,0,0,0.45)] ${TOAST_EDGE[t.kind] ?? TOAST_EDGE.info}`}
+          onClick={() => s.dismissToast(t.id)}
+        >
+          <Icon
+            name={t.kind === "error" ? "x" : t.kind === "success" ? "check" : "commit"}
+            size={14}
+            className={TOAST_ICON[t.kind] ?? TOAST_ICON.info}
+          />
           <div>
-            <strong>{t.title}</strong>
-            {t.detail ? <pre>{t.detail}</pre> : null}
+            <strong className="text-[12.5px] font-[650]">{t.title}</strong>
+            {t.detail ? (
+              <pre className="mx-0 mt-1 mb-0 max-h-[160px] overflow-auto font-mono text-[11px] break-words whitespace-pre-wrap text-fg-dim">
+                {t.detail}
+              </pre>
+            ) : null}
           </div>
         </div>
       ))}
     </div>
   );
 }
+
+const SPLITTER =
+  "w-1 flex-none cursor-col-resize bg-line-soft transition-[background] duration-150 ease-[ease] hover:bg-accent";
+
+/** リポジトリを開いている間、操作できないことを示す覆い。 */
+const VEIL =
+  "absolute inset-0 z-40 flex animate-veil-in items-center justify-center bg-veil backdrop-blur-[1.5px]";
 
 export default function App() {
   const s = useStore();
@@ -167,29 +214,29 @@ export default function App() {
   });
 
   return (
-    <div className="app">
+    <div className="flex h-full flex-col">
       <TitleBar />
       <Toolbar />
       {s.repo ? (
-        <div className="main">
+        <div className="relative flex min-h-0 flex-1 bg-bg-1">
           <div style={{ width: sidebar.width, flex: "0 0 auto", minWidth: 0 }}>
             <Sidebar onOpenPr={openPr} />
           </div>
-          <div className="splitter" {...sidebar.handlers} />
+          <div className={SPLITTER} {...sidebar.handlers} />
           <GraphPane />
-          <div className="splitter" {...detail.handlers} />
+          <div className={SPLITTER} {...detail.handlers} />
           <div style={{ width: detail.width, flex: "0 0 auto", minWidth: 0, display: "flex" }}>
             <DetailPane />
           </div>
           {s.opening ? (
-            <div className="main-veil">
+            <div className={VEIL}>
               <Opening path={s.opening} />
             </div>
           ) : null}
         </div>
       ) : s.opening ? (
-        <div className="main">
-          <div className="main-veil solid">
+        <div className="relative flex min-h-0 flex-1 bg-bg-1">
+          <div className={`${VEIL} bg-bg-1 backdrop-blur-none`}>
             <Opening path={s.opening} />
           </div>
         </div>

@@ -5,16 +5,16 @@ GitKraken 風のコミットグラフを持つ、シンプルな Git GUI (Tauri 
 
 ## 対応している操作
 
-| # | 操作 | 挙動 (GitKraken 踏襲) |
-|---|------|----------------------|
-| 1 | checkout | ブランチ / コミット / リモートブランチ (追跡ブランチを自動作成) をダブルクリックまたは右クリックから |
-| 2 | stash | 変更をスタッシュ / 最新をポップ / 適用 / 破棄。スタッシュ選択で内容の差分表示 |
-| 3 | pull | 既定は fast-forward。3 分ごとの自動フェッチで ahead/behind を表示 |
-| 4 | add | ファイル単位 / 一括のステージ・アンステージ・破棄 |
-| 5 | commit | 何もステージしていなければ全変更を自動ステージ、amend 対応 (Cmd+Enter) |
-| 6 | push | upstream 未設定なら `-u` を確認、behind があれば pull するか lease 付きの強制プッシュを選択 |
-| 7 | worktree | 一覧 / 追加 (ブランチ新規作成も可) / 削除 / prune |
-| 8 | pull request | `gh pr` で一覧・作成 (未 push なら先に push)・チェックアウト・マージ |
+| #   | 操作         | 挙動 (GitKraken 踏襲)                                                                                |
+| --- | ------------ | ---------------------------------------------------------------------------------------------------- |
+| 1   | checkout     | ブランチ / コミット / リモートブランチ (追跡ブランチを自動作成) をダブルクリックまたは右クリックから |
+| 2   | stash        | 変更をスタッシュ / 最新をポップ / 適用 / 破棄。スタッシュ選択で内容の差分表示                        |
+| 3   | pull         | 既定は fast-forward。3 分ごとの自動フェッチで ahead/behind を表示                                    |
+| 4   | add          | ファイル単位 / 一括のステージ・アンステージ・破棄                                                    |
+| 5   | commit       | 何もステージしていなければ全変更を自動ステージ、amend 対応 (Cmd+Enter)                               |
+| 6   | push         | upstream 未設定なら `-u` を確認、behind があれば pull するか lease 付きの強制プッシュを選択          |
+| 7   | worktree     | 一覧 / 追加 (ブランチ新規作成も可) / 削除 / prune                                                    |
+| 8   | pull request | `gh pr` で一覧・作成 (未 push なら先に push)・チェックアウト・マージ                                 |
 
 ## 前提
 
@@ -27,6 +27,18 @@ GitKraken 風のコミットグラフを持つ、シンプルな Git GUI (Tauri 
 bun install
 bun run tauri dev          # 起動時はカレント or 最後に開いたリポジトリを復元
 GIT_GRAPH_REPO=/path/to/repo bun run tauri dev
+```
+
+## フォーマット・静的解析
+
+コード整形には [Oxfmt](https://oxc.rs/docs/guide/usage/formatter) を使用します。
+TypeScript / TSX / CSS / JSON / Markdown などの対応ファイルが対象です。
+
+```sh
+bun run format            # 対応ファイルを整形
+bun run format:check      # 整形済みか確認 (CI 向け)
+bun run lint              # Oxlint による静的解析
+bun run ci                # 整形チェック・lint・build を並列実行
 ```
 
 ## ビルド

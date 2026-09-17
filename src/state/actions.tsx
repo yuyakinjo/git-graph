@@ -13,9 +13,7 @@ export function useActions() {
   return useMemo(() => {
     const dir = s.dir;
     const localBranchOptions = () =>
-      s.branches
-        .filter((b) => b.kind === "local")
-        .map((b) => ({ value: b.name, label: b.name }));
+      s.branches.filter((b) => b.kind === "local").map((b) => ({ value: b.name, label: b.name }));
 
     // ---------------------------------------------------------- repo
     const openFolder = async () => {
@@ -37,7 +35,14 @@ export function useActions() {
         title: "ブランチを作成",
         description: startPoint ? `分岐元: ${startPoint}` : undefined,
         fields: [
-          { name: "name", label: "ブランチ名", type: "text", required: true, mono: true, placeholder: "feature/awesome" },
+          {
+            name: "name",
+            label: "ブランチ名",
+            type: "text",
+            required: true,
+            mono: true,
+            placeholder: "feature/awesome",
+          },
           { name: "checkout", label: "作成後にチェックアウトする", type: "checkbox", value: true },
         ],
         submitLabel: "作成",
@@ -92,17 +97,30 @@ export function useActions() {
       const res = await dialogs.form({
         title: "変更をスタッシュ",
         fields: [
-          { name: "message", label: "メッセージ (任意)", type: "text", placeholder: "作業中の変更" },
+          {
+            name: "message",
+            label: "メッセージ (任意)",
+            type: "text",
+            placeholder: "作業中の変更",
+          },
           { name: "untracked", label: "未追跡ファイルも含める", type: "checkbox", value: true },
-          { name: "keepIndex", label: "ステージした変更は残す (--keep-index)", type: "checkbox", value: false },
+          {
+            name: "keepIndex",
+            label: "ステージした変更は残す (--keep-index)",
+            type: "checkbox",
+            value: false,
+          },
         ],
         submitLabel: "スタッシュ",
       });
       if (!res) return;
-      await s.run(
-        "スタッシュ",
-        () =>
-          api.stashPush(dir, String(res.message ?? ""), Boolean(res.untracked), Boolean(res.keepIndex)),
+      await s.run("スタッシュ", () =>
+        api.stashPush(
+          dir,
+          String(res.message ?? ""),
+          Boolean(res.untracked),
+          Boolean(res.keepIndex),
+        ),
       );
     };
 
@@ -129,7 +147,8 @@ export function useActions() {
     // ---------------------------------------------------------- 4-5. add / commit
     const stage = (paths: string[]) =>
       s.run("ステージ", () => api.stage(dir, paths), { silentSuccess: true });
-    const stageAll = () => s.run("すべてステージ", () => api.stageAll(dir), { silentSuccess: true });
+    const stageAll = () =>
+      s.run("すべてステージ", () => api.stageAll(dir), { silentSuccess: true });
     const unstage = (paths: string[]) =>
       s.run("アンステージ", () => api.unstage(dir, paths), { silentSuccess: true });
     const unstageAll = () =>
@@ -230,7 +249,8 @@ export function useActions() {
       const parent = s.repo ? s.repo.root.slice(0, s.repo.root.lastIndexOf("/")) : home;
       const res = await dialogs.form({
         title: "worktree を追加",
-        description: "別ディレクトリに作業ツリーを作り、同じリポジトリの別ブランチを並行して扱えます。",
+        description:
+          "別ディレクトリに作業ツリーを作り、同じリポジトリの別ブランチを並行して扱えます。",
         width: 560,
         fields: [
           {
@@ -243,7 +263,14 @@ export function useActions() {
               { value: "existing", label: "既存のブランチを使う" },
             ],
           },
-          { name: "branch", label: "ブランチ名", type: "text", required: true, mono: true, placeholder: "feature/awesome" },
+          {
+            name: "branch",
+            label: "ブランチ名",
+            type: "text",
+            required: true,
+            mono: true,
+            placeholder: "feature/awesome",
+          },
           {
             name: "base",
             label: "分岐元 (新規作成時)",
@@ -266,16 +293,14 @@ export function useActions() {
       if (!res) return;
       const isNew = res.mode === "new";
       const path = String(res.path).trim();
-      const ok = await s.run(
-        "worktree を追加",
-        () =>
-          api.worktreeAdd(
-            dir,
-            path,
-            String(res.branch).trim(),
-            isNew,
-            isNew ? String(res.base ?? "") : undefined,
-          ),
+      const ok = await s.run("worktree を追加", () =>
+        api.worktreeAdd(
+          dir,
+          path,
+          String(res.branch).trim(),
+          isNew,
+          isNew ? String(res.base ?? "") : undefined,
+        ),
       );
       if (ok && res.open) await s.openRepo(path);
     };
@@ -312,11 +337,19 @@ export function useActions() {
         return;
       }
       if (!s.gh?.installed) {
-        s.toast({ kind: "error", title: "gh CLI が見つかりません", detail: "brew install gh でインストールしてください" });
+        s.toast({
+          kind: "error",
+          title: "gh CLI が見つかりません",
+          detail: "brew install gh でインストールしてください",
+        });
         return;
       }
       if (!s.gh.authenticated) {
-        s.toast({ kind: "error", title: "gh CLI が未認証です", detail: "gh auth login を実行してください" });
+        s.toast({
+          kind: "error",
+          title: "gh CLI が未認証です",
+          detail: "gh auth login を実行してください",
+        });
         return;
       }
       if (!head.upstream) {
@@ -327,7 +360,11 @@ export function useActions() {
         });
         if (!ok) return;
         const pushed = await s.run("プッシュ", () =>
-          api.push(dir, { remote: s.repo?.remotes[0] ?? "origin", branch: head.name, setUpstream: true }),
+          api.push(dir, {
+            remote: s.repo?.remotes[0] ?? "origin",
+            branch: head.name,
+            setUpstream: true,
+          }),
         );
         if (!pushed) return;
       } else if (head.ahead > 0) {
@@ -355,7 +392,9 @@ export function useActions() {
         ...new Set(
           [
             s.gh.defaultBranch ?? "",
-            ...s.branches.filter((b) => b.kind === "remote").map((b) => b.name.split("/").slice(1).join("/")),
+            ...s.branches
+              .filter((b) => b.kind === "remote")
+              .map((b) => b.name.split("/").slice(1).join("/")),
           ].filter(Boolean),
         ),
       ].map((v) => ({ value: v, label: v }));
@@ -421,7 +460,12 @@ export function useActions() {
               { value: "rebase", label: "Rebase and merge" },
             ],
           },
-          { name: "deleteBranch", label: "マージ後にブランチを削除", type: "checkbox", value: true },
+          {
+            name: "deleteBranch",
+            label: "マージ後にブランチを削除",
+            type: "checkbox",
+            value: true,
+          },
         ],
         submitLabel: "マージ",
         danger: true,

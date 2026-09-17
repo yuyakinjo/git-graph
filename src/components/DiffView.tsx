@@ -12,7 +12,18 @@ function parseDiff(raw: string): Line[] {
   let oldNo = 0;
   let newNo = 0;
   for (const line of raw.split("\n")) {
-    if (line.startsWith("diff --git") || line.startsWith("index ") || line.startsWith("--- ") || line.startsWith("+++ ") || line.startsWith("new file") || line.startsWith("deleted file") || line.startsWith("similarity index") || line.startsWith("rename ") || line.startsWith("old mode") || line.startsWith("new mode")) {
+    if (
+      line.startsWith("diff --git") ||
+      line.startsWith("index ") ||
+      line.startsWith("--- ") ||
+      line.startsWith("+++ ") ||
+      line.startsWith("new file") ||
+      line.startsWith("deleted file") ||
+      line.startsWith("similarity index") ||
+      line.startsWith("rename ") ||
+      line.startsWith("old mode") ||
+      line.startsWith("new mode")
+    ) {
       continue;
     }
     if (line.startsWith("@@")) {
@@ -37,7 +48,8 @@ function parseDiff(raw: string): Line[] {
       out.push({ kind: "ctx", text: line.slice(1), oldNo: oldNo++, newNo: newNo++ });
     }
   }
-  while (out.length && out[out.length - 1].kind === "ctx" && out[out.length - 1].text === "") out.pop();
+  while (out.length && out[out.length - 1].kind === "ctx" && out[out.length - 1].text === "")
+    out.pop();
   return out;
 }
 

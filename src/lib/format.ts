@@ -13,7 +13,8 @@ const LANE_COLORS = [
   "#E879F9",
 ];
 
-export const laneColor = (i: number) => LANE_COLORS[((i % LANE_COLORS.length) + LANE_COLORS.length) % LANE_COLORS.length];
+export const laneColor = (i: number) =>
+  LANE_COLORS[((i % LANE_COLORS.length) + LANE_COLORS.length) % LANE_COLORS.length];
 
 export function relativeTime(unix: number): string {
   if (!unix) return "";
@@ -42,8 +43,16 @@ export function initials(name: string): string {
 }
 
 const AVATAR_COLORS = [
-  "#5B8FF9", "#61DDAA", "#F6BD16", "#7262FD", "#78D3F8",
-  "#9661BC", "#F6903D", "#008685", "#F08BB4", "#65789B",
+  "#5B8FF9",
+  "#61DDAA",
+  "#F6BD16",
+  "#7262FD",
+  "#78D3F8",
+  "#9661BC",
+  "#F6903D",
+  "#008685",
+  "#F08BB4",
+  "#65789B",
 ];
 
 export function avatarColor(seed: string): string {
@@ -53,7 +62,14 @@ export function avatarColor(seed: string): string {
 }
 
 export const statusLabel: Record<string, string> = {
-  A: "追加", M: "変更", D: "削除", R: "リネーム", C: "コピー", T: "種別変更", "?": "未追跡", U: "衝突",
+  A: "追加",
+  M: "変更",
+  D: "削除",
+  R: "リネーム",
+  C: "コピー",
+  T: "種別変更",
+  "?": "未追跡",
+  U: "衝突",
 };
 
 export function basename(p: string) {

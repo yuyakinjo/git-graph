@@ -23,7 +23,9 @@ export function Avatar({
       style={{ background: avatarColor(email || name) }}
     >
       {initials(name)}
-      {url ? <img className="avatar-img" src={url} alt="" loading="lazy" draggable={false} /> : null}
+      {url ? (
+        <img className="avatar-img" src={url} alt="" loading="lazy" draggable={false} />
+      ) : null}
     </span>
   );
 }

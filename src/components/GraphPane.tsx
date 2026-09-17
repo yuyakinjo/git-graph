@@ -22,12 +22,7 @@ const NO_EDGES: GraphEdge[] = [];
 const cxOf = (col: number, laneW: number) => PAD_X + col * laneW;
 const cy = (row: number) => row * ROW_H + ROW_H / 2;
 
-function edgePath(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-): string {
+function edgePath(x1: number, y1: number, x2: number, y2: number): string {
   if (x1 === x2) return `M ${x1} ${y1} L ${x2} ${y2}`;
   const r = Math.min(ROW_H * 0.9, Math.abs(y2 - y1));
   if (x2 > x1) {
@@ -68,7 +63,13 @@ function RefBadge({
   onMenu: (e: React.MouseEvent) => void;
 }) {
   const icon =
-    deco.kind === "tag" ? "tag" : deco.kind === "remote" ? "remote" : deco.kind === "head" ? "branch" : "commit";
+    deco.kind === "tag"
+      ? "tag"
+      : deco.kind === "remote"
+        ? "remote"
+        : deco.kind === "head"
+          ? "branch"
+          : "commit";
   return (
     <span
       className={`ref-badge ${deco.kind} ${deco.isHead ? "is-head" : ""}`}
@@ -108,12 +109,7 @@ function TagCell({
         {tags.length > 1 ? <span className="tag-n">{tags.length}</span> : null}
         <span className="tag-pop">
           {tags.map((d) => (
-            <RefBadge
-              key={d.full}
-              deco={d}
-              onCheckout={() => onCheckout(d)}
-              onMenu={onMenu(d)}
-            />
+            <RefBadge key={d.full} deco={d} onCheckout={() => onCheckout(d)} onMenu={onMenu(d)} />
           ))}
         </span>
       </span>
@@ -235,7 +231,11 @@ export function GraphPane() {
 
   const commitMenu = (c: GraphCommit) => (e: React.MouseEvent) => {
     openMenu(e, [
-      { label: `${c.short} をチェックアウト`, icon: "commit", onClick: () => act.checkout(c.hash, c.short) },
+      {
+        label: `${c.short} をチェックアウト`,
+        icon: "commit",
+        onClick: () => act.checkout(c.hash, c.short),
+      },
       { label: "ここからブランチを作成", icon: "branch", onClick: () => act.createBranch(c.hash) },
       { separator: true },
       {
@@ -258,7 +258,11 @@ export function GraphPane() {
     if (deco.kind === "head") {
       const branch = s.branches.find((b) => b.name === deco.name && b.kind === "local");
       openMenu(e, [
-        { label: `${deco.name} をチェックアウト`, icon: "branch", onClick: () => act.checkout(deco.name) },
+        {
+          label: `${deco.name} をチェックアウト`,
+          icon: "branch",
+          onClick: () => act.checkout(deco.name),
+        },
         { separator: true },
         {
           label: "ブランチを削除",
@@ -289,7 +293,11 @@ export function GraphPane() {
       return;
     }
     openMenu(e, [
-      { label: `${deco.name} をチェックアウト`, icon: "tag", onClick: () => act.checkout(deco.name) },
+      {
+        label: `${deco.name} をチェックアウト`,
+        icon: "tag",
+        onClick: () => act.checkout(deco.name),
+      },
     ]);
   };
 
@@ -484,85 +492,87 @@ export function GraphPane() {
                   strokeDasharray="2.5 2"
                 />
               ) : null}
-              {commits.slice(Math.max(0, start - rowOffset), Math.max(0, end - rowOffset)).map((c) => {
-                const isHead = c.hash === s.repo?.headHash;
-                const isSel = c.hash === selectedSha;
-                const color = laneColor(c.column);
-                const x = cx(c.column);
-                const y = cy(c.row + rowOffset);
-                const url = showNodeAvatar
-                  ? s.avatars[c.authorEmail.trim().toLowerCase()]
-                  : undefined;
-                return (
-                  <g key={c.hash} opacity={matches && !matches.has(c.hash) ? 0.3 : 1}>
-                    {isSel ? (
-                      <circle
-                        cx={x}
-                        cy={y}
-                        r={showNodeAvatar ? AVATAR_R + 3.5 : 8}
-                        fill="none"
-                        stroke={color}
-                        strokeWidth="1.2"
-                        opacity="0.5"
-                      />
-                    ) : null}
-                    {showNodeAvatar ? (
-                      <>
-                        {/* 画像が無い / 読めないときはこの地色 + イニシャルがそのまま見える */}
+              {commits
+                .slice(Math.max(0, start - rowOffset), Math.max(0, end - rowOffset))
+                .map((c) => {
+                  const isHead = c.hash === s.repo?.headHash;
+                  const isSel = c.hash === selectedSha;
+                  const color = laneColor(c.column);
+                  const x = cx(c.column);
+                  const y = cy(c.row + rowOffset);
+                  const url = showNodeAvatar
+                    ? s.avatars[c.authorEmail.trim().toLowerCase()]
+                    : undefined;
+                  return (
+                    <g key={c.hash} opacity={matches && !matches.has(c.hash) ? 0.3 : 1}>
+                      {isSel ? (
                         <circle
                           cx={x}
                           cy={y}
-                          r={AVATAR_R}
-                          fill={avatarColor(c.authorEmail || c.authorName)}
-                        />
-                        <text className="node-avatar-text" x={x} y={y}>
-                          {initials(c.authorName)}
-                        </text>
-                        {url ? (
-                          <image
-                            href={url}
-                            x={x - AVATAR_R}
-                            y={y - AVATAR_R}
-                            width={AVATAR_R * 2}
-                            height={AVATAR_R * 2}
-                            preserveAspectRatio="xMidYMid slice"
-                            clipPath="url(#node-avatar-clip)"
-                          />
-                        ) : null}
-                        {/* レーン色の輪郭で枝の対応を保つ (マージは二重線) */}
-                        <circle
-                          cx={x}
-                          cy={y}
-                          r={AVATAR_R}
+                          r={showNodeAvatar ? AVATAR_R + 3.5 : 8}
                           fill="none"
                           stroke={color}
-                          strokeWidth={isHead ? 2.5 : 1.8}
+                          strokeWidth="1.2"
+                          opacity="0.5"
                         />
-                        {c.parents.length > 1 ? (
+                      ) : null}
+                      {showNodeAvatar ? (
+                        <>
+                          {/* 画像が無い / 読めないときはこの地色 + イニシャルがそのまま見える */}
                           <circle
                             cx={x}
                             cy={y}
-                            r={AVATAR_R + 2}
+                            r={AVATAR_R}
+                            fill={avatarColor(c.authorEmail || c.authorName)}
+                          />
+                          <text className="node-avatar-text" x={x} y={y}>
+                            {initials(c.authorName)}
+                          </text>
+                          {url ? (
+                            <image
+                              href={url}
+                              x={x - AVATAR_R}
+                              y={y - AVATAR_R}
+                              width={AVATAR_R * 2}
+                              height={AVATAR_R * 2}
+                              preserveAspectRatio="xMidYMid slice"
+                              clipPath="url(#node-avatar-clip)"
+                            />
+                          ) : null}
+                          {/* レーン色の輪郭で枝の対応を保つ (マージは二重線) */}
+                          <circle
+                            cx={x}
+                            cy={y}
+                            r={AVATAR_R}
                             fill="none"
                             stroke={color}
-                            strokeWidth="1"
-                            opacity="0.7"
+                            strokeWidth={isHead ? 2.5 : 1.8}
                           />
-                        ) : null}
-                      </>
-                    ) : (
-                      <circle
-                        cx={x}
-                        cy={y}
-                        r={c.parents.length > 1 ? 4 : 4.5}
-                        fill={isHead ? color : "var(--bg-1)"}
-                        stroke={color}
-                        strokeWidth={isHead ? 3 : 2}
-                      />
-                    )}
-                  </g>
-                );
-              })}
+                          {c.parents.length > 1 ? (
+                            <circle
+                              cx={x}
+                              cy={y}
+                              r={AVATAR_R + 2}
+                              fill="none"
+                              stroke={color}
+                              strokeWidth="1"
+                              opacity="0.7"
+                            />
+                          ) : null}
+                        </>
+                      ) : (
+                        <circle
+                          cx={x}
+                          cy={y}
+                          r={c.parents.length > 1 ? 4 : 4.5}
+                          fill={isHead ? color : "var(--bg-1)"}
+                          stroke={color}
+                          strokeWidth={isHead ? 3 : 2}
+                        />
+                      )}
+                    </g>
+                  );
+                })}
             </svg>
           ) : null}
         </div>

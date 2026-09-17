@@ -71,7 +71,9 @@ export function Settings() {
           </select>
           <em className="hint">
             深くするほど見つかりますが検索に時間がかかります。
-            {s.scanning ? " 検索中..." : ` 現在 ${s.projects.length} 件のリポジトリを認識しています。`}
+            {s.scanning
+              ? " 検索中..."
+              : ` 現在 ${s.projects.length} 件のリポジトリを認識しています。`}
           </em>
         </div>
       </section>

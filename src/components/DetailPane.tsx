@@ -97,9 +97,7 @@ function WipPanel() {
           <h3>未コミットの変更</h3>
         </div>
         <div className="detail-sub">
-          {s.repo?.state !== "clean" ? (
-            <span className="state-pill">{s.repo?.state}</span>
-          ) : null}
+          {s.repo?.state !== "clean" ? <span className="state-pill">{s.repo?.state}</span> : null}
           <span>{changedCount + stagedCount} ファイル</span>
         </div>
       </header>
@@ -108,7 +106,11 @@ function WipPanel() {
         <section className="file-section">
           <div className="section-head">
             <span>変更 ({changedCount})</span>
-            <button className="btn tiny" disabled={changedCount === 0} onClick={() => act.stageAll()}>
+            <button
+              className="btn tiny"
+              disabled={changedCount === 0}
+              onClick={() => act.stageAll()}
+            >
               <Icon name="plus" size={12} /> すべてステージ
             </button>
           </div>
@@ -179,7 +181,11 @@ function WipPanel() {
         <section className="file-section">
           <div className="section-head">
             <span>ステージ済み ({stagedCount})</span>
-            <button className="btn tiny" disabled={stagedCount === 0} onClick={() => act.unstageAll()}>
+            <button
+              className="btn tiny"
+              disabled={stagedCount === 0}
+              onClick={() => act.unstageAll()}
+            >
               <Icon name="minus" size={12} /> すべて解除
             </button>
           </div>
@@ -207,7 +213,9 @@ function WipPanel() {
                 }
               />
             ))}
-            {stagedCount === 0 ? <div className="list-empty">ステージ済みのファイルはありません</div> : null}
+            {stagedCount === 0 ? (
+              <div className="list-empty">ステージ済みのファイルはありません</div>
+            ) : null}
           </div>
         </section>
       </div>
@@ -235,7 +243,11 @@ function WipPanel() {
         />
         <div className="commit-actions">
           <label className="check small">
-            <input type="checkbox" checked={amend} onChange={(e) => toggleAmend(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={amend}
+              onChange={(e) => toggleAmend(e.target.checked)}
+            />
             <span>直前のコミットを修正 (amend)</span>
           </label>
           <button
@@ -244,7 +256,11 @@ function WipPanel() {
             onClick={() => act.commit(message, amend).then((ok) => ok && setMessage(""))}
           >
             <Icon name="check" size={14} />
-            {amend ? "コミットを修正" : stagedCount === 0 ? "すべてコミット" : `${stagedCount} 件をコミット`}
+            {amend
+              ? "コミットを修正"
+              : stagedCount === 0
+                ? "すべてコミット"
+                : `${stagedCount} 件をコミット`}
           </button>
         </div>
       </div>
@@ -264,10 +280,10 @@ function CommitPanel({ sha }: { sha: string }) {
 
   const totals = useMemo(() => {
     const files = detail?.files ?? [];
-    return files.reduce(
-      (acc, f) => ({ a: acc.a + f.additions, d: acc.d + f.deletions }),
-      { a: 0, d: 0 },
-    );
+    return files.reduce((acc, f) => ({ a: acc.a + f.additions, d: acc.d + f.deletions }), {
+      a: 0,
+      d: 0,
+    });
   }, [detail]);
 
   if (!detail) return <div className="detail loading">読み込み中...</div>;
@@ -370,13 +386,25 @@ function StashPanel({ refname, message }: { refname: string; message: string }) 
           </div>
         </div>
         <div className="detail-tools">
-          <button className="btn tiny" disabled={!stash} onClick={() => stash && act.stashApply(stash, false)}>
+          <button
+            className="btn tiny"
+            disabled={!stash}
+            onClick={() => stash && act.stashApply(stash, false)}
+          >
             適用
           </button>
-          <button className="btn tiny" disabled={!stash} onClick={() => stash && act.stashApply(stash, true)}>
+          <button
+            className="btn tiny"
+            disabled={!stash}
+            onClick={() => stash && act.stashApply(stash, true)}
+          >
             ポップ
           </button>
-          <button className="btn tiny danger" disabled={!stash} onClick={() => stash && act.stashDrop(stash)}>
+          <button
+            className="btn tiny danger"
+            disabled={!stash}
+            onClick={() => stash && act.stashDrop(stash)}
+          >
             破棄
           </button>
         </div>

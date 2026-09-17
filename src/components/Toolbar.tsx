@@ -1,6 +1,24 @@
 import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
+import { iconBtn } from "./classes";
 import { Icon, Spinner, useMenu } from "./ui";
+
+const TOOL_BASE =
+  "flex h-[30px] cursor-pointer items-center gap-1.5 border-0 bg-transparent text-[12.5px] whitespace-nowrap not-disabled:hover:bg-bg-3 disabled:cursor-default disabled:opacity-40";
+/** 単独のツールボタン */
+const TOOL = `${TOOL_BASE} rounded-md px-2.5 text-fg`;
+/** ドロップダウンと連結したときの左半分 */
+const TOOL_SPLIT = `${TOOL_BASE} rounded-l-md rounded-r-none pr-1.5 pl-2.5 text-fg`;
+/** ドロップダウンを開く右半分 */
+const CARET = `${TOOL_BASE} rounded-r-md rounded-l-none px-[5px] text-fg-dim`;
+
+const TOOL_BADGE =
+  "rounded-lg bg-bg-3 px-[5px] py-px text-[10.5px] font-bold text-fg-dim not-italic";
+const TOOL_BADGE_ACCENT =
+  "rounded-lg bg-accent-soft px-[5px] py-px text-[10.5px] font-bold text-accent not-italic";
+
+/** ステータスバーの各項目 */
+const SB_ITEM = "inline-flex items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap";
 
 export function Toolbar() {
   const s = useStore();
@@ -47,74 +65,109 @@ export function Toolbar() {
   const disabled = !s.repo || Boolean(s.busy);
 
   return (
-    <header className="toolbar">
-      <div className="tool-group">
-        <button className="tool" disabled={disabled} onClick={() => act.fetch()} title="git fetch --all --prune">
+    <header className="flex h-[46px] flex-none items-center gap-2.5 border-b border-line bg-bg-0 px-2.5">
+      <div className="flex h-[30px] items-center gap-0.5">
+        <button
+          className={TOOL}
+          disabled={disabled}
+          onClick={() => act.fetch()}
+          title="git fetch --all --prune"
+        >
           <Icon name="fetch" />
           <span>フェッチ</span>
         </button>
-        <div className="split">
-          <button className="tool" disabled={disabled} onClick={() => act.pull(false)} title="git pull">
+        <div className="flex items-center">
+          <button
+            className={TOOL_SPLIT}
+            disabled={disabled}
+            onClick={() => act.pull(false)}
+            title="git pull"
+          >
             <Icon name="pull" />
             <span>プル</span>
-            {head?.behind ? <em className="tool-badge">{head.behind}</em> : null}
+            {head?.behind ? <em className={TOOL_BADGE}>{head.behind}</em> : null}
           </button>
-          <button className="caret" disabled={disabled} onClick={pullMenu}>
+          <button className={CARET} disabled={disabled} onClick={pullMenu}>
             <Icon name="chevronDown" size={11} />
           </button>
         </div>
-        <div className="split">
-          <button className="tool" disabled={disabled} onClick={() => act.push()} title="git push">
+        <div className="flex items-center">
+          <button
+            className={TOOL_SPLIT}
+            disabled={disabled}
+            onClick={() => act.push()}
+            title="git push"
+          >
             <Icon name="push" />
             <span>プッシュ</span>
-            {head?.ahead ? <em className="tool-badge accent">{head.ahead}</em> : null}
+            {head?.ahead ? <em className={TOOL_BADGE_ACCENT}>{head.ahead}</em> : null}
           </button>
-          <button className="caret" disabled={disabled} onClick={pushMenu}>
+          <button className={CARET} disabled={disabled} onClick={pushMenu}>
             <Icon name="chevronDown" size={11} />
           </button>
         </div>
       </div>
 
-      <div className="tool-group">
-        <button className="tool" disabled={disabled} onClick={() => act.createBranch()} title="ブランチを作成">
+      <div className="flex h-[30px] items-center gap-0.5 border-l border-line pl-1.5">
+        <button
+          className={TOOL}
+          disabled={disabled}
+          onClick={() => act.createBranch()}
+          title="ブランチを作成"
+        >
           <Icon name="branch" />
           <span>ブランチ</span>
         </button>
-        <div className="split">
-          <button className="tool" disabled={disabled} onClick={() => act.stashPush()} title="git stash push">
+        <div className="flex items-center">
+          <button
+            className={TOOL_SPLIT}
+            disabled={disabled}
+            onClick={() => act.stashPush()}
+            title="git stash push"
+          >
             <Icon name="stash" />
             <span>スタッシュ</span>
-            {s.stashes.length ? <em className="tool-badge">{s.stashes.length}</em> : null}
+            {s.stashes.length ? <em className={TOOL_BADGE}>{s.stashes.length}</em> : null}
           </button>
-          <button className="caret" disabled={disabled} onClick={stashMenu}>
+          <button className={CARET} disabled={disabled} onClick={stashMenu}>
             <Icon name="chevronDown" size={11} />
           </button>
         </div>
-        <button className="tool" disabled={disabled} onClick={() => act.worktreeAdd()} title="git worktree add">
+        <button
+          className={TOOL}
+          disabled={disabled}
+          onClick={() => act.worktreeAdd()}
+          title="git worktree add"
+        >
           <Icon name="worktree" />
           <span>worktree</span>
         </button>
-        <button className="tool" disabled={disabled} onClick={() => act.prCreate()} title="gh pr create">
+        <button
+          className={TOOL}
+          disabled={disabled}
+          onClick={() => act.prCreate()}
+          title="gh pr create"
+        >
           <Icon name="pr" />
           <span>PR 作成</span>
         </button>
       </div>
 
-      <div className="toolbar-right">
+      <div className="ml-auto flex items-center gap-2">
         {s.busy ? (
-          <span className="busy">
+          <span className="flex items-center gap-1.5 text-[12px] text-fg-dim">
             <Spinner /> {s.busy}
           </span>
         ) : null}
         <button
-          className={`icon-btn ${s.autoFetch ? "active" : ""}`}
+          className={iconBtn({ active: s.autoFetch })}
           title={`自動フェッチ: ${s.autoFetch ? "ON (3分間隔)" : "OFF"}`}
           onClick={s.toggleAutoFetch}
         >
           <Icon name="clock" size={15} />
         </button>
         <button
-          className="icon-btn"
+          className={iconBtn()}
           title="再読み込み"
           disabled={!s.repo}
           onClick={() => s.refresh({ withGh: true })}
@@ -129,26 +182,26 @@ export function Toolbar() {
 export function StatusBar() {
   const s = useStore();
   return (
-    <footer className="statusbar">
-      <span className="mono">{s.repo?.root ?? ""}</span>
-      <span className="grow-space" />
+    <footer className="flex h-6 flex-none items-center gap-3.5 border-t border-line bg-bg-0 px-3 text-[11px] text-fg-dim">
+      <span className={`${SB_ITEM} font-mono text-[12px]`}>{s.repo?.root ?? ""}</span>
+      <span className={`${SB_ITEM} flex-1`} />
       {s.gh?.repo ? (
-        <span title={s.gh.url ?? undefined}>
+        <span className={SB_ITEM} title={s.gh.url ?? undefined}>
           <Icon name="pr" size={12} /> {s.gh.repo}
           {s.gh.login ? ` (${s.gh.login})` : ""}
         </span>
       ) : s.gh && !s.gh.installed ? (
-        <span className="warn-text">gh CLI 未検出</span>
+        <span className={`${SB_ITEM} text-amber`}>gh CLI 未検出</span>
       ) : null}
-      {s.graph ? <span>{s.graph.commits.length} コミット</span> : null}
-      {s.stashes.length ? <span>スタッシュ {s.stashes.length}</span> : null}
+      {s.graph ? <span className={SB_ITEM}>{s.graph.commits.length} コミット</span> : null}
+      {s.stashes.length ? <span className={SB_ITEM}>スタッシュ {s.stashes.length}</span> : null}
       {s.repo?.headHash ? (
-        <span className="mono" title="HEAD">
+        <span className={`${SB_ITEM} font-mono text-[12px]`} title="HEAD">
           {s.repo.headHash.slice(0, 7)}
         </span>
       ) : null}
       {s.status ? (
-        <span>
+        <span className={SB_ITEM}>
           {s.dirty ? `変更 ${s.status.staged.length + s.status.unstaged.length}` : "クリーン"}
           {s.status.conflicts.length ? ` / 衝突 ${s.status.conflicts.length}` : ""}
         </span>

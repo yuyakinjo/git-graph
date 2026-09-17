@@ -76,9 +76,7 @@ export const GRAPH_COLUMNS = [
 export type GraphColumnKey = (typeof GRAPH_COLUMNS)[number]["key"];
 export type GraphColumns = Record<GraphColumnKey, boolean>;
 
-const DEFAULT_COLUMNS = Object.fromEntries(
-  GRAPH_COLUMNS.map((c) => [c.key, true]),
-) as GraphColumns;
+const DEFAULT_COLUMNS = Object.fromEntries(GRAPH_COLUMNS.map((c) => [c.key, true])) as GraphColumns;
 
 function loadColumns(): GraphColumns {
   const next = { ...DEFAULT_COLUMNS };
@@ -157,9 +155,7 @@ export function useStoreValue(boot: BootData | null) {
   });
   // タブごとの「未コミット変更あり」。現在のタブ以外は最後に読んだ時点の情報。
   const [tabDirty, setTabDirty] = useState<Record<string, boolean>>({});
-  const [autoFetch, setAutoFetch] = useState(
-    () => localStorage.getItem(AUTOFETCH_KEY) !== "off",
-  );
+  const [autoFetch, setAutoFetch] = useState(() => localStorage.getItem(AUTOFETCH_KEY) !== "off");
   const [columns, setColumns] = useState<GraphColumns>(loadColumns);
 
   // ---- 設定 (プロジェクト置き場) と、そこから見つけたリポジトリ ----
@@ -616,13 +612,7 @@ export type Store = ReturnType<typeof useStoreValue>;
 
 const Ctx = createContext<Store | null>(null);
 
-export function StoreProvider({
-  boot,
-  children,
-}: {
-  boot: BootData | null;
-  children: ReactNode;
-}) {
+export function StoreProvider({ boot, children }: { boot: BootData | null; children: ReactNode }) {
   const value = useStoreValue(boot);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useStore } from "../state/store";
 import { RepoPicker } from "./RepoPicker";
+import { miniPill } from "./classes";
 import { Icon, Spinner, useMenu } from "./ui";
 
 const shortPath = (p: string) => p.replace(/^\/Users\/[^/]+/, "~");
@@ -47,8 +48,12 @@ export function TitleBar() {
   const head = s.headBranch;
   const headLabel = s.repo?.detached
     ? `detached @ ${s.repo.headHash?.slice(0, 7) ?? ""}`
-    : head?.name ?? s.repo?.headBranch ?? "";
-  const headTitle = [headLabel, head?.ahead ? `↑${head.ahead}` : "", head?.behind ? `↓${head.behind}` : ""]
+    : (head?.name ?? s.repo?.headBranch ?? "");
+  const headTitle = [
+    headLabel,
+    head?.ahead ? `↑${head.ahead}` : "",
+    head?.behind ? `↓${head.behind}` : "",
+  ]
     .filter(Boolean)
     .join(" ");
 
@@ -72,8 +77,11 @@ export function TitleBar() {
   };
 
   return (
-    <header className="titlebar" data-tauri-drag-region>
-      <div className="titlebar-tabs">
+    <header
+      className="flex h-10 flex-none items-end border-b border-line bg-bg-0 pl-[98px] select-none"
+      data-tauri-drag-region
+    >
+      <div className="flex min-w-0 items-end gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:h-0">
         {tabs.map((path) => {
           // 読み込み中はその行き先を選択中として見せる (実際の切り替えは読み込み後)
           const loading = path === s.opening;
@@ -81,25 +89,47 @@ export function TitleBar() {
           return (
             <div
               key={path}
-              className={`rtab ${active ? "active" : ""} ${loading ? "loading" : ""}`}
+              className={`group flex h-[30px] min-w-[96px] flex-initial cursor-default items-center gap-1.5 rounded-t-lg border border-transparent border-b-0 py-0 pr-1.5 pl-2.5 text-[12.5px] ${
+                active
+                  ? "max-w-[420px] border-line bg-bg-1 font-semibold text-fg"
+                  : "max-w-[190px] text-fg-dim hover:bg-bg-hover hover:text-fg"
+              }`}
               title={shortPath(path)}
               onClick={() => !active && !s.opening && s.openRepo(path)}
               onContextMenu={(e) => tabMenu(e, path)}
               onAuxClick={(e) => e.button === 1 && s.closeTab(path)}
             >
               {loading ? <Spinner size={12} /> : <Icon name="repo" size={13} />}
-              <span className="rtab-name">{labels[path]}</span>
+              <span
+                className={`min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap ${
+                  loading ? "text-fg-dim" : ""
+                }`}
+              >
+                {labels[path]}
+              </span>
               {/* チェックアウト中のブランチはアクティブなタブのリポジトリ名の横に出す */}
               {active && !loading && s.repo ? (
-                <span className="rtab-branch" title={headTitle}>
+                <span
+                  className="flex h-5 max-w-[220px] min-w-0 flex-initial items-center gap-1 rounded-[10px] border border-line bg-bg-2 px-[7px] text-[11.5px] font-medium text-fg-dim"
+                  title={headTitle}
+                >
                   <Icon name={s.repo.detached ? "commit" : "branch"} size={11} />
-                  <span className="rtab-branch-name">{headLabel}</span>
-                  {s.repo.isLinkedWorktree ? <span className="mini-pill">worktree</span> : null}
+                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                    {headLabel}
+                  </span>
+                  {s.repo.isLinkedWorktree ? <span className={miniPill()}>worktree</span> : null}
                 </span>
               ) : null}
-              {s.tabDirty[path] ? <span className="rtab-dot" title="未コミットの変更あり" /> : null}
+              {s.tabDirty[path] ? (
+                <span
+                  className="h-1.5 w-1.5 flex-none rounded-full bg-amber"
+                  title="未コミットの変更あり"
+                />
+              ) : null}
               <button
-                className="rtab-close"
+                className={`flex h-[18px] w-[18px] flex-none cursor-pointer items-center justify-center rounded-[5px] border-0 bg-transparent p-0 text-fg-faint group-hover:opacity-100 hover:bg-bg-3 hover:text-fg ${
+                  active ? "opacity-100" : "opacity-0"
+                }`}
                 title="タブを閉じる"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -111,14 +141,16 @@ export function TitleBar() {
             </div>
           );
         })}
-        <button className="rtab-add" title="リポジトリを開く" onClick={openPicker}>
+        <button
+          className="mx-0.5 mt-0 mb-0.5 flex h-[26px] w-[26px] flex-none cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-fg-dim hover:bg-bg-3 hover:text-fg"
+          title="リポジトリを開く"
+          onClick={openPicker}
+        >
           <Icon name="plus" size={13} />
         </button>
       </div>
-      <div className="titlebar-drag" data-tauri-drag-region />
-      {picker ? (
-        <RepoPicker x={picker.x} y={picker.y} onClose={() => setPicker(null)} />
-      ) : null}
+      <div className="min-w-[24px] flex-1 self-stretch" data-tauri-drag-region />
+      {picker ? <RepoPicker x={picker.x} y={picker.y} onClose={() => setPicker(null)} /> : null}
     </header>
   );
 }

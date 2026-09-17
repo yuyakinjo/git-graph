@@ -49,7 +49,12 @@ export const api = {
     invoke<string>("git_pull", { dir, rebase, autostash }),
   push: (
     dir: string,
-    opts: { remote?: string; branch?: string; setUpstream?: boolean; forceWithLease?: boolean } = {},
+    opts: {
+      remote?: string;
+      branch?: string;
+      setUpstream?: boolean;
+      forceWithLease?: boolean;
+    } = {},
   ) =>
     invoke<string>("git_push", {
       dir,

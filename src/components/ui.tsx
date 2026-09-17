@@ -1,6 +1,20 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useWindowEvent } from "../lib/effects";
+import {
+  btn,
+  ctxBackdrop,
+  ctxIconGap,
+  ctxItem,
+  ctxMenu,
+  ctxSep,
+  dialogDesc,
+  field,
+  fieldInput,
+  fieldLabel,
+  hint,
+  iconBtn,
+} from "./classes";
 
 /**
  * 中に何も focus が無ければ自分に focus する ref コールバック。
@@ -20,34 +34,191 @@ function focusField(el: HTMLInputElement | HTMLTextAreaElement | null) {
 // ------------------------------------------------------------------ アイコン
 
 const PATHS: Record<string, ReactNode> = {
-  pull: <><path d="M12 3v11" /><path d="M7.5 9.5 12 14l4.5-4.5" /><path d="M4 19h16" /></>,
-  push: <><path d="M12 21V10" /><path d="M7.5 14.5 12 10l4.5 4.5" /><path d="M4 5h16" /></>,
-  fetch: <><path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1" /><path d="M20.5 4.5v4h-4" /></>,
-  branch: <><circle cx="6" cy="5" r="2.2" /><circle cx="6" cy="19" r="2.2" /><circle cx="17.5" cy="7.5" r="2.2" /><path d="M6 7.2v9.6" /><path d="M15.7 9.2c-1.6 3.4-9.7 2.1-9.7 7.6" /></>,
-  stash: <><path d="M3.5 7.5h17v3.5h-17z" /><path d="M5.5 11v8.5h13V11" /><path d="M10 15h4" /></>,
-  commit: <><circle cx="12" cy="12" r="3.3" /><path d="M3 12h5.7" /><path d="M15.3 12H21" /></>,
-  tag: <><path d="M12.5 3.5H6A2.5 2.5 0 0 0 3.5 6v6.5l9 9 9-9-9-9z" /><circle cx="8" cy="8" r="1.3" /></>,
-  pr: <><circle cx="6.5" cy="5.5" r="2.2" /><circle cx="6.5" cy="18.5" r="2.2" /><circle cx="17.5" cy="18.5" r="2.2" /><path d="M6.5 7.7v8.6" /><path d="M17.5 16.3V9.5A2.5 2.5 0 0 0 15 7h-3" /><path d="M14 4.5 11.5 7 14 9.5" /></>,
-  folder: <><path d="M3.5 7a2 2 0 0 1 2-2h3.7l2 2h7.3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></>,
-  plus: <><path d="M12 5v14" /><path d="M5 12h14" /></>,
-  minus: <><path d="M5 12h14" /></>,
-  trash: <><path d="M4 7h16" /><path d="M9.5 7V4.8h5V7" /><path d="M6.5 7l1 12.2h9L17.5 7" /></>,
-  check: <><path d="M5 12.5l4.5 4.5L19 7.5" /></>,
-  x: <><path d="M6.5 6.5l11 11" /><path d="M17.5 6.5l-11 11" /></>,
-  chevronRight: <><path d="M9.5 6l6 6-6 6" /></>,
-  chevronDown: <><path d="M6 9.5l6 6 6-6" /></>,
-  dots: <><circle cx="6" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="18" cy="12" r="1.5" /></>,
-  search: <><circle cx="11" cy="11" r="6.5" /><path d="M16.2 16.2 21 21" /></>,
-  external: <><path d="M14 4h6v6" /><path d="M20 4l-8.5 8.5" /><path d="M18 14.5V19a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 19V8.5A1.5 1.5 0 0 1 6 7h4.5" /></>,
-  worktree: <><path d="M12 3l8.5 4.7-8.5 4.7L3.5 7.7z" /><path d="M3.5 12.8 12 17.5l8.5-4.7" /><path d="M3.5 17.3 12 22l8.5-4.7" /></>,
-  copy: <><path d="M9 9h10.5v11.5H9z" /><path d="M5.5 15V3.5H16" /></>,
-  remote: <><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17" /><path d="M12 3.5c2.6 2.6 2.6 14.4 0 17" /><path d="M12 3.5c-2.6 2.6-2.6 14.4 0 17" /></>,
-  repo: <><path d="M5 4.5h11a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2z" /><path d="M5 17.5h13" /></>,
-  file: <><path d="M13.5 3.5H7a1.5 1.5 0 0 0-1.5 1.5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5z" /><path d="M13.5 3.5V8.5h5" /></>,
-  amend: <><path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1" /><path d="M20.5 4.5v4h-4" /><path d="M12 8v4l3 2" /></>,
-  merge: <><circle cx="6.5" cy="5.5" r="2.2" /><circle cx="6.5" cy="18.5" r="2.2" /><circle cx="17.5" cy="9" r="2.2" /><path d="M6.5 7.7v8.6" /><path d="M15.4 10.6c-1.5 3.2-8.9 2-8.9 7.2" /></>,
-  clock: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3.2 2" /></>,
-  columns: <><rect x="3.5" y="4.5" width="17" height="15" rx="2" /><path d="M9.5 4.5v15" /><path d="M15.5 4.5v15" /></>,
+  pull: (
+    <>
+      <path d="M12 3v11" />
+      <path d="M7.5 9.5 12 14l4.5-4.5" />
+      <path d="M4 19h16" />
+    </>
+  ),
+  push: (
+    <>
+      <path d="M12 21V10" />
+      <path d="M7.5 14.5 12 10l4.5 4.5" />
+      <path d="M4 5h16" />
+    </>
+  ),
+  fetch: (
+    <>
+      <path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1" />
+      <path d="M20.5 4.5v4h-4" />
+    </>
+  ),
+  branch: (
+    <>
+      <circle cx="6" cy="5" r="2.2" />
+      <circle cx="6" cy="19" r="2.2" />
+      <circle cx="17.5" cy="7.5" r="2.2" />
+      <path d="M6 7.2v9.6" />
+      <path d="M15.7 9.2c-1.6 3.4-9.7 2.1-9.7 7.6" />
+    </>
+  ),
+  stash: (
+    <>
+      <path d="M3.5 7.5h17v3.5h-17z" />
+      <path d="M5.5 11v8.5h13V11" />
+      <path d="M10 15h4" />
+    </>
+  ),
+  commit: (
+    <>
+      <circle cx="12" cy="12" r="3.3" />
+      <path d="M3 12h5.7" />
+      <path d="M15.3 12H21" />
+    </>
+  ),
+  tag: (
+    <>
+      <path d="M12.5 3.5H6A2.5 2.5 0 0 0 3.5 6v6.5l9 9 9-9-9-9z" />
+      <circle cx="8" cy="8" r="1.3" />
+    </>
+  ),
+  pr: (
+    <>
+      <circle cx="6.5" cy="5.5" r="2.2" />
+      <circle cx="6.5" cy="18.5" r="2.2" />
+      <circle cx="17.5" cy="18.5" r="2.2" />
+      <path d="M6.5 7.7v8.6" />
+      <path d="M17.5 16.3V9.5A2.5 2.5 0 0 0 15 7h-3" />
+      <path d="M14 4.5 11.5 7 14 9.5" />
+    </>
+  ),
+  folder: (
+    <>
+      <path d="M3.5 7a2 2 0 0 1 2-2h3.7l2 2h7.3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" />
+    </>
+  ),
+  plus: (
+    <>
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </>
+  ),
+  minus: (
+    <>
+      <path d="M5 12h14" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M4 7h16" />
+      <path d="M9.5 7V4.8h5V7" />
+      <path d="M6.5 7l1 12.2h9L17.5 7" />
+    </>
+  ),
+  check: (
+    <>
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </>
+  ),
+  x: (
+    <>
+      <path d="M6.5 6.5l11 11" />
+      <path d="M17.5 6.5l-11 11" />
+    </>
+  ),
+  chevronRight: (
+    <>
+      <path d="M9.5 6l6 6-6 6" />
+    </>
+  ),
+  chevronDown: (
+    <>
+      <path d="M6 9.5l6 6 6-6" />
+    </>
+  ),
+  dots: (
+    <>
+      <circle cx="6" cy="12" r="1.5" />
+      <circle cx="12" cy="12" r="1.5" />
+      <circle cx="18" cy="12" r="1.5" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M16.2 16.2 21 21" />
+    </>
+  ),
+  external: (
+    <>
+      <path d="M14 4h6v6" />
+      <path d="M20 4l-8.5 8.5" />
+      <path d="M18 14.5V19a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 19V8.5A1.5 1.5 0 0 1 6 7h4.5" />
+    </>
+  ),
+  worktree: (
+    <>
+      <path d="M12 3l8.5 4.7-8.5 4.7L3.5 7.7z" />
+      <path d="M3.5 12.8 12 17.5l8.5-4.7" />
+      <path d="M3.5 17.3 12 22l8.5-4.7" />
+    </>
+  ),
+  copy: (
+    <>
+      <path d="M9 9h10.5v11.5H9z" />
+      <path d="M5.5 15V3.5H16" />
+    </>
+  ),
+  remote: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17" />
+      <path d="M12 3.5c2.6 2.6 2.6 14.4 0 17" />
+      <path d="M12 3.5c-2.6 2.6-2.6 14.4 0 17" />
+    </>
+  ),
+  repo: (
+    <>
+      <path d="M5 4.5h11a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2z" />
+      <path d="M5 17.5h13" />
+    </>
+  ),
+  file: (
+    <>
+      <path d="M13.5 3.5H7a1.5 1.5 0 0 0-1.5 1.5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8.5z" />
+      <path d="M13.5 3.5V8.5h5" />
+    </>
+  ),
+  amend: (
+    <>
+      <path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1" />
+      <path d="M20.5 4.5v4h-4" />
+      <path d="M12 8v4l3 2" />
+    </>
+  ),
+  merge: (
+    <>
+      <circle cx="6.5" cy="5.5" r="2.2" />
+      <circle cx="6.5" cy="18.5" r="2.2" />
+      <circle cx="17.5" cy="9" r="2.2" />
+      <path d="M6.5 7.7v8.6" />
+      <path d="M15.4 10.6c-1.5 3.2-8.9 2-8.9 7.2" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3.2 2" />
+    </>
+  ),
+  columns: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <path d="M9.5 4.5v15" />
+      <path d="M15.5 4.5v15" />
+    </>
+  ),
 };
 
 export function Icon({
@@ -94,7 +265,7 @@ export function Modal({
 }) {
   return (
     <div
-      className="modal-backdrop"
+      className="fixed inset-0 z-[60] flex items-start justify-center bg-scrim pt-[8vh] backdrop-blur-[2px]"
       onMouseDown={onClose}
       onKeyDown={(e) => {
         if (e.key !== "Escape") return;
@@ -103,7 +274,7 @@ export function Modal({
       }}
     >
       <div
-        className="modal"
+        className="flex max-h-[82vh] flex-col overflow-hidden rounded-xl border border-line bg-bg-2 shadow-[0_24px_60px_rgba(0,0,0,0.5)]"
         style={{ width }}
         tabIndex={-1}
         ref={focusIfEmpty}
@@ -111,14 +282,20 @@ export function Modal({
         role="dialog"
         aria-label={title}
       >
-        <header className="modal-head">
-          <h2>{title}</h2>
-          <button className="icon-btn" onClick={onClose} title="閉じる">
+        <header className="flex items-center gap-2.5 border-b border-line px-3.5 py-3">
+          <h2 className="m-0 flex-1 overflow-hidden text-[14px] font-[650] text-ellipsis whitespace-nowrap">
+            {title}
+          </h2>
+          <button className={iconBtn()} onClick={onClose} title="閉じる">
             <Icon name="x" />
           </button>
         </header>
-        <div className="modal-body">{children}</div>
-        {footer ? <footer className="modal-foot">{footer}</footer> : null}
+        <div className="overflow-auto p-3.5">{children}</div>
+        {footer ? (
+          <footer className="flex items-center justify-end gap-2 border-t border-line bg-bg-1 px-3.5 py-2.5">
+            {footer}
+          </footer>
+        ) : null}
       </div>
     </div>
   );
@@ -204,11 +381,11 @@ function FormDialog({
       onClose={() => resolve(null)}
       footer={
         <>
-          <button className="btn ghost" onClick={() => resolve(null)}>
+          <button className={btn("ghost")} onClick={() => resolve(null)}>
             キャンセル
           </button>
           <button
-            className={`btn ${spec.danger ? "danger" : "primary"}`}
+            className={btn(spec.danger ? "danger" : "primary")}
             disabled={missing}
             onClick={submit}
           >
@@ -217,9 +394,9 @@ function FormDialog({
         </>
       }
     >
-      {spec.description ? <p className="dialog-desc">{spec.description}</p> : null}
+      {spec.description ? <p className={dialogDesc}>{spec.description}</p> : null}
       <div
-        className="form"
+        className="flex flex-col gap-3"
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
         }}
@@ -228,29 +405,33 @@ function FormDialog({
           const common = { id: `f-${f.name}` };
           if (f.type === "checkbox") {
             return (
-              <label key={f.name} className="check">
+              <label
+                key={f.name}
+                className="flex cursor-pointer items-center gap-[7px] text-[12.5px] text-fg"
+              >
                 <input
                   type="checkbox"
+                  className="h-[14px] w-[14px] accent-accent"
                   checked={Boolean(values[f.name])}
                   onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.checked }))}
                 />
                 <span>{f.label}</span>
-                {f.hint ? <em className="hint">{f.hint}</em> : null}
+                {f.hint ? <em className={hint}>{f.hint}</em> : null}
               </label>
             );
           }
           return (
-            <div key={f.name} className="field">
-              <label htmlFor={common.id}>
+            <div key={f.name} className={field}>
+              <label className={fieldLabel} htmlFor={common.id}>
                 {f.label}
-                {f.required ? <span className="req">*</span> : null}
+                {f.required ? <span className="ml-[3px] text-red">*</span> : null}
               </label>
               {f.type === "textarea" ? (
                 <textarea
                   {...common}
                   ref={i === 0 ? focusField : undefined}
                   rows={f.rows ?? 6}
-                  className={f.mono ? "mono" : undefined}
+                  className={`${fieldInput} ${f.mono ? "font-mono text-[12px]" : "font-sans text-[12.5px]"}`}
                   placeholder={f.placeholder}
                   value={String(values[f.name] ?? "")}
                   onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
@@ -258,6 +439,7 @@ function FormDialog({
               ) : f.type === "select" ? (
                 <select
                   {...common}
+                  className={`${fieldInput} font-sans text-[12.5px]`}
                   value={String(values[f.name] ?? "")}
                   onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
                 >
@@ -268,16 +450,16 @@ function FormDialog({
                   ))}
                 </select>
               ) : f.type === "dirpath" ? (
-                <div className="row">
+                <div className="flex gap-2">
                   <input
                     {...common}
                     ref={i === 0 ? focusField : undefined}
-                    className="mono"
+                    className={`${fieldInput} font-mono text-[12px]`}
                     placeholder={f.placeholder}
                     value={String(values[f.name] ?? "")}
                     onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
                   />
-                  <button className="btn ghost" onClick={() => pickDir(f.name)}>
+                  <button className={btn("ghost")} onClick={() => pickDir(f.name)}>
                     <Icon name="folder" /> 選択
                   </button>
                 </div>
@@ -285,13 +467,13 @@ function FormDialog({
                 <input
                   {...common}
                   ref={i === 0 ? focusField : undefined}
-                  className={f.mono ? "mono" : undefined}
+                  className={`${fieldInput} ${f.mono ? "font-mono text-[12px]" : "font-sans text-[12.5px]"}`}
                   placeholder={f.placeholder}
                   value={String(values[f.name] ?? "")}
                   onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
                 />
               )}
-              {f.hint ? <em className="hint">{f.hint}</em> : null}
+              {f.hint ? <em className={hint}>{f.hint}</em> : null}
             </div>
           );
         })}
@@ -300,13 +482,7 @@ function FormDialog({
   );
 }
 
-function ConfirmDialog({
-  spec,
-  resolve,
-}: {
-  spec: ConfirmSpec;
-  resolve: (v: boolean) => void;
-}) {
+function ConfirmDialog({ spec, resolve }: { spec: ConfirmSpec; resolve: (v: boolean) => void }) {
   return (
     <Modal
       title={spec.title}
@@ -314,19 +490,16 @@ function ConfirmDialog({
       onClose={() => resolve(false)}
       footer={
         <>
-          <button className="btn ghost" onClick={() => resolve(false)}>
+          <button className={btn("ghost")} onClick={() => resolve(false)}>
             キャンセル
           </button>
-          <button
-            className={`btn ${spec.danger ? "danger" : "primary"}`}
-            onClick={() => resolve(true)}
-          >
+          <button className={btn(spec.danger ? "danger" : "primary")} onClick={() => resolve(true)}>
             {spec.confirmLabel ?? "実行"}
           </button>
         </>
       }
     >
-      <div className="confirm-msg">{spec.message}</div>
+      <div className="text-[13px] leading-[1.6] break-words text-fg">{spec.message}</div>
     </Modal>
   );
 }
@@ -382,9 +555,9 @@ export interface MenuItem {
   separator?: boolean;
 }
 
-const MenuCtx = createContext<((e: { clientX: number; clientY: number }, items: MenuItem[]) => void) | null>(
-  null,
-);
+const MenuCtx = createContext<
+  ((e: { clientX: number; clientY: number }, items: MenuItem[]) => void) | null
+>(null);
 export const useMenu = () => {
   const v = useContext(MenuCtx);
   if (!v) throw new Error("MenuProvider が必要です");
@@ -394,12 +567,9 @@ export const useMenu = () => {
 export function MenuProvider({ children }: { children: ReactNode }) {
   const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
 
-  const openMenu = useCallback(
-    (e: { clientX: number; clientY: number }, items: MenuItem[]) => {
-      setMenu({ x: e.clientX, y: e.clientY, items: items.filter(Boolean) });
-    },
-    [],
-  );
+  const openMenu = useCallback((e: { clientX: number; clientY: number }, items: MenuItem[]) => {
+    setMenu({ x: e.clientX, y: e.clientY, items: items.filter(Boolean) });
+  }, []);
 
   const close = useCallback(() => setMenu(null), []);
 
@@ -416,7 +586,7 @@ export function MenuProvider({ children }: { children: ReactNode }) {
       {children}
       {menu ? (
         <div
-          className="ctx-backdrop"
+          className={ctxBackdrop}
           tabIndex={-1}
           ref={focusIfEmpty}
           onMouseDown={close}
@@ -426,25 +596,25 @@ export function MenuProvider({ children }: { children: ReactNode }) {
           }}
           onKeyDown={(e) => e.key === "Escape" && close()}
         >
-          <div className="ctx-menu" style={{ top, left }} onMouseDown={(e) => e.stopPropagation()}>
-          {items.map((it, i) =>
-            it.separator ? (
-              <div key={i} className="ctx-sep" />
-            ) : (
-              <button
-                key={i}
-                className={`ctx-item ${it.danger ? "danger" : ""}`}
-                disabled={it.disabled}
-                onClick={() => {
-                  close();
-                  it.onClick?.();
-                }}
-              >
-                {it.icon ? <Icon name={it.icon} size={14} /> : <span className="ctx-icon-gap" />}
-                <span>{it.label}</span>
-              </button>
-            ),
-          )}
+          <div className={ctxMenu} style={{ top, left }} onMouseDown={(e) => e.stopPropagation()}>
+            {items.map((it, i) =>
+              it.separator ? (
+                <div key={i} className={ctxSep} />
+              ) : (
+                <button
+                  key={i}
+                  className={ctxItem(it.danger)}
+                  disabled={it.disabled}
+                  onClick={() => {
+                    close();
+                    it.onClick?.();
+                  }}
+                >
+                  {it.icon ? <Icon name={it.icon} size={14} /> : <span className={ctxIconGap} />}
+                  <span>{it.label}</span>
+                </button>
+              ),
+            )}
           </div>
         </div>
       ) : null}
@@ -455,12 +625,20 @@ export function MenuProvider({ children }: { children: ReactNode }) {
 // ------------------------------------------------------------------ 小物
 
 export function Spinner({ size = 14 }: { size?: number }) {
-  return <span className="spinner" style={{ width: size, height: size }} />;
+  return (
+    <span
+      className="inline-block animate-spinner rounded-full border-2 border-[rgba(255,255,255,0.18)] border-t-accent"
+      style={{ width: size, height: size }}
+    />
+  );
 }
 
 export function Badge({ children, color }: { children: ReactNode; color?: string }) {
   return (
-    <span className="badge" style={color ? { borderColor: color, color } : undefined}>
+    <span
+      className="inline-flex items-center rounded-[9px] border border-line px-[7px] py-px text-[11px] text-fg-dim"
+      style={color ? { borderColor: color, color } : undefined}
+    >
       {children}
     </span>
   );

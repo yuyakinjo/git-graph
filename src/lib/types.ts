@@ -151,7 +151,9 @@ export interface PullRequest {
   mergeable: string | null;
   additions?: number;
   deletions?: number;
-  statusCheckRollup?: { state?: string; conclusion?: string; status?: string; name?: string }[] | null;
+  statusCheckRollup?:
+    | { state?: string; conclusion?: string; status?: string; name?: string }[]
+    | null;
 }
 
 /** 設定で登録したプロジェクト置き場から見つかった git リポジトリ。 */

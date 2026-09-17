@@ -76,7 +76,9 @@ export function PrModal({ pr, onClose }: { pr: PullRequest; onClose: () => void 
           })}
         </div>
       ) : null}
-      <pre className="pr-body">{(d as PullRequest & { body?: string }).body?.trim() || "(本文なし)"}</pre>
+      <pre className="pr-body">
+        {(d as PullRequest & { body?: string }).body?.trim() || "(本文なし)"}
+      </pre>
     </Modal>
   );
 }
