@@ -1,6 +1,9 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useStore } from "../state/store";
+import { btn, dialogDesc, field, fieldInput, fieldLabel, hint, iconBtn } from "./classes";
 import { Icon, Modal, Spinner } from "./ui";
+
+const SECTION_H3 = "mx-0 mt-0 mb-1.5 text-[13px]";
 
 const shortPath = (p: string) => p.replace(/^\/Users\/[^/]+/, "~");
 
@@ -21,20 +24,25 @@ export function Settings() {
 
   return (
     <Modal title="設定" width={560} onClose={s.closeSettings}>
-      <section className="settings-section">
-        <h3>プロジェクトの場所</h3>
-        <p className="dialog-desc">
+      <section>
+        <h3 className={SECTION_H3}>プロジェクトの場所</h3>
+        <p className={dialogDesc}>
           ここに登録したフォルダの配下から git リポジトリを探します。
           タブの「+」を押すと、見つかったリポジトリを検索して開けます。
         </p>
 
-        <div className="settings-roots">
+        <div className="my-2.5 flex flex-col gap-1">
           {s.projectRoots.map((p) => (
-            <div key={p} className="settings-root">
+            <div
+              key={p}
+              className="flex items-center gap-2 rounded-md border border-line-soft bg-bg-1 px-2 py-[5px] text-[12px]"
+            >
               <Icon name="folder" size={14} />
-              <span className="mono">{shortPath(p)}</span>
+              <span className="min-w-0 flex-1 overflow-hidden font-mono text-[12px] text-ellipsis whitespace-nowrap">
+                {shortPath(p)}
+              </span>
               <button
-                className="icon-btn tiny"
+                className={iconBtn({ tiny: true })}
                 title="削除"
                 onClick={() => s.setProjectRoots(s.projectRoots.filter((x) => x !== p))}
               >
@@ -43,22 +51,27 @@ export function Settings() {
             </div>
           ))}
           {!s.projectRoots.length ? (
-            <div className="settings-empty">まだ登録されていません</div>
+            <div className="rounded-md border border-dashed border-line p-2.5 text-center text-[12px] text-fg-faint">
+              まだ登録されていません
+            </div>
           ) : null}
         </div>
 
-        <div className="row settings-actions">
-          <button className="btn primary" onClick={addRoot}>
+        <div className="mb-3.5">
+          <button className={btn("primary")} onClick={addRoot}>
             <Icon name="plus" size={14} /> フォルダを追加
           </button>
-          <button className="btn ghost" disabled={s.scanning} onClick={() => s.scanProjects()}>
+          <button className={btn("ghost")} disabled={s.scanning} onClick={() => s.scanProjects()}>
             {s.scanning ? <Spinner /> : <Icon name="fetch" size={14} />} 再検索
           </button>
         </div>
 
-        <div className="field">
-          <label htmlFor="scan-depth">探索する階層の深さ</label>
+        <div className={field}>
+          <label className={fieldLabel} htmlFor="scan-depth">
+            探索する階層の深さ
+          </label>
           <select
+            className={`${fieldInput} font-sans text-[12.5px]`}
             id="scan-depth"
             value={String(s.scanDepth)}
             onChange={(e) => s.setScanDepth(Number(e.target.value))}
@@ -69,7 +82,7 @@ export function Settings() {
               </option>
             ))}
           </select>
-          <em className="hint">
+          <em className={hint}>
             深くするほど見つかりますが検索に時間がかかります。
             {s.scanning
               ? " 検索中..."
@@ -78,15 +91,15 @@ export function Settings() {
         </div>
       </section>
 
-      <section className="settings-section">
-        <h3>作者アイコン</h3>
-        <p className="dialog-desc">
+      <section>
+        <h3 className={SECTION_H3}>作者アイコン</h3>
+        <p className={dialogDesc}>
           コミット作者のメールアドレスから gh CLI で GitHub のアバターを引いて表示します。
           結果はディスクに残るので、同じ作者を何度も取りに行くことはありません。
           アイコンを変えた人が古いままのときだけ、ここで消してください。
         </p>
-        <div className="row settings-actions">
-          <button className="btn ghost" onClick={() => void s.clearAvatarCache()}>
+        <div className="mb-3.5">
+          <button className={btn("ghost")} onClick={() => void s.clearAvatarCache()}>
             <Icon name="fetch" size={14} /> キャッシュを消して取り直す
           </button>
         </div>

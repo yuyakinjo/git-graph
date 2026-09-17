@@ -6,7 +6,40 @@ import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
 import { Avatar } from "./Avatar";
 import { DiffView } from "./DiffView";
+import { btn, fstatAdd, fstatDel, fstats, iconBtn } from "./classes";
 import { Icon, useMenu } from "./ui";
+
+const DETAIL = "flex h-full min-w-0 flex-col";
+const DETAIL_HEAD = "flex-none border-b border-line px-3 py-2.5";
+const DETAIL_TITLE = "flex min-w-0 items-start gap-[9px]";
+const DETAIL_H3 = "m-0 text-[13.5px] font-[650] leading-[1.35] break-words";
+const DETAIL_SUB = "mt-[3px] flex flex-wrap items-center gap-2 text-[11.5px] text-fg-dim";
+const DETAIL_TOOLS = "mt-[9px] flex gap-1.5";
+
+const SECTION_HEAD =
+  "flex h-7 flex-none items-center justify-between gap-2 border-b border-line-soft bg-bg-1 px-2.5 text-[11.5px] font-semibold text-fg-dim";
+/** wip 側は一覧をスクロールさせるので見出しを貼り付けておく */
+const SECTION_HEAD_STICKY = `${SECTION_HEAD} sticky top-0 z-[1]`;
+
+const LIST_EMPTY = "px-3 py-2 text-[11.5px] text-fg-faint";
+const DIFF_WRAP = "flex min-h-0 flex-auto flex-col border-t border-line bg-bg-1";
+/** パスの先頭側を省略したいので rtl。記号の並び替えは lrm ユーティリティで抑える */
+const DIFF_HEAD =
+  "lrm flex-none overflow-hidden border-b border-line-soft px-2.5 py-[5px] text-left font-mono text-[12px] text-ellipsis whitespace-nowrap text-fg-dim [direction:rtl]";
+
+const FILE_ROW_BASE = "group flex h-6 cursor-default items-center gap-[7px] px-2.5 text-[12px]";
+const FILE_ROW_SELECTED = `${FILE_ROW_BASE} bg-accent-soft shadow-[inset_2px_0_0_var(--color-accent)]`;
+const FILE_ROW_PLAIN = `${FILE_ROW_BASE} hover:bg-bg-hover`;
+
+const FSTATUS_COLOR: Record<string, string> = {
+  A: "text-green",
+  M: "text-accent",
+  T: "text-accent",
+  D: "text-red",
+  R: "text-violet",
+  C: "text-violet",
+  U: "text-amber",
+};
 
 function FileRow({
   path,
@@ -30,21 +63,31 @@ function FileRow({
   const dir = dirname(origPath ? `${origPath} → ${path}` : path);
   return (
     <div
-      className={`file-row ${selected ? "selected" : ""}`}
+      className={selected ? FILE_ROW_SELECTED : FILE_ROW_PLAIN}
       onClick={onClick}
       onContextMenu={onContextMenu}
       title={origPath ? `${origPath} → ${path}` : path}
     >
-      <span className={`fstatus s-${status}`}>{status}</span>
-      <span className="fname">{basename(path)}</span>
-      <span className="fdir">{dir}</span>
+      <span
+        className={`w-[14px] flex-none text-center font-mono text-[10.5px] font-bold ${
+          FSTATUS_COLOR[status] ?? "text-fg-faint"
+        }`}
+      >
+        {status}
+      </span>
+      <span className="max-w-[55%] flex-none overflow-hidden text-ellipsis whitespace-nowrap">
+        {basename(path)}
+      </span>
+      <span className="lrm flex-auto overflow-hidden text-left text-[11px] text-ellipsis whitespace-nowrap text-fg-faint [direction:rtl]">
+        {dir}
+      </span>
       {stats && (stats.additions || stats.deletions) ? (
-        <span className="fstats">
-          <em className="add">+{stats.additions}</em>
-          <em className="del">-{stats.deletions}</em>
+        <span className={fstats}>
+          <em className={fstatAdd}>+{stats.additions}</em>
+          <em className={fstatDel}>-{stats.deletions}</em>
         </span>
       ) : null}
-      {right ? <span className="frow-actions">{right}</span> : null}
+      {right ? <span className="hidden flex-none gap-0.5 group-hover:flex">{right}</span> : null}
     </div>
   );
 }
@@ -90,31 +133,35 @@ function WipPanel() {
   const canCommit = (stagedCount > 0 || changedCount > 0 || amend) && !s.busy;
 
   return (
-    <div className="detail wip-panel">
-      <header className="detail-head">
-        <div className="detail-title">
+    <div className={DETAIL}>
+      <header className={DETAIL_HEAD}>
+        <div className={DETAIL_TITLE}>
           <Icon name="commit" size={15} />
-          <h3>未コミットの変更</h3>
+          <h3 className={DETAIL_H3}>未コミットの変更</h3>
         </div>
-        <div className="detail-sub">
-          {s.repo?.state !== "clean" ? <span className="state-pill">{s.repo?.state}</span> : null}
+        <div className={DETAIL_SUB}>
+          {s.repo?.state !== "clean" ? (
+            <span className="rounded-lg bg-amber-16 px-1.5 py-px font-bold text-amber">
+              {s.repo?.state}
+            </span>
+          ) : null}
           <span>{changedCount + stagedCount} ファイル</span>
         </div>
       </header>
 
-      <div className="wip-lists">
-        <section className="file-section">
-          <div className="section-head">
+      <div className="flex max-h-[46%] flex-initial flex-col overflow-y-auto">
+        <section className="flex min-h-0 flex-none flex-col">
+          <div className={SECTION_HEAD_STICKY}>
             <span>変更 ({changedCount})</span>
             <button
-              className="btn tiny"
+              className={btn("default", "tiny")}
               disabled={changedCount === 0}
               onClick={() => act.stageAll()}
             >
               <Icon name="plus" size={12} /> すべてステージ
             </button>
           </div>
-          <div className="file-list">
+          <div className="flex-none overflow-visible">
             {status?.conflicts.map((f) => (
               <FileRow
                 key={`c-${f.path}`}
@@ -125,7 +172,7 @@ function WipPanel() {
                 onContextMenu={fileMenu(f, false)}
                 right={
                   <button
-                    className="icon-btn tiny"
+                    className={iconBtn({ tiny: true })}
                     title="解決済みとしてステージ"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -151,7 +198,7 @@ function WipPanel() {
                 right={
                   <>
                     <button
-                      className="icon-btn tiny"
+                      className={iconBtn({ tiny: true })}
                       title="変更を破棄"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -161,7 +208,7 @@ function WipPanel() {
                       <Icon name="trash" size={13} />
                     </button>
                     <button
-                      className="icon-btn tiny"
+                      className={iconBtn({ tiny: true })}
                       title="ステージ"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -174,22 +221,22 @@ function WipPanel() {
                 }
               />
             ))}
-            {changedCount === 0 ? <div className="list-empty">変更はありません</div> : null}
+            {changedCount === 0 ? <div className={LIST_EMPTY}>変更はありません</div> : null}
           </div>
         </section>
 
-        <section className="file-section">
-          <div className="section-head">
+        <section className="flex min-h-0 flex-none flex-col">
+          <div className={SECTION_HEAD_STICKY}>
             <span>ステージ済み ({stagedCount})</span>
             <button
-              className="btn tiny"
+              className={btn("default", "tiny")}
               disabled={stagedCount === 0}
               onClick={() => act.unstageAll()}
             >
               <Icon name="minus" size={12} /> すべて解除
             </button>
           </div>
-          <div className="file-list">
+          <div className="flex-none overflow-visible">
             {status?.staged.map((f) => (
               <FileRow
                 key={`s-${f.path}`}
@@ -201,7 +248,7 @@ function WipPanel() {
                 onContextMenu={fileMenu(f, true)}
                 right={
                   <button
-                    className="icon-btn tiny"
+                    className={iconBtn({ tiny: true })}
                     title="アンステージ"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -214,19 +261,20 @@ function WipPanel() {
               />
             ))}
             {stagedCount === 0 ? (
-              <div className="list-empty">ステージ済みのファイルはありません</div>
+              <div className={LIST_EMPTY}>ステージ済みのファイルはありません</div>
             ) : null}
           </div>
         </section>
       </div>
 
-      <div className="diff-wrap">
-        {sel ? <div className="diff-head mono">{sel.path}</div> : null}
+      <div className={DIFF_WRAP}>
+        {sel ? <div className={DIFF_HEAD}>{sel.path}</div> : null}
         <DiffView raw={s.diff.text} loading={s.diff.loading} />
       </div>
 
-      <div className="commit-box">
+      <div className="flex-none border-t border-line bg-bg-2 px-2.5 pt-2 pb-2.5">
         <textarea
+          className="w-full resize-y rounded-md border border-line bg-bg-1 px-[9px] py-[7px] font-[inherit] text-[12.5px] text-fg outline-none focus:border-accent"
           placeholder={
             stagedCount === 0 && changedCount > 0
               ? "コミットメッセージ (ステージ済みが無い場合はすべてステージしてコミットします)"
@@ -241,9 +289,10 @@ function WipPanel() {
             }
           }}
         />
-        <div className="commit-actions">
-          <label className="check small">
+        <div className="mt-2 flex items-center justify-between gap-2.5">
+          <label className="flex cursor-pointer items-center gap-[7px] text-[11.5px] text-fg-dim">
             <input
+              className="h-[14px] w-[14px] accent-accent"
               type="checkbox"
               checked={amend}
               onChange={(e) => toggleAmend(e.target.checked)}
@@ -251,7 +300,7 @@ function WipPanel() {
             <span>直前のコミットを修正 (amend)</span>
           </label>
           <button
-            className="btn primary"
+            className={btn("primary")}
             disabled={!canCommit || (!message.trim() && !amend)}
             onClick={() => act.commit(message, amend).then((ok) => ok && setMessage(""))}
           >
@@ -286,7 +335,7 @@ function CommitPanel({ sha }: { sha: string }) {
     });
   }, [detail]);
 
-  if (!detail) return <div className="detail loading">読み込み中...</div>;
+  if (!detail) return <div className={`${DETAIL} p-4 text-fg-dim`}>読み込み中...</div>;
 
   const fileMenu = (f: DiffFile) => (e: React.MouseEvent) => {
     e.preventDefault();
@@ -300,17 +349,17 @@ function CommitPanel({ sha }: { sha: string }) {
   };
 
   return (
-    <div className="detail">
-      <header className="detail-head">
-        <div className="detail-title">
+    <div className={DETAIL}>
+      <header className={DETAIL_HEAD}>
+        <div className={DETAIL_TITLE}>
           <Avatar name={detail.authorName} email={detail.authorEmail} big />
-          <div>
-            <h3>{detail.subject}</h3>
-            <div className="detail-sub">
+          <div className="min-w-0">
+            <h3 className={DETAIL_H3}>{detail.subject}</h3>
+            <div className={DETAIL_SUB}>
               <strong>{detail.authorName}</strong>
               <span title={absoluteTime(detail.authorAt)}>{relativeTime(detail.authorAt)}</span>
               <button
-                className="sha-btn mono"
+                className="inline-flex cursor-pointer items-center gap-1 rounded-[5px] border-0 bg-bg-3 px-1.5 py-px font-mono text-[12px] text-fg-dim hover:text-fg"
                 title="SHA をコピー"
                 onClick={() => navigator.clipboard.writeText(detail.hash).catch(() => undefined)}
               >
@@ -319,29 +368,36 @@ function CommitPanel({ sha }: { sha: string }) {
             </div>
           </div>
         </div>
-        <div className="detail-tools">
-          <button className="btn tiny" onClick={() => act.checkout(detail.hash, detail.short)}>
+        <div className={DETAIL_TOOLS}>
+          <button
+            className={btn("default", "tiny")}
+            onClick={() => act.checkout(detail.hash, detail.short)}
+          >
             <Icon name="commit" size={12} /> チェックアウト
           </button>
-          <button className="btn tiny" onClick={() => act.createBranch(detail.hash)}>
+          <button className={btn("default", "tiny")} onClick={() => act.createBranch(detail.hash)}>
             <Icon name="branch" size={12} /> ブランチ作成
           </button>
         </div>
       </header>
 
-      {detail.body ? <pre className="commit-body">{detail.body}</pre> : null}
+      {detail.body ? (
+        <pre className="m-0 max-h-[140px] flex-none overflow-auto border-b border-line px-3 py-2.5 font-[inherit] text-[12px] whitespace-pre-wrap text-fg-dim">
+          {detail.body}
+        </pre>
+      ) : null}
 
-      <div className="section-head">
+      <div className={SECTION_HEAD}>
         <span>
           {detail.files.length} ファイル変更
           {detail.parents.length > 1 ? " (第一親との差分)" : ""}
         </span>
-        <span className="fstats">
-          <em className="add">+{totals.a}</em>
-          <em className="del">-{totals.d}</em>
+        <span className={fstats}>
+          <em className={fstatAdd}>+{totals.a}</em>
+          <em className={fstatDel}>-{totals.d}</em>
         </span>
       </div>
-      <div className="file-list grow-list">
+      <div className="max-h-[38%] min-h-[80px] flex-auto overflow-y-auto">
         {detail.files.map((f) => (
           <FileRow
             key={f.path}
@@ -354,11 +410,11 @@ function CommitPanel({ sha }: { sha: string }) {
             stats={{ additions: f.additions, deletions: f.deletions }}
           />
         ))}
-        {detail.files.length === 0 ? <div className="list-empty">差分はありません</div> : null}
+        {detail.files.length === 0 ? <div className={LIST_EMPTY}>差分はありません</div> : null}
       </div>
 
-      <div className="diff-wrap">
-        {sel ? <div className="diff-head mono">{sel}</div> : null}
+      <div className={DIFF_WRAP}>
+        {sel ? <div className={DIFF_HEAD}>{sel}</div> : null}
         <DiffView raw={s.diff.text} loading={s.diff.loading} />
       </div>
     </div>
@@ -376,32 +432,32 @@ function StashPanel({ refname, message }: { refname: string; message: string }) 
   const stash = s.stashes.find((x) => x.name === refname);
 
   return (
-    <div className="detail">
-      <header className="detail-head">
-        <div className="detail-title">
+    <div className={DETAIL}>
+      <header className={DETAIL_HEAD}>
+        <div className={DETAIL_TITLE}>
           <Icon name="stash" size={15} />
-          <div>
-            <h3>{message}</h3>
-            <div className="detail-sub mono">{refname}</div>
+          <div className="min-w-0">
+            <h3 className={DETAIL_H3}>{message}</h3>
+            <div className={`${DETAIL_SUB} font-mono text-[11.5px]`}>{refname}</div>
           </div>
         </div>
-        <div className="detail-tools">
+        <div className={DETAIL_TOOLS}>
           <button
-            className="btn tiny"
+            className={btn("default", "tiny")}
             disabled={!stash}
             onClick={() => stash && act.stashApply(stash, false)}
           >
             適用
           </button>
           <button
-            className="btn tiny"
+            className={btn("default", "tiny")}
             disabled={!stash}
             onClick={() => stash && act.stashApply(stash, true)}
           >
             ポップ
           </button>
           <button
-            className="btn tiny danger"
+            className={btn("outlineDanger", "tiny")}
             disabled={!stash}
             onClick={() => stash && act.stashDrop(stash)}
           >
@@ -409,7 +465,7 @@ function StashPanel({ refname, message }: { refname: string; message: string }) 
           </button>
         </div>
       </header>
-      <div className="file-list grow-list">
+      <div className="max-h-[38%] min-h-[80px] flex-auto overflow-y-auto">
         {files.map((f) => (
           <FileRow
             key={f.path}
@@ -421,8 +477,8 @@ function StashPanel({ refname, message }: { refname: string; message: string }) 
           />
         ))}
       </div>
-      <div className="diff-wrap">
-        {sel ? <div className="diff-head mono">{sel}</div> : null}
+      <div className={DIFF_WRAP}>
+        {sel ? <div className={DIFF_HEAD}>{sel}</div> : null}
         <DiffView raw={s.diff.text} loading={s.diff.loading} />
       </div>
     </div>
@@ -434,7 +490,7 @@ export function DetailPane() {
   const sel = s.selection;
 
   return (
-    <div className="pane detail-pane">
+    <div className="flex min-w-0 flex-1 flex-col border-l border-line bg-bg-2">
       {sel.kind === "wip" ? (
         <WipPanel />
       ) : sel.kind === "commit" ? (

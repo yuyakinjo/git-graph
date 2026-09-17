@@ -265,7 +265,7 @@ export function Modal({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-start justify-center bg-scrim pt-[8vh] backdrop-blur-[2px]"
+      className="fixed inset-0 z-60 flex items-start justify-center bg-scrim pt-[8vh] backdrop-blur-[2px]"
       onMouseDown={onClose}
       onKeyDown={(e) => {
         if (e.key !== "Escape") return;
@@ -407,11 +407,11 @@ function FormDialog({
             return (
               <label
                 key={f.name}
-                className="flex cursor-pointer items-center gap-[7px] text-[12.5px] text-fg"
+                className="flex cursor-pointer items-center gap-1.75 text-[12.5px] text-fg"
               >
                 <input
                   type="checkbox"
-                  className="h-[14px] w-[14px] accent-accent"
+                  className="h-3.5 w-3.5 accent-accent"
                   checked={Boolean(values[f.name])}
                   onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.checked }))}
                 />
@@ -424,7 +424,7 @@ function FormDialog({
             <div key={f.name} className={field}>
               <label className={fieldLabel} htmlFor={common.id}>
                 {f.label}
-                {f.required ? <span className="ml-[3px] text-red">*</span> : null}
+                {f.required ? <span className="ml-0.75 text-red">*</span> : null}
               </label>
               {f.type === "textarea" ? (
                 <textarea
@@ -499,7 +499,7 @@ function ConfirmDialog({ spec, resolve }: { spec: ConfirmSpec; resolve: (v: bool
         </>
       }
     >
-      <div className="text-[13px] leading-[1.6] break-words text-fg">{spec.message}</div>
+      <div className="text-[13px] leading-[1.6] wrap-break-word text-fg">{spec.message}</div>
     </Modal>
   );
 }
@@ -636,7 +636,7 @@ export function Spinner({ size = 14 }: { size?: number }) {
 export function Badge({ children, color }: { children: ReactNode; color?: string }) {
   return (
     <span
-      className="inline-flex items-center rounded-[9px] border border-line px-[7px] py-px text-[11px] text-fg-dim"
+      className="inline-flex items-center rounded-[9px] border border-line px-1.75 py-px text-[11px] text-fg-dim"
       style={color ? { borderColor: color, color } : undefined}
     >
       {children}

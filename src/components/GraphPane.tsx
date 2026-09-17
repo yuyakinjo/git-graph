@@ -5,7 +5,35 @@ import type { GraphCommit, GraphEdge, RefDeco } from "../lib/types";
 import { useActions } from "../state/actions";
 import { GRAPH_COLUMNS, useStore } from "../state/store";
 import { Avatar } from "./Avatar";
+import { ctxBackdrop, ctxIconGap, ctxItem, ctxSep, iconBtn, popMenu } from "./classes";
 import { Icon, useMenu } from "./ui";
+
+/** 行と見出しで同じ幅を使うため、列のクラスは 1 か所にまとめる */
+const COL_REFS = "flex w-[190px] flex-none items-center gap-[5px] overflow-hidden pl-1.5";
+const COL_TAGS = "group/tags relative flex w-8 flex-none items-center";
+const COL_MSG = "flex min-w-0 flex-auto items-center gap-[5px] overflow-hidden pl-1.5";
+const COL_AUTHOR = "flex w-[170px] flex-none items-center gap-1.5 overflow-hidden text-[12px] text-fg-dim";
+const COL_SHA = "w-[74px] flex-none text-fg-faint";
+const COL_DATE = "w-[92px] flex-none text-right text-[11.5px] text-fg-faint";
+
+const PANE = "flex min-w-0 flex-auto flex-col bg-bg-1";
+
+const ROW_BASE =
+  "absolute right-0 left-0 flex h-[30px] cursor-default items-center border-b border-transparent pr-2.5 select-none";
+/** .grow.selected は .grow:hover より後に定義されていたので、選択中はホバーで色が変わらない */
+const ROW_SELECTED = `${ROW_BASE} bg-accent-soft shadow-[inset_2px_0_0_var(--color-accent)]`;
+const ROW_PLAIN = `${ROW_BASE} hover:z-[2] hover:bg-row-hover`;
+
+const REF_BADGE_BASE =
+  "inline-flex max-w-[220px] flex-none cursor-default items-center gap-[3px] overflow-hidden rounded-[10px] border py-px pr-[7px] pl-[5px] text-[11px] font-semibold whitespace-nowrap";
+const REF_BADGE_KIND: Record<string, string> = {
+  head: "bg-accent-14 border-accent-35 text-accent",
+  remote: "bg-violet-12 border-violet-30 text-violet",
+  tag: "bg-amber-12 border-amber-30 text-amber",
+  commit: "bg-bg-3 border-transparent text-fg-dim",
+};
+/** チェックアウト中のブランチだけ塗りつぶす */
+const REF_BADGE_IS_HEAD = "bg-accent border-accent text-on-accent";
 
 const ROW_H = 30;
 const LANE_W = 16;
@@ -72,7 +100,11 @@ function RefBadge({
           : "commit";
   return (
     <span
-      className={`ref-badge ${deco.kind} ${deco.isHead ? "is-head" : ""}`}
+      className={`${REF_BADGE_BASE} ${
+        deco.kind === "head" && deco.isHead
+          ? REF_BADGE_IS_HEAD
+          : (REF_BADGE_KIND[deco.kind] ?? REF_BADGE_KIND.commit)
+      }`}
       title={deco.full}
       onDoubleClick={(e) => {
         e.stopPropagation();
@@ -84,7 +116,7 @@ function RefBadge({
         onMenu(e);
       }}
     >
-      {deco.isHead && deco.kind === "head" ? <span className="head-dot" /> : null}
+      {deco.isHead && deco.kind === "head" ? <span className="h-[5px] w-[5px] rounded-full bg-current" /> : null}
       <Icon name={icon} size={11} />
       {deco.name}
     </span>
@@ -101,13 +133,16 @@ function TagCell({
   onCheckout: (d: RefDeco) => void;
   onMenu: (d: RefDeco) => (e: React.MouseEvent) => void;
 }) {
-  if (!tags.length) return <div className="col-tags" />;
+  if (!tags.length) return <div className={COL_TAGS} />;
   return (
-    <div className="col-tags">
-      <span className="tag-chip" title={tags.map((t) => t.name).join("\n")}>
+    <div className={COL_TAGS}>
+      <span
+        className="inline-flex h-[18px] cursor-default items-center gap-0.5 rounded-[9px] border border-amber-30 bg-amber-12 px-1 text-amber [&>svg]:flex-none"
+        title={tags.map((t) => t.name).join("\n")}
+      >
         <Icon name="tag" size={12} />
-        {tags.length > 1 ? <span className="tag-n">{tags.length}</span> : null}
-        <span className="tag-pop">
+        {tags.length > 1 ? <span className="text-[10px] font-bold">{tags.length}</span> : null}
+        <span className="absolute top-1/2 left-[calc(100%+6px)] hidden max-w-[460px] -translate-y-1/2 items-center gap-[5px] overflow-hidden rounded-lg border border-line bg-bg-3 px-1.5 py-1 whitespace-nowrap shadow-[0_6px_18px_rgba(0,0,0,0.45)] group-hover/tags:flex">
           {tags.map((d) => (
             <RefBadge key={d.full} deco={d} onCheckout={() => onCheckout(d)} onMenu={onMenu(d)} />
           ))}
@@ -123,27 +158,31 @@ function ColumnMenu() {
   const [open, setOpen] = useState(false);
   if (!open) {
     return (
-      <button className="icon-btn tiny" title="表示する列" onClick={() => setOpen(true)}>
+      <button className={iconBtn({ tiny: true })} title="表示する列" onClick={() => setOpen(true)}>
         <Icon name="columns" size={14} />
       </button>
     );
   }
   return (
-    <span className="col-menu-wrap">
-      <button className="icon-btn tiny on" title="表示する列" onClick={() => setOpen(false)}>
+    <span className="relative inline-flex">
+      <button
+        className={iconBtn({ tiny: true, on: true })}
+        title="表示する列"
+        onClick={() => setOpen(false)}
+      >
         <Icon name="columns" size={14} />
       </button>
-      <div className="ctx-backdrop" onMouseDown={() => setOpen(false)} />
-      <div className="col-menu" onMouseDown={(e) => e.stopPropagation()}>
+      <div className={ctxBackdrop} onMouseDown={() => setOpen(false)} />
+      <div className={popMenu} onMouseDown={(e) => e.stopPropagation()}>
         {GRAPH_COLUMNS.map((c) => (
-          <button key={c.key} className="ctx-item" onClick={() => s.toggleColumn(c.key)}>
-            {s.columns[c.key] ? <Icon name="check" size={14} /> : <span className="ctx-icon-gap" />}
+          <button key={c.key} className={ctxItem()} onClick={() => s.toggleColumn(c.key)}>
+            {s.columns[c.key] ? <Icon name="check" size={14} /> : <span className={ctxIconGap} />}
             <span>{c.label}</span>
           </button>
         ))}
-        <div className="ctx-sep" />
-        <button className="ctx-item" onClick={s.resetColumns}>
-          <span className="ctx-icon-gap" />
+        <div className={ctxSep} />
+        <button className={ctxItem()} onClick={s.resetColumns}>
+          <span className={ctxIconGap} />
           <span>すべて表示</span>
         </button>
       </div>
@@ -316,7 +355,7 @@ export function GraphPane() {
     revealRow(Math.max(next, 0) + rowOffset);
   });
 
-  if (!s.graph) return <div className="pane graph-pane empty" />;
+  if (!s.graph) return <div className={PANE} />;
 
   const rows: React.ReactNode[] = [];
   for (let r = start; r < end; r++) {
@@ -328,32 +367,32 @@ export function GraphPane() {
       rows.push(
         <div
           key="wip"
-          className={`grow wip ${s.selection.kind === "wip" ? "selected" : ""}`}
+          className={s.selection.kind === "wip" ? ROW_SELECTED : ROW_PLAIN}
           style={{ top: 0 }}
           onClick={() => s.select({ kind: "wip" })}
         >
-          {cols.graph ? <div className="col-graph" style={{ width: graphW }} /> : null}
-          {cols.refs ? <div className="col-refs" /> : null}
-          {cols.tags ? <div className="col-tags" /> : null}
-          <div className="col-msg">
-            <span className="wip-label">未コミットの変更</span>
-            <span className="wip-count">{count} ファイル</span>
+          {cols.graph ? <div className="flex-none" style={{ width: graphW }} /> : null}
+          {cols.refs ? <div className={COL_REFS} /> : null}
+          {cols.tags ? <div className={COL_TAGS} /> : null}
+          <div className={COL_MSG}>
+            <span className="font-bold text-amber">未コミットの変更</span>
+            <span className="ml-2 text-[11.5px] text-fg-faint">{count} ファイル</span>
           </div>
-          {cols.author ? <div className="col-author" /> : null}
-          {cols.sha ? <div className="col-sha" /> : null}
-          {cols.date ? <div className="col-date" /> : null}
+          {cols.author ? <div className={COL_AUTHOR} /> : null}
+          {cols.sha ? <div className={COL_SHA} /> : null}
+          {cols.date ? <div className={COL_DATE} /> : null}
         </div>,
       );
       continue;
     }
     const c = commits[r - rowOffset];
     if (!c) continue;
-    const dim = matches ? !matches.has(c.hash) : false;
+    const dimmed = matches ? !matches.has(c.hash) : false;
     rows.push(
       <div
         key={c.hash}
-        className={`grow ${selectedSha === c.hash ? "selected" : ""} ${dim ? "dim" : ""} ${
-          headRow === c.row ? "is-head-row" : ""
+        className={`${selectedSha === c.hash ? ROW_SELECTED : ROW_PLAIN} ${
+          dimmed ? "opacity-35" : ""
         }`}
         style={{ top: r * ROW_H }}
         onClick={() => s.select({ kind: "commit", sha: c.hash })}
@@ -364,9 +403,9 @@ export function GraphPane() {
           commitMenu(c)(e);
         }}
       >
-        {cols.graph ? <div className="col-graph" style={{ width: graphW }} /> : null}
+        {cols.graph ? <div className="flex-none" style={{ width: graphW }} /> : null}
         {cols.refs ? (
-          <div className="col-refs">
+          <div className={COL_REFS}>
             {c.refs
               .filter((d) => d.kind !== "tag" || !cols.tags)
               .map((d) => (
@@ -387,57 +426,60 @@ export function GraphPane() {
           />
         ) : null}
         {cols.subject ? (
-          <div className="col-msg">
-            <span className="subject">{c.subject}</span>
+          <div className={COL_MSG}>
+            <span className="min-w-0 flex-auto overflow-hidden text-ellipsis whitespace-nowrap">
+              {c.subject}
+            </span>
           </div>
         ) : (
-          <div className="col-fill" />
+          <div className="min-w-0 flex-auto" />
         )}
         {cols.author ? (
-          <div className="col-author" title={`${c.authorName} <${c.authorEmail}>`}>
+          <div className={COL_AUTHOR} title={`${c.authorName} <${c.authorEmail}>`}>
             <Avatar name={c.authorName} email={c.authorEmail} />
-            <span className="author-name">{c.authorName}</span>
+            <span className="overflow-hidden text-ellipsis whitespace-nowrap">{c.authorName}</span>
           </div>
         ) : null}
-        {cols.sha ? <div className="col-sha mono">{c.short}</div> : null}
-        {cols.date ? <div className="col-date">{relativeTime(c.timestamp)}</div> : null}
+        {cols.sha ? <div className={`${COL_SHA} font-mono text-[12px]`}>{c.short}</div> : null}
+        {cols.date ? <div className={COL_DATE}>{relativeTime(c.timestamp)}</div> : null}
       </div>,
     );
   }
 
   return (
-    <div className="pane graph-pane">
-      <div className="graph-head">
-        <div className="graph-search">
+    <div className={PANE}>
+      <div className="flex h-[34px] flex-none items-center gap-2.5 border-b border-line bg-bg-1 px-2.5">
+        <div className="flex h-6 max-w-[340px] flex-1 items-center gap-1.5 rounded-xl border border-line bg-bg-2 px-2 text-fg-dim">
           <Icon name="search" size={14} />
           <input
+            className="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none"
             placeholder="コミット・作者・SHA を検索"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
           />
           {query ? (
-            <button className="icon-btn tiny" onClick={() => setQuery("")} title="クリア">
+            <button className={iconBtn({ tiny: true })} onClick={() => setQuery("")} title="クリア">
               <Icon name="x" size={12} />
             </button>
           ) : null}
         </div>
         <ColumnMenu />
-        <div className="graph-head-cols">
-          {cols.author ? <span className="col-author">作者</span> : null}
-          {cols.sha ? <span className="col-sha">SHA</span> : null}
-          {cols.date ? <span className="col-date">日時</span> : null}
+        <div className="ml-auto flex text-[10.5px] tracking-[0.05em] text-fg-faint uppercase">
+          {cols.author ? <span className={COL_AUTHOR}>作者</span> : null}
+          {cols.sha ? <span className={COL_SHA}>SHA</span> : null}
+          {cols.date ? <span className={COL_DATE}>日時</span> : null}
         </div>
       </div>
       <div
-        className="graph-scroll"
+        className="relative flex-1 overflow-auto"
         ref={attachScroll}
         onScroll={(e) => setScrollTop((e.target as HTMLDivElement).scrollTop)}
       >
-        <div className="graph-canvas" style={{ height: totalRows * ROW_H }}>
-          <div className="graph-rows">{rows}</div>
+        <div className="relative min-w-full" style={{ height: totalRows * ROW_H }}>
+          <div className="absolute inset-0">{rows}</div>
           {cols.graph ? (
             <svg
-              className="graph-svg"
+              className="pointer-events-none absolute top-0 left-0"
               width={graphW}
               height={totalRows * ROW_H}
               style={{ height: totalRows * ROW_H }}
@@ -486,7 +528,7 @@ export function GraphPane() {
                   cx={cx(headRow >= 0 ? commits[headRow].column : 0)}
                   cy={cy(0)}
                   r="4.5"
-                  fill="var(--bg-1)"
+                  fill="var(--color-bg-1)"
                   stroke={laneColor(headRow >= 0 ? commits[headRow].column : 0)}
                   strokeWidth="1.8"
                   strokeDasharray="2.5 2"
@@ -525,7 +567,7 @@ export function GraphPane() {
                             r={AVATAR_R}
                             fill={avatarColor(c.authorEmail || c.authorName)}
                           />
-                          <text className="node-avatar-text" x={x} y={y}>
+                          <text className="svg-initials fill-white text-[8px] font-bold select-none" x={x} y={y}>
                             {initials(c.authorName)}
                           </text>
                           {url ? (
@@ -565,7 +607,7 @@ export function GraphPane() {
                           cx={x}
                           cy={y}
                           r={c.parents.length > 1 ? 4 : 4.5}
-                          fill={isHead ? color : "var(--bg-1)"}
+                          fill={isHead ? color : "var(--color-bg-1)"}
                           stroke={color}
                           strokeWidth={isHead ? 3 : 2}
                         />
@@ -578,7 +620,9 @@ export function GraphPane() {
         </div>
       </div>
       {s.graph.truncated ? (
-        <div className="graph-foot">直近 {commits.length} 件を表示しています</div>
+        <div className="flex-none border-t border-line px-3 py-1 text-[11px] text-fg-faint">
+          直近 {commits.length} 件を表示しています
+        </div>
       ) : null}
     </div>
   );

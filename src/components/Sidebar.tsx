@@ -3,7 +3,24 @@ import { relativeTime } from "../lib/format";
 import type { BranchInfo, PullRequest } from "../lib/types";
 import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
+import { checkDot, dim, iconBtn, miniPill } from "./classes";
 import { Icon, useMenu } from "./ui";
+
+const SIDE_HEADER =
+  "group flex h-7 cursor-pointer items-center gap-1.5 px-2 text-[10.5px] font-bold tracking-[0.06em] text-fg-dim uppercase select-none hover:text-fg";
+
+const SIDE_ITEM = "flex h-[26px] cursor-default items-center gap-1.5 py-0 pr-2 pl-3.5 select-none";
+/** 選択中の行。ホバーの上書きが効かないよう、状態ごとに背景を出し分ける */
+const SIDE_ITEM_CURRENT = `${SIDE_ITEM} bg-accent-soft`;
+const SIDE_ITEM_PLAIN = `${SIDE_ITEM} hover:bg-bg-hover`;
+
+const sideIcon = (current = false) => `flex flex-none ${current ? "text-accent" : "text-fg-faint"}`;
+const sideLabel = (current = false) =>
+  `flex-1 overflow-hidden text-[12.5px] text-ellipsis whitespace-nowrap ${
+    current ? "font-bold text-white" : ""
+  }`;
+
+const SIDE_NOTE = "pt-1 pr-3.5 pb-2 pl-3.5 text-[11.5px] text-fg-faint";
 
 const OPEN_KEY = "gitgraph.sections";
 /** 件数が多くなりがちなセクションは初期状態を閉じておく */
@@ -49,17 +66,20 @@ function Section({
 }) {
   const open = isOpen(id);
   return (
-    <section className="side-section">
-      <header onClick={() => toggle(id)}>
+    <section>
+      <header className={SIDE_HEADER} onClick={() => toggle(id)}>
         <Icon name={open ? "chevronDown" : "chevronRight"} size={12} />
         <Icon name={icon} size={13} />
-        <span className="side-title">{title}</span>
-        {count !== undefined ? <span className="side-count">{count}</span> : null}
-        <span className="side-action" onClick={(e) => e.stopPropagation()}>
+        <span className="flex-1 overflow-hidden text-ellipsis">{title}</span>
+        {count !== undefined ? <span className="text-[10px] text-fg-faint">{count}</span> : null}
+        <span
+          className="flex opacity-0 group-hover:opacity-100"
+          onClick={(e) => e.stopPropagation()}
+        >
           {action}
         </span>
       </header>
-      {open ? <div className="side-body">{children}</div> : null}
+      {open ? <div className="pb-1.5">{children}</div> : null}
     </section>
   );
 }
@@ -104,7 +124,7 @@ function BranchItem({ b }: { b: BranchInfo }) {
 
   return (
     <div
-      className={`side-item ${b.isHead ? "current" : ""}`}
+      className={b.isHead ? SIDE_ITEM_CURRENT : SIDE_ITEM_PLAIN}
       title={`${b.name}${b.upstream ? ` → ${b.upstream}` : ""}\n${b.subject}`}
       onClick={() => s.select({ kind: "commit", sha: b.hash })}
       onDoubleClick={() =>
@@ -112,21 +132,21 @@ function BranchItem({ b }: { b: BranchInfo }) {
       }
       onContextMenu={menu}
     >
-      <span className="side-icon">
+      <span className={sideIcon(b.isHead)}>
         <Icon name={b.kind === "remote" ? "remote" : "branch"} size={13} />
       </span>
-      <span className="side-label">
-        {prefix ? <em className="dim">{prefix}</em> : null}
+      <span className={sideLabel(b.isHead)}>
+        {prefix ? <em className={dim}>{prefix}</em> : null}
         {last}
       </span>
       {b.worktreePath && !b.isHead ? (
-        <span className="mini-pill" title={`worktree: ${b.worktreePath}`}>
+        <span className={miniPill()} title={`worktree: ${b.worktreePath}`}>
           <Icon name="worktree" size={10} />
         </span>
       ) : null}
-      {b.gone ? <span className="mini-pill warn">gone</span> : null}
-      {b.ahead ? <span className="mini-pill ahead">↑{b.ahead}</span> : null}
-      {b.behind ? <span className="mini-pill behind">↓{b.behind}</span> : null}
+      {b.gone ? <span className={miniPill("warn")}>gone</span> : null}
+      {b.ahead ? <span className={miniPill("ahead")}>↑{b.ahead}</span> : null}
+      {b.behind ? <span className={miniPill("behind")}>↓{b.behind}</span> : null}
     </div>
   );
 }
@@ -142,7 +162,7 @@ function PrItem({ pr, onOpen }: { pr: PullRequest; onOpen: (pr: PullRequest) => 
   const dot = failed ? "fail" : pending ? "pending" : checks.length ? "pass" : "none";
   return (
     <div
-      className="side-item"
+      className={SIDE_ITEM_PLAIN}
       title={`#${pr.number} ${pr.title}\n${pr.headRefName} → ${pr.baseRefName}`}
       onClick={() => onOpen(pr)}
       onDoubleClick={() => act.prCheckout(pr)}
@@ -157,14 +177,14 @@ function PrItem({ pr, onOpen }: { pr: PullRequest; onOpen: (pr: PullRequest) => 
         ]);
       }}
     >
-      <span className="side-icon">
+      <span className={sideIcon()}>
         <Icon name="pr" size={13} />
       </span>
-      <span className="side-label">
-        <em className="dim">#{pr.number}</em> {pr.title}
+      <span className={sideLabel()}>
+        <em className={dim}>#{pr.number}</em> {pr.title}
       </span>
-      {pr.isDraft ? <span className="mini-pill">draft</span> : null}
-      <span className={`check-dot ${dot}`} />
+      {pr.isDraft ? <span className={miniPill()}>draft</span> : null}
+      <span className={checkDot(dot)} />
     </div>
   );
 }
@@ -179,7 +199,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
   const remotes = useMemo(() => s.branches.filter((b) => b.kind === "remote"), [s.branches]);
 
   return (
-    <aside className="sidebar">
+    <aside className="h-full overflow-y-auto bg-bg-2 pt-1.5 pb-5">
       <Section
         id="local"
         title="ローカル"
@@ -189,7 +209,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         toggle={toggle}
         action={
           <button
-            className="icon-btn tiny"
+            className={iconBtn({ tiny: true })}
             title="ブランチを作成"
             onClick={() => act.createBranch()}
           >
@@ -210,7 +230,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         isOpen={isOpen}
         toggle={toggle}
         action={
-          <button className="icon-btn tiny" title="フェッチ" onClick={() => act.fetch()}>
+          <button className={iconBtn({ tiny: true })} title="フェッチ" onClick={() => act.fetch()}>
             <Icon name="fetch" size={13} />
           </button>
         }
@@ -228,19 +248,19 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         isOpen={isOpen}
         toggle={toggle}
         action={
-          <button className="icon-btn tiny" title="PR を作成" onClick={() => act.prCreate()}>
+          <button className={iconBtn({ tiny: true })} title="PR を作成" onClick={() => act.prCreate()}>
             <Icon name="plus" size={13} />
           </button>
         }
       >
         {!s.gh?.installed ? (
-          <div className="side-note">gh CLI が未インストールです</div>
+          <div className={SIDE_NOTE}>gh CLI が未インストールです</div>
         ) : !s.gh.authenticated ? (
-          <div className="side-note">gh auth login が必要です</div>
+          <div className={SIDE_NOTE}>gh auth login が必要です</div>
         ) : !s.gh.repo ? (
-          <div className="side-note">GitHub リポジトリではありません</div>
+          <div className={SIDE_NOTE}>GitHub リポジトリではありません</div>
         ) : s.prs.length === 0 ? (
-          <div className="side-note">オープンな PR はありません</div>
+          <div className={SIDE_NOTE}>オープンな PR はありません</div>
         ) : (
           s.prs.map((pr) => <PrItem key={pr.number} pr={pr} onOpen={onOpenPr} />)
         )}
@@ -255,7 +275,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         toggle={toggle}
         action={
           <button
-            className="icon-btn tiny"
+            className={iconBtn({ tiny: true })}
             title="変更をスタッシュ"
             onClick={() => act.stashPush()}
           >
@@ -264,14 +284,14 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         }
       >
         {s.stashes.length === 0 ? (
-          <div className="side-note">スタッシュはありません</div>
+          <div className={SIDE_NOTE}>スタッシュはありません</div>
         ) : (
-          s.stashes.map((st) => (
+          s.stashes.map((st) => {
+            const current = s.selection.kind === "stash" && s.selection.refname === st.name;
+            return (
             <div
               key={st.name}
-              className={`side-item ${
-                s.selection.kind === "stash" && s.selection.refname === st.name ? "current" : ""
-              }`}
+              className={current ? SIDE_ITEM_CURRENT : SIDE_ITEM_PLAIN}
               title={`${st.name}\n${st.message}`}
               onClick={() => s.select({ kind: "stash", refname: st.name, message: st.message })}
               onDoubleClick={() => act.stashApply(st, false)}
@@ -294,13 +314,16 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
                 ]);
               }}
             >
-              <span className="side-icon">
+              <span className={sideIcon(current)}>
                 <Icon name="stash" size={13} />
               </span>
-              <span className="side-label">{st.message}</span>
-              <span className="side-time">{relativeTime(st.createdAt)}</span>
+              <span className={sideLabel(current)}>{st.message}</span>
+              <span className="flex-none text-[10.5px] text-fg-faint">
+                {relativeTime(st.createdAt)}
+              </span>
             </div>
-          ))
+            );
+          })
         )}
       </Section>
 
@@ -313,7 +336,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         toggle={toggle}
         action={
           <button
-            className="icon-btn tiny"
+            className={iconBtn({ tiny: true })}
             title="worktree を追加"
             onClick={() => act.worktreeAdd()}
           >
@@ -324,7 +347,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         {s.worktrees.map((wt) => (
           <div
             key={wt.path}
-            className={`side-item ${wt.isCurrent ? "current" : ""}`}
+            className={wt.isCurrent ? SIDE_ITEM_CURRENT : SIDE_ITEM_PLAIN}
             title={wt.path}
             onClick={() => !wt.isCurrent && s.openRepo(wt.path)}
             onContextMenu={(e) => {
@@ -352,18 +375,21 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
               ]);
             }}
           >
-            <span className="side-icon">
+            <span className={sideIcon(wt.isCurrent)}>
               <Icon name="worktree" size={13} />
             </span>
-            <span className="side-label">
+            <span className={sideLabel(wt.isCurrent)}>
               {wt.branch ?? wt.head.slice(0, 7)}
-              {wt.isMain ? <em className="dim"> (main)</em> : null}
+              {wt.isMain ? <em className={dim}> (main)</em> : null}
             </span>
-            {wt.prunable ? <span className="mini-pill warn">prunable</span> : null}
+            {wt.prunable ? <span className={miniPill("warn")}>prunable</span> : null}
           </div>
         ))}
         {s.worktrees.some((w) => w.prunable) ? (
-          <button className="side-note link" onClick={() => act.worktreePrune()}>
+          <button
+            className={`${SIDE_NOTE} block w-full cursor-pointer border-0 bg-none text-left text-accent`}
+            onClick={() => act.worktreePrune()}
+          >
             使われていない worktree を整理する
           </button>
         ) : null}
@@ -380,18 +406,18 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         {s.tags.slice(0, 50).map((t) => (
           <div
             key={t.name}
-            className="side-item"
+            className={SIDE_ITEM_PLAIN}
             title={t.name}
             onClick={() => s.select({ kind: "commit", sha: t.hash })}
             onDoubleClick={() => act.checkout(t.name)}
           >
-            <span className="side-icon">
+            <span className={sideIcon()}>
               <Icon name="tag" size={13} />
             </span>
-            <span className="side-label">{t.name}</span>
+            <span className={sideLabel()}>{t.name}</span>
           </div>
         ))}
-        {s.tags.length === 0 ? <div className="side-note">タグはありません</div> : null}
+        {s.tags.length === 0 ? <div className={SIDE_NOTE}>タグはありません</div> : null}
       </Section>
     </aside>
   );

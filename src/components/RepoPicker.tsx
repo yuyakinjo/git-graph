@@ -3,6 +3,12 @@ import type { ProjectEntry } from "../lib/types";
 import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
 import { Icon, Spinner } from "./ui";
+import { ctxBackdrop } from "./classes";
+
+const PICKER_ACTION =
+  "flex cursor-pointer items-center gap-2 rounded-md border-none bg-transparent px-2 py-1.5 text-left text-[12px] text-fg hover:bg-bg-hover";
+/** 「開いています」「最近」の小さなラベル */
+const PICKER_TAG = "flex-none rounded-full bg-bg-3 px-1.5 py-px text-[10px] text-fg-dim";
 
 const shortPath = (p: string) => p.replace(/^\/Users\/[^/]+/, "~");
 
@@ -104,18 +110,19 @@ export function RepoPicker({ x, y, onClose }: { x: number; y: number; onClose: (
   const top = Math.min(y, window.innerHeight - 420);
 
   return (
-    <div className="ctx-backdrop" onMouseDown={onClose}>
+    <div className={ctxBackdrop} onMouseDown={onClose}>
       <div
-        className="repo-picker"
+        className="fixed z-[81] flex max-h-[420px] w-[360px] flex-col overflow-hidden rounded-[10px] border border-line bg-bg-2 shadow-[0_18px_44px_rgba(0,0,0,0.5)]"
         style={{ left: Math.max(8, left), top: Math.max(8, top) }}
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
         role="dialog"
         aria-label="リポジトリを選択"
       >
-        <div className="repo-picker-search">
+        <div className="flex items-center gap-[7px] border-b border-line-soft px-2.5 py-2 text-fg-dim">
           <Icon name="search" size={14} />
           <input
+            className="min-w-0 flex-1 border-none bg-transparent text-[13px] text-fg outline-none"
             ref={focusInput}
             value={query}
             placeholder="プロジェクトを検索"
@@ -127,28 +134,34 @@ export function RepoPicker({ x, y, onClose }: { x: number; y: number; onClose: (
           {s.scanning ? <Spinner /> : null}
         </div>
 
-        <div className="repo-picker-list">
+        <div className="min-h-0 flex-1 overflow-y-auto p-1">
           {items.map((c, i) => {
             const open = s.tabs.includes(c.path);
             return (
               <button
                 key={c.path}
                 ref={i === index ? keepVisible : undefined}
-                className={`repo-picker-item ${i === index ? "active" : ""}`}
+                className={`flex w-full cursor-pointer items-center gap-2 rounded-md border-none px-2 py-[5px] text-left text-[13px] text-fg ${
+                  i === index ? "bg-accent-soft" : "bg-transparent"
+                }`}
                 onMouseEnter={() => setActive(i)}
                 onClick={() => choose(c.path)}
                 title={c.path}
               >
                 <Icon name="repo" size={14} />
-                <span className="repo-picker-name">{c.name}</span>
-                <span className="repo-picker-detail mono">{c.detail}</span>
-                {open ? <span className="repo-picker-open">開いています</span> : null}
-                {!c.known ? <span className="repo-picker-tag">最近</span> : null}
+                <span className="max-w-[45%] flex-none overflow-hidden text-ellipsis whitespace-nowrap">
+                  {c.name}
+                </span>
+                <span className="min-w-0 flex-1 overflow-hidden font-mono text-[11px] text-ellipsis whitespace-nowrap text-fg-faint">
+                  {c.detail}
+                </span>
+                {open ? <span className={PICKER_TAG}>開いています</span> : null}
+                {!c.known ? <span className={PICKER_TAG}>最近</span> : null}
               </button>
             );
           })}
           {!items.length ? (
-            <div className="repo-picker-empty">
+            <div className="px-3 py-3.5 text-[12px] leading-[1.6] text-fg-dim">
               {s.projectRoots.length
                 ? s.scanning
                   ? "検索中..."
@@ -158,9 +171,9 @@ export function RepoPicker({ x, y, onClose }: { x: number; y: number; onClose: (
           ) : null}
         </div>
 
-        <div className="repo-picker-foot">
+        <div className="flex flex-col border-t border-line-soft p-1">
           <button
-            className="repo-picker-action"
+            className={PICKER_ACTION}
             onClick={() => {
               onClose();
               void act.openFolder();
@@ -169,14 +182,14 @@ export function RepoPicker({ x, y, onClose }: { x: number; y: number; onClose: (
             <Icon name="folder" size={14} /> Finder から開く...
           </button>
           <button
-            className="repo-picker-action"
+            className={PICKER_ACTION}
             onClick={() => {
               onClose();
               s.openSettings();
             }}
           >
             <Icon name="worktree" size={14} /> プロジェクトの場所を設定
-            <span className="repo-picker-kbd">⌘,</span>
+            <span className="ml-auto text-[11px] text-fg-faint">⌘,</span>
           </button>
         </div>
       </div>

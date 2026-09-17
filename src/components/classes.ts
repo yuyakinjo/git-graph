@@ -124,6 +124,7 @@ export const fstatDel = "text-red not-italic";
 // ------------------------------------------------------------------ フォーム
 
 export const dialogDesc = "mt-0 mx-0 mb-3 text-fg-dim text-[12px]";
+export const dim = "text-fg-faint not-italic";
 export const hint = "text-fg-faint text-[11px] not-italic";
 export const field = "flex flex-col gap-[5px]";
 export const fieldLabel = "text-fg-dim text-[11.5px] font-semibold";

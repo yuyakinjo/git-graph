@@ -65,7 +65,7 @@ function Welcome() {
   const act = useActions();
   return (
     <div className="flex flex-1 items-center justify-center bg-[radial-gradient(circle_at_30%_10%,#1d2735_0%,var(--color-bg-1)_60%)]">
-      <div className="w-[480px] max-w-[88vw] text-center">
+      <div className="w-120 max-w-[88vw] text-center">
         <h1 className="mx-0 mt-0 mb-1.5 text-[26px] tracking-[-0.01em]">Git Graph</h1>
         <p className="mx-0 mt-0 mb-5 text-fg-dim">
           シンプルな操作に絞った git GUI。GitHub 操作は gh CLI を使います。
@@ -74,14 +74,14 @@ function Welcome() {
           <Icon name="folder" size={16} /> リポジトリを開く
         </button>
         {s.recent.length ? (
-          <div className="mt-[26px] text-left">
+          <div className="mt-6.5 text-left">
             <h2 className="mx-0 mt-0 mb-1.5 text-[11px] tracking-[0.06em] text-fg-faint uppercase">
               最近開いたリポジトリ
             </h2>
             {s.recent.map((p) => (
               <div key={p} className="flex items-center gap-1">
                 <button
-                  className="flex h-[30px] min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2 text-left text-fg hover:bg-bg-2"
+                  className="flex h-7.5 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2 text-left text-fg hover:bg-bg-2"
                   onClick={() => s.openRepo(p)}
                 >
                   <Icon name="repo" size={14} />
@@ -109,7 +109,7 @@ function Welcome() {
 /** リポジトリを開いている間の表示。重いリポジトリでも押した手応えが残るようにする。 */
 function Opening({ path }: { path: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-[10px] border border-line bg-bg-2 px-[18px] py-3.5 shadow-[0_18px_44px_rgba(0,0,0,0.45)]">
+    <div className="flex items-center gap-3 rounded-[10px] border border-line bg-bg-2 px-4.5 py-3.5 shadow-[0_18px_44px_rgba(0,0,0,0.45)]">
       <Spinner size={20} />
       <div className="flex min-w-0 flex-col gap-0.5">
         <strong className="text-[13px]">{path.split("/").filter(Boolean).pop()}</strong>
@@ -136,11 +136,11 @@ const TOAST_ICON: Record<string, string> = {
 function Toasts() {
   const s = useStore();
   return (
-    <div className="fixed right-3.5 bottom-[34px] z-[90] flex max-w-[420px] flex-col gap-2">
+    <div className="fixed right-3.5 bottom-8.5 z-90 flex max-w-105 flex-col gap-2">
       {s.toasts.map((t) => (
         <div
           key={t.id}
-          className={`flex animate-toast-in cursor-pointer gap-[9px] rounded-lg border border-pop-line border-l-[3px] bg-pop px-3 py-2.5 shadow-[0_12px_30px_rgba(0,0,0,0.45)] ${TOAST_EDGE[t.kind] ?? TOAST_EDGE.info}`}
+          className={`flex animate-toast-in cursor-pointer gap-2.25 rounded-lg border border-pop-line border-l-[3px] bg-pop px-3 py-2.5 shadow-[0_12px_30px_rgba(0,0,0,0.45)] ${TOAST_EDGE[t.kind] ?? TOAST_EDGE.info}`}
           onClick={() => s.dismissToast(t.id)}
         >
           <Icon
@@ -151,7 +151,7 @@ function Toasts() {
           <div>
             <strong className="text-[12.5px] font-[650]">{t.title}</strong>
             {t.detail ? (
-              <pre className="mx-0 mt-1 mb-0 max-h-[160px] overflow-auto font-mono text-[11px] break-words whitespace-pre-wrap text-fg-dim">
+              <pre className="mx-0 mt-1 mb-0 max-h-40 overflow-auto font-mono text-[11px] wrap-break-word whitespace-pre-wrap text-fg-dim">
                 {t.detail}
               </pre>
             ) : null}

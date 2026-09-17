@@ -78,10 +78,10 @@ export function TitleBar() {
 
   return (
     <header
-      className="flex h-10 flex-none items-end border-b border-line bg-bg-0 pl-[98px] select-none"
+      className="flex h-10 flex-none items-end border-b border-line bg-bg-0 pl-24.5 select-none"
       data-tauri-drag-region
     >
-      <div className="flex min-w-0 items-end gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:h-0">
+      <div className="flex min-w-0 items-end gap-0.5 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:h-0">
         {tabs.map((path) => {
           // 読み込み中はその行き先を選択中として見せる (実際の切り替えは読み込み後)
           const loading = path === s.opening;
@@ -89,10 +89,10 @@ export function TitleBar() {
           return (
             <div
               key={path}
-              className={`group flex h-[30px] min-w-[96px] flex-initial cursor-default items-center gap-1.5 rounded-t-lg border border-transparent border-b-0 py-0 pr-1.5 pl-2.5 text-[12.5px] ${
+              className={`group flex h-7.5 min-w-24 flex-initial cursor-default items-center gap-1.5 rounded-t-lg border border-transparent border-b-0 py-0 pr-1.5 pl-2.5 text-[12.5px] ${
                 active
-                  ? "max-w-[420px] border-line bg-bg-1 font-semibold text-fg"
-                  : "max-w-[190px] text-fg-dim hover:bg-bg-hover hover:text-fg"
+                  ? "max-w-105 border-line bg-bg-1 font-semibold text-fg"
+                  : "max-w-47.5 text-fg-dim hover:bg-bg-hover hover:text-fg"
               }`}
               title={shortPath(path)}
               onClick={() => !active && !s.opening && s.openRepo(path)}
@@ -110,7 +110,7 @@ export function TitleBar() {
               {/* チェックアウト中のブランチはアクティブなタブのリポジトリ名の横に出す */}
               {active && !loading && s.repo ? (
                 <span
-                  className="flex h-5 max-w-[220px] min-w-0 flex-initial items-center gap-1 rounded-[10px] border border-line bg-bg-2 px-[7px] text-[11.5px] font-medium text-fg-dim"
+                  className="flex h-5 max-w-55 min-w-0 flex-initial items-center gap-1 rounded-[10px] border border-line bg-bg-2 px-1.75 text-[11.5px] font-medium text-fg-dim"
                   title={headTitle}
                 >
                   <Icon name={s.repo.detached ? "commit" : "branch"} size={11} />
@@ -127,7 +127,7 @@ export function TitleBar() {
                 />
               ) : null}
               <button
-                className={`flex h-[18px] w-[18px] flex-none cursor-pointer items-center justify-center rounded-[5px] border-0 bg-transparent p-0 text-fg-faint group-hover:opacity-100 hover:bg-bg-3 hover:text-fg ${
+                className={`flex h-4.5 w-4.5 flex-none cursor-pointer items-center justify-center rounded-[5px] border-0 bg-transparent p-0 text-fg-faint group-hover:opacity-100 hover:bg-bg-3 hover:text-fg ${
                   active ? "opacity-100" : "opacity-0"
                 }`}
                 title="タブを閉じる"
@@ -142,14 +142,14 @@ export function TitleBar() {
           );
         })}
         <button
-          className="mx-0.5 mt-0 mb-0.5 flex h-[26px] w-[26px] flex-none cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-fg-dim hover:bg-bg-3 hover:text-fg"
+          className="mx-0.5 mt-0 mb-0.5 flex h-6.5 w-6.5 flex-none cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-fg-dim hover:bg-bg-3 hover:text-fg"
           title="リポジトリを開く"
           onClick={openPicker}
         >
           <Icon name="plus" size={13} />
         </button>
       </div>
-      <div className="min-w-[24px] flex-1 self-stretch" data-tauri-drag-region />
+      <div className="min-w-6 flex-1 self-stretch" data-tauri-drag-region />
       {picker ? <RepoPicker x={picker.x} y={picker.y} onClose={() => setPicker(null)} /> : null}
     </header>
   );

@@ -19,12 +19,20 @@ export function Avatar({
   const url = useStore().avatars[email.trim().toLowerCase()];
   return (
     <span
-      className={`avatar ${big ? "big" : ""}`}
+      className={`relative inline-flex flex-none items-center justify-center overflow-hidden rounded-full font-bold text-avatar-fg ${
+        big ? "h-7.5 w-7.5 text-[12px]" : "h-4.5 w-4.5 text-[9px]"
+      }`}
       style={{ background: avatarColor(email || name) }}
     >
       {initials(name)}
       {url ? (
-        <img className="avatar-img" src={url} alt="" loading="lazy" draggable={false} />
+        <img
+          className="absolute inset-0 block h-full w-full rounded-full object-cover"
+          src={url}
+          alt=""
+          loading="lazy"
+          draggable={false}
+        />
       ) : null}
     </span>
   );

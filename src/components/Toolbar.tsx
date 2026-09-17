@@ -65,8 +65,8 @@ export function Toolbar() {
   const disabled = !s.repo || Boolean(s.busy);
 
   return (
-    <header className="flex h-[46px] flex-none items-center gap-2.5 border-b border-line bg-bg-0 px-2.5">
-      <div className="flex h-[30px] items-center gap-0.5">
+    <header className="flex h-11.5 flex-none items-center gap-2.5 border-b border-line bg-bg-0 px-2.5">
+      <div className="flex h-7.5 items-center gap-0.5">
         <button
           className={TOOL}
           disabled={disabled}
@@ -108,7 +108,7 @@ export function Toolbar() {
         </div>
       </div>
 
-      <div className="flex h-[30px] items-center gap-0.5 border-l border-line pl-1.5">
+      <div className="flex h-7.5 items-center gap-0.5 border-l border-line pl-1.5">
         <button
           className={TOOL}
           disabled={disabled}
