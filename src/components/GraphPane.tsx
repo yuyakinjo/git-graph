@@ -1,33 +1,33 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useWindowEvent } from "../lib/effects";
-import { avatarColor, initials, laneColor, relativeTime } from "../lib/format";
+import { absoluteTime, avatarColor, initials, laneColor, relativeTime } from "../lib/format";
 import type { GraphCommit, GraphEdge, RefDeco } from "../lib/types";
+import { groupRefs } from "../lib/graphRefs";
 import { useActions } from "../state/actions";
 import { GRAPH_COLUMNS, useStore } from "../state/store";
 import { Avatar } from "./Avatar";
-import { ctxBackdrop, ctxIconGap, ctxItem, ctxSep, iconBtn, popMenu } from "./classes";
+import { btn, ctxBackdrop, ctxIconGap, ctxItem, ctxSep, iconBtn, popMenu } from "./classes";
 import { Icon } from "./ui";
 import { useMenu } from "./ui-context";
 
 /** 行と見出しで同じ幅を使うため、列のクラスは 1 か所にまとめる */
-const COL_REFS = "flex w-[190px] flex-none items-center gap-[5px] overflow-hidden pl-1.5";
 const COL_TAGS = "group/tags relative flex w-8 flex-none items-center";
 const COL_MSG = "flex min-w-0 flex-auto items-center gap-[5px] overflow-hidden pl-1.5";
 const COL_AUTHOR =
   "flex w-[170px] flex-none items-center gap-1.5 overflow-hidden text-[12px] text-fg-dim";
 const COL_SHA = "w-[74px] flex-none text-fg-faint";
-const COL_DATE = "w-[92px] flex-none text-right text-[11.5px] text-fg-faint";
+const COL_DATE = "w-[92px] flex-none text-right text-[11.5px] text-fg-dim";
 
 const PANE = "flex min-w-0 flex-auto flex-col bg-bg-1";
 
 const ROW_BASE =
   "absolute right-0 left-0 flex h-[30px] cursor-default items-center border-b border-transparent pr-2.5 select-none";
 /** .grow.selected は .grow:hover より後に定義されていたので、選択中はホバーで色が変わらない */
-const ROW_SELECTED = `${ROW_BASE} bg-accent-soft shadow-[inset_2px_0_0_var(--color-accent)]`;
-const ROW_PLAIN = `${ROW_BASE} hover:z-[2] hover:bg-row-hover`;
+const ROW_SELECTED = `${ROW_BASE} focus-within:z-[3] bg-accent-soft shadow-[inset_2px_0_0_var(--color-accent)]`;
+const ROW_PLAIN = `${ROW_BASE} focus-within:z-[3] hover:z-[2] hover:bg-row-hover`;
 
 const REF_BADGE_BASE =
-  "inline-flex max-w-[220px] flex-none cursor-default items-center gap-[3px] overflow-hidden rounded-[10px] border py-px pr-[7px] pl-[5px] text-[11px] font-semibold whitespace-nowrap";
+  "inline-flex min-w-0 max-w-full shrink cursor-default items-center gap-[3px] overflow-hidden rounded-[10px] border py-px pr-[7px] pl-[5px] text-[11px] font-semibold whitespace-nowrap [&>svg]:flex-none";
 const REF_BADGE_KIND: Record<string, string> = {
   head: "bg-accent-14 border-accent-35 text-accent",
   remote: "bg-violet-12 border-violet-30 text-violet",
@@ -96,7 +96,9 @@ function RefBadge({
   deco,
   onCheckout,
   onMenu,
+  tracking,
 }: {
+  tracking?: RefDeco;
   deco: RefDeco;
   onCheckout: () => void;
   onMenu: (e: React.MouseEvent) => void;
@@ -116,7 +118,7 @@ function RefBadge({
           ? REF_BADGE_IS_HEAD
           : (REF_BADGE_KIND[deco.kind] ?? REF_BADGE_KIND.commit)
       }`}
-      title={deco.full}
+      title={tracking ? `${deco.full}\n${tracking.full}（同位置）` : deco.full}
       onDoubleClick={(e) => {
         e.stopPropagation();
         onCheckout();
@@ -131,8 +133,78 @@ function RefBadge({
         <span className="h-1.25 w-1.25 rounded-full bg-current" />
       ) : null}
       <Icon name={icon} size={11} />
-      {deco.name}
+      {tracking ? <Icon name="remote" size={11} /> : null}
+      <span className="truncate">{deco.name}</span>
     </span>
+  );
+}
+
+/** 先頭の参照を優先し、残りは操作可能な一覧にまとめる。 */
+function CommitRefs({
+  refs,
+  upstreams,
+  onCheckout,
+  onMenu,
+}: {
+  refs: RefDeco[];
+  upstreams: Map<string, string>;
+  onCheckout: (d: RefDeco) => void;
+  onMenu: (d: RefDeco) => (e: React.MouseEvent) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const { primary, tracking, others } = groupRefs(refs, upstreams);
+  if (!primary) return null;
+  return (
+    <div className="relative flex min-w-0 max-w-full shrink items-center gap-1">
+      <RefBadge
+        deco={primary}
+        tracking={tracking}
+        onCheckout={() => onCheckout(primary)}
+        onMenu={onMenu(primary)}
+      />
+      {others.length ? (
+        <>
+          <button
+            className="flex-none rounded px-1 text-[11px] text-fg-dim hover:bg-bg-3"
+            aria-label={`その他の参照 ${others.length} 件`}
+            aria-expanded={open}
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(!open);
+            }}
+            onDoubleClick={(e) => e.stopPropagation()}
+          >
+            +{others.length}
+          </button>
+          {open ? (
+            <>
+              <div
+                className={ctxBackdrop}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpen(false);
+                }}
+              />
+              <div
+                className={`${popMenu} max-w-100`}
+                onClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === "Escape") setOpen(false);
+                }}
+              >
+                {others.map((d) => (
+                  <div key={d.full} className="flex px-2 py-1">
+                    <RefBadge deco={d} onCheckout={() => onCheckout(d)} onMenu={onMenu(d)} />
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </>
+      ) : null}
+    </div>
   );
 }
 
@@ -196,14 +268,14 @@ function ColumnMenu() {
         <div className={ctxSep} />
         <button className={ctxItem()} onClick={s.resetColumns}>
           <span className={ctxIconGap} />
-          <span>すべて表示</span>
+          <span>標準表示に戻す</span>
         </button>
       </div>
     </span>
   );
 }
 
-export function GraphPane() {
+export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
   const s = useStore();
   const act = useActions();
   const openMenu = useMenu();
@@ -229,6 +301,15 @@ export function GraphPane() {
   const rowOffset = hasWip ? 1 : 0;
   const totalRows = commits.length + rowOffset;
   const cols = s.columns;
+  const upstreams = useMemo(
+    () =>
+      new Map(
+        s.branches
+          .filter((b) => b.kind === "local" && b.upstream && !b.gone)
+          .map((b) => [b.name, b.upstream!]),
+      ),
+    [s.branches],
+  );
   const isRailway = s.graphStyle === "japanese-railway";
   const showNodeAvatar = cols.nodeAvatar;
   const lineWidth = isRailway ? RAILWAY_LINE_W : 1.8;
@@ -397,10 +478,12 @@ export function GraphPane() {
           key="wip"
           className={s.selection.kind === "wip" ? ROW_SELECTED : ROW_PLAIN}
           style={{ top: 0 }}
-          onClick={() => s.select({ kind: "wip" })}
+          onClick={() => {
+            s.select({ kind: "wip" });
+            onOpenDetail();
+          }}
         >
           {cols.graph ? <div className="flex-none" style={{ width: graphW }} /> : null}
-          {cols.refs ? <div className={COL_REFS} /> : null}
           {cols.tags ? <div className={COL_TAGS} /> : null}
           <div className={COL_MSG}>
             <span className="font-bold text-amber">未コミットの変更</span>
@@ -423,7 +506,10 @@ export function GraphPane() {
           dimmed ? "opacity-35" : ""
         }`}
         style={{ top: r * ROW_H }}
-        onClick={() => s.select({ kind: "commit", sha: c.hash })}
+        onClick={() => {
+          s.select({ kind: "commit", sha: c.hash });
+          onOpenDetail();
+        }}
         onDoubleClick={() => act.checkout(c.hash, c.short)}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -432,36 +518,31 @@ export function GraphPane() {
         }}
       >
         {cols.graph ? <div className="flex-none" style={{ width: graphW }} /> : null}
-        {cols.refs ? (
-          <div className={COL_REFS}>
-            {c.refs
-              .filter((d) => d.kind !== "tag" || !cols.tags)
-              .map((d) => (
-                <RefBadge
-                  key={`${d.kind}:${d.full}`}
-                  deco={d}
-                  onCheckout={() => checkoutRef(d)}
-                  onMenu={refMenu(d)}
-                />
-              ))}
-          </div>
-        ) : null}
-        {cols.tags ? (
-          <TagCell
-            tags={c.refs.filter((d) => d.kind === "tag")}
-            onCheckout={checkoutRef}
-            onMenu={refMenu}
-          />
-        ) : null}
-        {cols.subject ? (
-          <div className={COL_MSG}>
-            <span className="min-w-0 flex-auto overflow-hidden text-ellipsis whitespace-nowrap">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 pl-1.5">
+          {cols.refs ? (
+            <CommitRefs
+              refs={c.refs.filter((d) => d.kind !== "tag" || !cols.tags)}
+              upstreams={upstreams}
+              onCheckout={checkoutRef}
+              onMenu={refMenu}
+            />
+          ) : null}
+          {cols.tags && c.refs.some((d) => d.kind === "tag") ? (
+            <TagCell
+              tags={c.refs.filter((d) => d.kind === "tag")}
+              onCheckout={checkoutRef}
+              onMenu={refMenu}
+            />
+          ) : null}
+          {cols.subject ? (
+            <span
+              className={`min-w-0 flex-1 truncate ${cols.refs && c.refs.some((d) => d.kind !== "tag") ? "text-fg-dim" : "text-fg"}`}
+              title={c.subject}
+            >
               {c.subject}
             </span>
-          </div>
-        ) : (
-          <div className="min-w-0 flex-auto" />
-        )}
+          ) : null}
+        </div>
         {cols.author ? (
           <div className={COL_AUTHOR} title={`${c.authorName} <${c.authorEmail}>`}>
             <Avatar name={c.authorName} email={c.authorEmail} />
@@ -469,7 +550,16 @@ export function GraphPane() {
           </div>
         ) : null}
         {cols.sha ? <div className={`${COL_SHA} font-mono text-[12px]`}>{c.short}</div> : null}
-        {cols.date ? <div className={COL_DATE}>{relativeTime(c.timestamp)}</div> : null}
+        {cols.date ? (
+          <div
+            className={COL_DATE}
+            tabIndex={0}
+            title={absoluteTime(c.timestamp)}
+            aria-label={absoluteTime(c.timestamp)}
+          >
+            {relativeTime(c.timestamp)}
+          </div>
+        ) : null}
       </div>,
     );
   }
@@ -492,6 +582,17 @@ export function GraphPane() {
           ) : null}
         </div>
         <ColumnMenu />
+        <button
+          className={btn("default", "tiny")}
+          disabled={headRow < 0}
+          onClick={() => {
+            if (!headHash || headRow < 0) return;
+            s.select({ kind: "commit", sha: headHash });
+            revealRow(headRow + rowOffset, true);
+          }}
+        >
+          HEADへ
+        </button>
         <div className="ml-auto flex text-[10.5px] tracking-wider text-fg-faint uppercase">
           {cols.author ? <span className={COL_AUTHOR}>作者</span> : null}
           {cols.sha ? <span className={COL_SHA}>SHA</span> : null}

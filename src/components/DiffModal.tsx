@@ -1,10 +1,11 @@
 import { useMemo } from "react";
 import { useWindowEvent } from "../lib/effects";
 import { basename, dirname } from "../lib/format";
+import { useActions } from "../state/actions";
 import type { FileTarget } from "../state/store";
 import { useStore } from "../state/store";
 import { DiffView } from "./DiffView";
-import { FSTATUS_COLOR, fstatAdd, fstatDel, fstats, iconBtn } from "./classes";
+import { FSTATUS_COLOR, btn, fstatAdd, fstatDel, fstats, iconBtn } from "./classes";
 import { Icon } from "./ui";
 
 interface Entry {
@@ -69,6 +70,7 @@ function useEntries(): Entry[] {
  */
 export function DiffModal() {
   const s = useStore();
+  const act = useActions();
   const entries = useEntries();
   const cur = s.file;
   const index = cur
@@ -76,6 +78,16 @@ export function DiffModal() {
     : -1;
 
   const close = () => s.setDiffModal(false);
+
+  // WIP のファイルだけはダイアログから直接ステージ / アンステージできる。
+  // 実行後は refresh がこのパスを新しい source で選び直すので、選択はそのまま残る。
+  const staged = cur?.source === "staged";
+  const canStage =
+    cur?.source === "staged" || cur?.source === "unstaged" || cur?.source === "untracked";
+  const toggleStage = () => {
+    if (!cur) return;
+    void (staged ? act.unstage([cur.path]) : act.stage([cur.path]));
+  };
 
   const go = (delta: number) => {
     if (!entries.length) return;
@@ -132,6 +144,17 @@ export function DiffModal() {
               <em className={fstatAdd}>+{entries[index].stats.additions}</em>
               <em className={fstatDel}>-{entries[index].stats.deletions}</em>
             </span>
+          ) : null}
+          {canStage ? (
+            <button
+              className={btn(staged ? "default" : "primary", "tiny")}
+              title={staged ? "このファイルをアンステージ" : "このファイルを git add"}
+              disabled={!!s.busy}
+              onClick={toggleStage}
+            >
+              <Icon name={staged ? "minus" : "plus"} size={12} />
+              {staged ? "アンステージ" : "ステージ"}
+            </button>
           ) : null}
           <span className="flex-none font-mono text-[11.5px] text-fg-dim">
             {index < 0 ? "-" : index + 1} / {entries.length}

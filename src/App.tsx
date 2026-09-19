@@ -173,6 +173,7 @@ export default function App() {
   const act = useActions();
   const [pr, setPr] = useState<PullRequest | null>(null);
   const sidebar = usePaneWidth(248, SIDEBAR_KEY, 180, 420);
+  const [detailOpen, setDetailOpen] = useState(false);
   const detail = usePaneWidth(520, DETAIL_KEY, 340, 900, true);
 
   // 一覧の情報ですぐ開き、詳細が届いたら差し替える (取得はクリック起点)
@@ -186,6 +187,18 @@ export default function App() {
   );
 
   useWindowEvent("keydown", (e) => {
+    if (
+      e.key === "Escape" &&
+      !e.defaultPrevented &&
+      !s.diffModal &&
+      !s.settingsOpen &&
+      !pr &&
+      !(e.target instanceof HTMLInputElement) &&
+      !(e.target instanceof HTMLTextAreaElement)
+    ) {
+      setDetailOpen(false);
+      return;
+    }
     if (!(e.metaKey || e.ctrlKey)) return;
     if (e.key === "o") {
       e.preventDefault();
@@ -222,11 +235,15 @@ export default function App() {
             <Sidebar onOpenPr={openPr} />
           </div>
           <div className={SPLITTER} {...sidebar.handlers} />
-          <GraphPane />
-          <div className={SPLITTER} {...detail.handlers} />
-          <div style={{ width: detail.width, flex: "0 0 auto", minWidth: 0, display: "flex" }}>
-            <DetailPane />
-          </div>
+          <GraphPane onOpenDetail={() => setDetailOpen(true)} />
+          {detailOpen ? (
+            <>
+              <div className={SPLITTER} {...detail.handlers} />
+              <div style={{ width: detail.width, flex: "0 0 auto", minWidth: 0, display: "flex" }}>
+                <DetailPane />
+              </div>
+            </>
+          ) : null}
           {s.opening ? (
             <div className={VEIL}>
               <Opening path={s.opening} />

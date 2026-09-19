@@ -48,15 +48,15 @@ export function Toolbar() {
 
   const stashMenu = (e: React.MouseEvent) =>
     openMenu(e, [
-      { label: "変更をスタッシュ", icon: "stash", onClick: () => act.stashPush() },
+      { label: "stash", icon: "stash", onClick: () => act.stashPush() },
       {
-        label: "最新のスタッシュをポップ",
+        label: "pop",
         icon: "pull",
         disabled: s.stashes.length === 0,
         onClick: () => s.stashes[0] && act.stashApply(s.stashes[0], true),
       },
       {
-        label: "最新のスタッシュを適用",
+        label: "apply",
         icon: "check",
         disabled: s.stashes.length === 0,
         onClick: () => s.stashes[0] && act.stashApply(s.stashes[0], false),

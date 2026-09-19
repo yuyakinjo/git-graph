@@ -73,7 +73,12 @@ export const GRAPH_COLUMNS = [
 export type GraphColumnKey = (typeof GRAPH_COLUMNS)[number]["key"];
 export type GraphColumns = Record<GraphColumnKey, boolean>;
 
-const DEFAULT_COLUMNS = Object.fromEntries(GRAPH_COLUMNS.map((c) => [c.key, true])) as GraphColumns;
+const DEFAULT_COLUMNS = {
+  ...Object.fromEntries(GRAPH_COLUMNS.map((c) => [c.key, true])),
+  sha: false,
+  author: false,
+  nodeAvatar: false,
+} as GraphColumns;
 
 function loadColumns(): GraphColumns {
   const next = { ...DEFAULT_COLUMNS };
@@ -84,7 +89,7 @@ function loadColumns(): GraphColumns {
       if (typeof saved[c.key] === "boolean") next[c.key] = saved[c.key];
     }
   } catch {
-    /* 壊れていれば既定 (全表示) に戻す */
+    /* 壊れていれば標準表示 に戻す */
   }
   return next;
 }

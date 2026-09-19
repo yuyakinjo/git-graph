@@ -305,7 +305,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         action={
           <button
             className={iconBtn({ tiny: true })}
-            title="変更をスタッシュ"
+            title="stash"
             onClick={() => act.stashPush()}
           >
             <Icon name="plus" size={13} />
@@ -328,18 +328,18 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
                   e.preventDefault();
                   openMenu(e, [
                     {
-                      label: "適用 (apply)",
+                      label: "apply",
                       icon: "check",
                       onClick: () => act.stashApply(st, false),
                     },
                     {
-                      label: "ポップ (pop)",
+                      label: "pop",
                       icon: "stash",
                       onClick: () => act.stashApply(st, true),
                     },
                     { separator: true },
                     {
-                      label: "破棄 (drop)",
+                      label: "drop",
                       icon: "trash",
                       danger: true,
                       onClick: () => act.stashDrop(st),
