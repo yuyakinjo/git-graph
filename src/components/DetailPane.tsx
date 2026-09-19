@@ -6,7 +6,6 @@ import { useActions } from "../state/actions";
 import type { FileTarget } from "../state/store";
 import { useStore } from "../state/store";
 import { Avatar } from "./Avatar";
-import { DiffView } from "./DiffView";
 import { FSTATUS_COLOR, btn, fstatAdd, fstatDel, fstats, iconBtn } from "./classes";
 import { Icon } from "./ui";
 import { useMenu } from "./ui-context";
@@ -24,10 +23,6 @@ const SECTION_HEAD =
 const SECTION_HEAD_STICKY = `${SECTION_HEAD} sticky top-0 z-[1]`;
 
 const LIST_EMPTY = "px-3 py-2 text-[11.5px] text-fg-faint";
-const DIFF_WRAP = "flex min-h-0 flex-auto flex-col border-t border-line bg-bg-1";
-/** パスの先頭側を省略したいので rtl。記号の並び替えは lrm ユーティリティで抑える */
-const DIFF_HEAD =
-  "lrm flex-none overflow-hidden border-b border-line-soft px-2.5 py-[5px] text-left font-mono text-[12px] text-ellipsis whitespace-nowrap text-fg-dim [direction:rtl]";
 
 const FILE_ROW_BASE = "group flex h-6 cursor-default items-center gap-[7px] px-2.5 text-[12px]";
 const FILE_ROW_SELECTED = `${FILE_ROW_BASE} bg-accent-soft shadow-[inset_2px_0_0_var(--color-accent)]`;
@@ -94,7 +89,7 @@ function WipPanel() {
   const [amend, setAmend] = useState(false);
   const sel = s.file;
 
-  /** ファイル行のクリックは差分ダイアログを開く (下の差分ペインも同じ対象を出す) */
+  /** ファイル行のクリックは差分ダイアログを開く */
   const open = (target: FileTarget) => {
     void s.openFile(target);
     s.setDiffModal(true);
@@ -147,7 +142,7 @@ function WipPanel() {
         </div>
       </header>
 
-      <div className="flex max-h-[46%] flex-initial flex-col overflow-y-auto">
+      <div className="flex min-h-0 flex-auto flex-col overflow-y-auto">
         <section className="flex min-h-0 flex-none flex-col">
           <div className={SECTION_HEAD_STICKY}>
             <span>変更 ({changedCount})</span>
@@ -263,11 +258,6 @@ function WipPanel() {
             ) : null}
           </div>
         </section>
-      </div>
-
-      <div className={DIFF_WRAP}>
-        {sel ? <div className={DIFF_HEAD}>{sel.path}</div> : null}
-        <DiffView raw={s.diff.text} loading={s.diff.loading} />
       </div>
 
       <div className="flex-none border-t border-line bg-bg-2 px-2.5 pt-2 pb-2.5">
@@ -395,7 +385,7 @@ function CommitPanel({ sha }: { sha: string }) {
           <em className={fstatDel}>-{totals.d}</em>
         </span>
       </div>
-      <div className="max-h-[38%] min-h-20 flex-auto overflow-y-auto">
+      <div className="min-h-20 flex-auto overflow-y-auto">
         {detail.files.map((f) => (
           <FileRow
             key={f.path}
@@ -412,11 +402,6 @@ function CommitPanel({ sha }: { sha: string }) {
           />
         ))}
         {detail.files.length === 0 ? <div className={LIST_EMPTY}>差分はありません</div> : null}
-      </div>
-
-      <div className={DIFF_WRAP}>
-        {sel ? <div className={DIFF_HEAD}>{sel}</div> : null}
-        <DiffView raw={s.diff.text} loading={s.diff.loading} />
       </div>
     </div>
   );
@@ -466,7 +451,7 @@ function StashPanel({ refname, message }: { refname: string; message: string }) 
           </button>
         </div>
       </header>
-      <div className="max-h-[38%] min-h-20 flex-auto overflow-y-auto">
+      <div className="min-h-20 flex-auto overflow-y-auto">
         {files.map((f) => (
           <FileRow
             key={f.path}
@@ -480,11 +465,7 @@ function StashPanel({ refname, message }: { refname: string; message: string }) 
             stats={{ additions: f.additions, deletions: f.deletions }}
           />
         ))}
-      </div>
-      <div className={DIFF_WRAP}>
-        {sel ? <div className={DIFF_HEAD}>{sel}</div> : null}
-        <DiffView raw={s.diff.text} loading={s.diff.loading} />
-      </div>
+      </div>{" "}
     </div>
   );
 }
