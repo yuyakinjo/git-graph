@@ -303,11 +303,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         isOpen={isOpen}
         toggle={toggle}
         action={
-          <button
-            className={iconBtn({ tiny: true })}
-            title="stash"
-            onClick={() => act.stashPush()}
-          >
+          <button className={iconBtn({ tiny: true })} title="stash" onClick={() => act.stashPush()}>
             <Icon name="plus" size={13} />
           </button>
         }

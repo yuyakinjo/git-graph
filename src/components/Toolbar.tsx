@@ -1,8 +1,9 @@
+import { ZOOM_MAX, ZOOM_MIN, ZOOM_PRESETS, ZOOM_STEP, clampZoom, zoomLabel } from "../lib/zoom";
 import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
 import { iconBtn } from "./classes";
 import { Icon, Spinner } from "./ui";
-import { useMenu } from "./ui-context";
+import { useDialogs, useMenu } from "./ui-context";
 
 const TOOL_BASE =
   "flex h-[30px] cursor-pointer items-center gap-1.5 border-0 bg-transparent text-[12.5px] whitespace-nowrap not-disabled:hover:bg-bg-3 disabled:cursor-default disabled:opacity-40";
@@ -180,6 +181,64 @@ export function Toolbar() {
   );
 }
 
+/** フッターの表示倍率。クリックでプリセットと数値指定のメニューを出す。 */
+function ZoomStatus() {
+  const s = useStore();
+  const openMenu = useMenu();
+  const dialogs = useDialogs();
+
+  const ask = async () => {
+    const r = await dialogs.form({
+      title: "表示倍率",
+      description: `${ZOOM_MIN * 100}〜${ZOOM_MAX * 100} の範囲で指定します。`,
+      fields: [
+        {
+          name: "percent",
+          label: "倍率 (%)",
+          type: "text",
+          value: String(Math.round(s.zoom * 100)),
+          required: true,
+          mono: true,
+        },
+      ],
+      submitLabel: "適用",
+      width: 320,
+    });
+    const percent = Number(
+      String(r?.percent ?? "")
+        .replace("%", "")
+        .trim(),
+    );
+    if (!r || !Number.isFinite(percent) || percent <= 0) return;
+    s.setZoom(percent / 100);
+  };
+
+  const menu = (e: React.MouseEvent) =>
+    openMenu(e, [
+      { label: "拡大 (Cmd +)", icon: "plus", onClick: () => s.setZoom(s.zoom + ZOOM_STEP) },
+      { label: "縮小 (Cmd -)", icon: "minus", onClick: () => s.setZoom(s.zoom - ZOOM_STEP) },
+      { label: "100% に戻す (Cmd 0)", icon: "fetch", onClick: () => s.setZoom(1) },
+      { separator: true },
+      ...ZOOM_PRESETS.map((z) => ({
+        label: zoomLabel(z),
+        icon: clampZoom(s.zoom) === z ? "check" : undefined,
+        onClick: () => s.setZoom(z),
+      })),
+      { separator: true },
+      { label: "倍率を入力…", icon: "amend", onClick: ask },
+    ]);
+
+  return (
+    <button
+      className={`${SB_ITEM} h-5 cursor-pointer rounded border-0 bg-transparent px-1.5 text-[11px] text-fg-dim tabular-nums hover:bg-bg-3`}
+      title="表示倍率 (Cmd + / Cmd - / Cmd 0)"
+      onClick={menu}
+    >
+      <Icon name="search" size={11} /> {zoomLabel(s.zoom)}
+    </button>
+  );
+}
+
 export function StatusBar() {
   const s = useStore();
   return (
@@ -194,6 +253,7 @@ export function StatusBar() {
       ) : s.gh && !s.gh.installed ? (
         <span className={`${SB_ITEM} text-amber`}>gh CLI 未検出</span>
       ) : null}
+      <ZoomStatus />
       {s.graph ? <span className={SB_ITEM}>{s.graph.commits.length} コミット</span> : null}
       {s.stashes.length ? <span className={SB_ITEM}>スタッシュ {s.stashes.length}</span> : null}
       {s.repo?.headHash ? (

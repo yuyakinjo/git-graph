@@ -13,6 +13,7 @@ import {
   type RepoSnapshot,
 } from "../lib/repo-data";
 import { snapshotHash, type CachedRepo } from "../lib/snapshot-cache";
+import { applyZoom, clampZoom, loadZoom, saveZoom } from "../lib/zoom";
 import type {
   BranchInfo,
   CommitDetail,
@@ -170,6 +171,8 @@ export function useStoreValue(boot: BootData | null) {
   const [graphStyle, setGraphStyleState] = useState<GraphStyle>(() =>
     localStorage.getItem(GRAPH_STYLE_KEY) === "japanese-railway" ? "japanese-railway" : "default",
   );
+  // 表示倍率。実際の反映は setZoom / 起動時の main.tsx で行う。
+  const [zoom, setZoomState] = useState(loadZoom);
 
   // ---- 設定 (プロジェクト置き場) と、そこから見つけたリポジトリ ----
   const [projectRoots, setProjectRootsState] = useState<string[]>(() => loadPaths(ROOTS_KEY));
@@ -698,6 +701,14 @@ export function useStoreValue(boot: BootData | null) {
     localStorage.setItem(COLS_KEY, JSON.stringify(DEFAULT_COLUMNS));
   }, []);
 
+  /** 表示倍率を変える。範囲外は丸める。 */
+  const setZoom = useCallback((next: number) => {
+    const z = clampZoom(next);
+    setZoomState(z);
+    saveZoom(z);
+    applyZoom(z);
+  }, []);
+
   const setGraphStyle = useCallback((style: GraphStyle) => {
     setGraphStyleState(style);
     localStorage.setItem(GRAPH_STYLE_KEY, style);
@@ -761,6 +772,8 @@ export function useStoreValue(boot: BootData | null) {
     resetColumns,
     graphStyle,
     setGraphStyle,
+    zoom,
+    setZoom,
     projectRoots,
     setProjectRoots,
     scanDepth,

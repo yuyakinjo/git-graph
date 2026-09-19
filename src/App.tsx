@@ -12,6 +12,7 @@ import { Icon, Spinner } from "./components/ui";
 import { api } from "./lib/api";
 import { useWindowEvent } from "./lib/effects";
 import type { PullRequest } from "./lib/types";
+import { ZOOM_STEP, zoomKeyAction } from "./lib/zoom";
 import { useActions } from "./state/actions";
 import { useStore } from "./state/store";
 
@@ -200,6 +201,12 @@ export default function App() {
       return;
     }
     if (!(e.metaKey || e.ctrlKey)) return;
+    const zoomAct = zoomKeyAction(e);
+    if (zoomAct) {
+      e.preventDefault();
+      s.setZoom(zoomAct === "reset" ? 1 : s.zoom + (zoomAct === "in" ? ZOOM_STEP : -ZOOM_STEP));
+      return;
+    }
     if (e.key === "o") {
       e.preventDefault();
       act.openFolder();
