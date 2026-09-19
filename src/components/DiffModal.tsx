@@ -206,7 +206,12 @@ export function DiffModal() {
             ))}
           </div>
           <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-bg-1">
-            <DiffView raw={s.diff.text} loading={s.diff.loading} />
+            <DiffView
+              text={s.diff.text}
+              lines={s.diff.lines}
+              tokens={s.diff.tokens}
+              loading={s.diff.loading}
+            />
           </div>
         </div>
       </div>

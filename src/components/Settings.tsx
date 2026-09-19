@@ -1,4 +1,5 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { DIFF_THEMES, isDiffTheme } from "../lib/highlight";
 import { useStore } from "../state/store";
 import { btn, dialogDesc, field, fieldInput, fieldLabel, hint, iconBtn } from "./classes";
 import { Icon, Modal, Spinner } from "./ui";
@@ -64,6 +65,32 @@ export function Settings() {
             <option value="avatar">アバター</option>
             <option value="circle">◯</option>
           </select>
+        </div>
+      </section>
+
+      <section>
+        <h3 className={SECTION_H3}>差分の表示</h3>
+        <div className={field}>
+          <label className={fieldLabel} htmlFor="diff-theme">
+            シンタックスハイライト
+          </label>
+          <select
+            className={`${fieldInput} font-sans text-[12.5px]`}
+            id="diff-theme"
+            value={s.diffTheme}
+            onChange={(e) => {
+              if (isDiffTheme(e.target.value)) void s.setDiffTheme(e.target.value);
+            }}
+          >
+            {DIFF_THEMES.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+          <em className={hint}>
+            ファイルの拡張子から言語を判定して色を付けます。テーマは選んだものだけを読み込みます。
+          </em>
         </div>
       </section>
 

@@ -1,5 +1,8 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import type { ThemedToken } from "shiki";
 import { api } from "../lib/api";
+import { parseDiff, tokenizeDiff, type DiffLine } from "../lib/diff";
+import { DEFAULT_DIFF_THEME, isDiffTheme, type DiffTheme } from "../lib/highlight";
 import { useInterval } from "../lib/effects";
 import {
   GRAPH_LIMIT,
@@ -46,6 +49,14 @@ export interface FileTarget {
   ref?: string;
 }
 
+/** いま開いているファイルの差分。tokens は shiki のハイライトが間に合ったら入る。 */
+export interface DiffState {
+  text: string | null;
+  lines: DiffLine[];
+  tokens: ThemedToken[][] | null;
+  loading: boolean;
+}
+
 const RECENT_KEY = "gitgraph.recent";
 const TABS_KEY = "gitgraph.tabs";
 const AUTOFETCH_KEY = "gitgraph.autofetch";
@@ -57,6 +68,8 @@ const DEFAULT_DEPTH = 3;
 // グラフ一覧の列。表示順もこの並びに合わせる。
 const COLS_KEY = "gitgraph.graphColumns";
 const GRAPH_STYLE_KEY = "gitgraph.graphStyle";
+// 差分ビューのシンタックスハイライトのテーマ
+const DIFF_THEME_KEY = "gitgraph.diffTheme";
 export type GraphStyle = "default" | "japanese-railway";
 
 export const GRAPH_COLUMNS = [
@@ -188,12 +201,18 @@ export function useStoreValue(boot: BootData | null) {
   const [commit, setCommit] = useState<CommitDetail | null>(null);
   const [stashFiles, setStashFiles] = useState<DiffFile[]>([]);
   const [file, setFile] = useState<FileTarget | null>(null);
-  const [diff, setDiff] = useState<{ text: string | null; loading: boolean }>({
+  const [diff, setDiff] = useState<DiffState>({
     text: null,
+    lines: [],
+    tokens: null,
     loading: false,
   });
   /** 差分を全画面のダイアログで見ているか (ファイル行のクリックで開く) */
   const [diffModal, setDiffModal] = useState(false);
+  const [diffTheme, setDiffThemeState] = useState<DiffTheme>(() => {
+    const saved = localStorage.getItem(DIFF_THEME_KEY);
+    return isDiffTheme(saved) ? saved : DEFAULT_DIFF_THEME;
+  });
 
   const toastSeq = useRef(0);
   const detailSeq = useRef(0);
@@ -225,6 +244,10 @@ export function useStoreValue(boot: BootData | null) {
   tabsRef.current = tabs;
   const fileRef = useRef(file);
   fileRef.current = file;
+  const diffRef = useRef(diff);
+  diffRef.current = diff;
+  const diffThemeRef = useRef(diffTheme);
+  diffThemeRef.current = diffTheme;
   const rootsRef = useRef(projectRoots);
   rootsRef.current = projectRoots;
   const depthRef = useRef(scanDepth);
@@ -271,16 +294,23 @@ export function useStoreValue(boot: BootData | null) {
     fileRef.current = target;
     const id = ++diffSeq.current;
     if (!target) {
-      setDiff({ text: null, loading: false });
+      setDiff({ text: null, lines: [], tokens: null, loading: false });
       return;
     }
-    setDiff((d) => ({ text: d.text, loading: true }));
+    setDiff((d) => ({ ...d, loading: true }));
+    let text: string;
     try {
-      const text = await api.diffText(dirRef.current, target.source, target.path, target.ref);
-      if (diffSeq.current === id) setDiff({ text, loading: false });
+      text = await api.diffText(dirRef.current, target.source, target.path, target.ref);
     } catch {
-      if (diffSeq.current === id) setDiff({ text: "", loading: false });
+      text = "";
     }
+    if (diffSeq.current !== id) return;
+    // まず素のテキストで出し、シンタックスハイライトは間に合った時点で乗せ替える
+    // (shiki の文法は初回だけ動的 import が挟まるので、待たせない)。
+    const lines = parseDiff(text);
+    setDiff({ text, lines, tokens: null, loading: false });
+    const tokens = await tokenizeDiff(lines, target.path, diffThemeRef.current);
+    if (tokens && diffSeq.current === id) setDiff({ text, lines, tokens, loading: false });
   }, []);
 
   /** 選択を変える唯一の入口。選択と同時にその中身も取りに行く。 */
@@ -554,7 +584,7 @@ export function useStoreValue(boot: BootData | null) {
     setCommit(null);
     setStashFiles([]);
     setFile(null);
-    setDiff({ text: null, loading: false });
+    setDiff({ text: null, lines: [], tokens: null, loading: false });
     setGraphLimit(GRAPH_LIMIT);
     graphLimitRef.current = GRAPH_LIMIT;
     dirRef.current = "";
@@ -709,6 +739,19 @@ export function useStoreValue(boot: BootData | null) {
     applyZoom(z);
   }, []);
 
+  /** テーマを変えたら、いま開いている差分だけその場で塗り直す。 */
+  const setDiffTheme = useCallback(async (theme: DiffTheme) => {
+    setDiffThemeState(theme);
+    diffThemeRef.current = theme;
+    localStorage.setItem(DIFF_THEME_KEY, theme);
+    const { text, lines } = diffRef.current;
+    const path = fileRef.current?.path;
+    if (text === null || !lines.length) return;
+    const id = ++diffSeq.current;
+    const tokens = await tokenizeDiff(lines, path, theme);
+    if (diffSeq.current === id) setDiff({ text, lines, tokens, loading: false });
+  }, []);
+
   const setGraphStyle = useCallback((style: GraphStyle) => {
     setGraphStyleState(style);
     localStorage.setItem(GRAPH_STYLE_KEY, style);
@@ -772,6 +815,8 @@ export function useStoreValue(boot: BootData | null) {
     resetColumns,
     graphStyle,
     setGraphStyle,
+    diffTheme,
+    setDiffTheme,
     zoom,
     setZoom,
     projectRoots,
