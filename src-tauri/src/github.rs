@@ -201,3 +201,59 @@ pub fn pr_template(dir: &str) -> Option<String> {
     }
     None
 }
+
+/// リポジトリの作成先に選べるアカウント (自分のログイン + 所属 org)。
+/// org の取得には read:org スコープが要るので、取れなければ自分だけを返す。
+pub fn owners(dir: &str) -> Vec<String> {
+    let mut list: Vec<String> = Vec::new();
+    if let Ok(login) = sh::gh(dir, &["api", "user", "--jq", ".login"]) {
+        let login = login.trim();
+        if !login.is_empty() {
+            list.push(login.to_string());
+        }
+    }
+    if let Ok(orgs) = sh::gh(dir, &["api", "user/orgs", "--paginate", "--jq", ".[].login"]) {
+        for line in orgs.lines() {
+            let name = line.trim();
+            if !name.is_empty() && !list.iter().any(|o| o == name) {
+                list.push(name.to_string());
+            }
+        }
+    }
+    list
+}
+
+/// GitHub にリポジトリを作成し、このリポジトリのリモートとして登録する。
+/// `--source` を使うので、リモート未設定のローカルリポジトリが前提。
+pub fn repo_create(
+    dir: &str,
+    name: &str,
+    visibility: &str,
+    description: &str,
+    remote: &str,
+    push: bool,
+) -> Result<String, String> {
+    let mut args: Vec<String> = vec!["repo".into(), "create".into(), name.into()];
+    args.push(match visibility {
+        "public" => "--public".into(),
+        "internal" => "--internal".into(),
+        _ => "--private".into(),
+    });
+    args.push("--source".into());
+    args.push(".".into());
+    args.push("--remote".into());
+    args.push(remote.to_string());
+    if !description.trim().is_empty() {
+        args.push("--description".into());
+        args.push(description.trim().to_string());
+    }
+    if push {
+        args.push("--push".into());
+    }
+    let out = sh::exec(dir, "gh", &args)?;
+    if out.ok() {
+        Ok(out.message())
+    } else {
+        Err(out.message())
+    }
+}

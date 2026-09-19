@@ -4,6 +4,7 @@ import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { api } from "../lib/api";
 import { useDialogs } from "../components/ui-context";
 import { useStore } from "./store";
+import type { FormField } from "../components/ui";
 import type { BranchInfo, PullRequest, StashInfo, WorktreeInfo } from "../lib/types";
 
 export function useActions() {
@@ -338,6 +339,109 @@ export function useActions() {
 
     const worktreePrune = () => s.run("worktree を整理", () => api.worktreePrune(dir));
 
+    // ---------------------------------------------------------- 7.5. remote
+    /**
+     * リモート未設定のリポジトリに GitHub の新規リポジトリを作って origin に登録する。
+     * gh repo create --source が前提なので、既にリモートがある場合は何もしない。
+     */
+    const remoteCreate = async () => {
+      if (!s.repo) return;
+      if (s.repo.remotes.length > 0) {
+        s.toast({
+          kind: "info",
+          title: "リモートは設定済みです",
+          detail: s.repo.remotes.join(", "),
+        });
+        return;
+      }
+      if (!s.gh?.installed) {
+        s.toast({
+          kind: "error",
+          title: "gh CLI が見つかりません",
+          detail: "brew install gh でインストールしてください",
+        });
+        return;
+      }
+      if (!s.gh.authenticated) {
+        s.toast({
+          kind: "error",
+          title: "gh CLI が未認証です",
+          detail: "gh auth login を実行してください",
+        });
+        return;
+      }
+
+      // オーナー候補 (自分 + 所属 org)。read:org が無いと自分だけになる。
+      const fetched = await api.ghOwners(dir).catch(() => [] as string[]);
+      const owners = fetched.length ? fetched : s.gh.login ? [s.gh.login] : [];
+      /** 空リポジトリはプッシュするものが無い */
+      const hasCommits = Boolean(s.repo.headHash);
+
+      const ownerField: FormField[] = owners.length
+        ? [
+            {
+              name: "owner",
+              label: "オーナー",
+              type: "select",
+              value: owners[0],
+              options: owners.map((o) => ({ value: o, label: o })),
+            },
+          ]
+        : [];
+      const fields: FormField[] = [
+        ...ownerField,
+        {
+          name: "name",
+          label: "リポジトリ名",
+          type: "text",
+          required: true,
+          mono: true,
+          value: s.repo.name,
+        },
+        {
+          name: "visibility",
+          label: "公開範囲",
+          type: "select",
+          value: "private",
+          options: [
+            { value: "private", label: "Private" },
+            { value: "public", label: "Public" },
+            { value: "internal", label: "Internal (org のみ)" },
+          ],
+        },
+        { name: "description", label: "説明 (任意)", type: "text" },
+        {
+          name: "push",
+          label: "作成後に現在のブランチをプッシュする",
+          type: "checkbox",
+          value: hasCommits,
+          hint: hasCommits ? undefined : "コミットが無いためプッシュできません",
+        },
+      ];
+
+      const res = await dialogs.form({
+        title: "GitHub にリポジトリを作成",
+        description: "作成した GitHub リポジトリを origin として登録します。",
+        width: 560,
+        fields,
+        submitLabel: "作成",
+      });
+      if (!res) return;
+
+      const owner = String(res.owner ?? "").trim();
+      const name = String(res.name).trim();
+      const full = owner ? `${owner}/${name}` : name;
+      await s.run("GitHub リポジトリを作成", () =>
+        api.ghRepoCreate(dir, {
+          name: full,
+          visibility: String(res.visibility ?? "private"),
+          description: String(res.description ?? ""),
+          remote: "origin",
+          push: hasCommits && Boolean(res.push),
+        }),
+      );
+    };
+
     // ---------------------------------------------------------- 8. pull request
     const prCreate = async () => {
       const head = s.headBranch;
@@ -509,6 +613,7 @@ export function useActions() {
       worktreeAdd,
       worktreeRemove,
       worktreePrune,
+      remoteCreate,
       prCreate,
       prCheckout,
       prOpen,

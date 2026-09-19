@@ -222,6 +222,8 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
 
   const locals = useMemo(() => s.branches.filter((b) => b.kind === "local"), [s.branches]);
   const remotes = useMemo(() => s.branches.filter((b) => b.kind === "remote"), [s.branches]);
+  /** リモート未設定なら、フェッチではなく GitHub リポジトリ作成を出す */
+  const noRemote = (s.repo?.remotes.length ?? 0) === 0;
 
   return (
     <aside className="flex h-full flex-col overflow-y-auto bg-bg-2 pt-1.5 pb-5">
@@ -255,14 +257,38 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         isOpen={isOpen}
         toggle={toggle}
         action={
-          <button className={iconBtn({ tiny: true })} title="フェッチ" onClick={() => act.fetch()}>
-            <Icon name="fetch" size={13} />
-          </button>
+          noRemote ? (
+            <button
+              className={iconBtn({ tiny: true })}
+              title="GitHub にリポジトリを作成"
+              onClick={() => act.remoteCreate()}
+            >
+              <Icon name="plus" size={13} />
+            </button>
+          ) : (
+            <button
+              className={iconBtn({ tiny: true })}
+              title="フェッチ"
+              onClick={() => act.fetch()}
+            >
+              <Icon name="fetch" size={13} />
+            </button>
+          )
         }
       >
-        {remotes.map((b) => (
-          <BranchItem key={b.full} b={b} />
-        ))}
+        {noRemote ? (
+          <>
+            <div className={SIDE_NOTE}>リモートリポジトリが未設定です</div>
+            <button
+              className={`${SIDE_NOTE} block w-full cursor-pointer border-0 bg-none pt-0 text-left text-accent`}
+              onClick={() => act.remoteCreate()}
+            >
+              GitHub にリポジトリを作成する
+            </button>
+          </>
+        ) : (
+          remotes.map((b) => <BranchItem key={b.full} b={b} />)
+        )}
       </Section>
 
       <Section

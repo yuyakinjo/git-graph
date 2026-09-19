@@ -372,6 +372,23 @@ pub fn gh_status(dir: String) -> Result<github::GhStatus, String> {
 }
 
 #[tauri::command]
+pub fn gh_owners(dir: String) -> Result<Vec<String>, String> {
+    Ok(github::owners(&dir))
+}
+
+#[tauri::command]
+pub fn gh_repo_create(
+    dir: String,
+    name: String,
+    visibility: String,
+    description: String,
+    remote: String,
+    push: bool,
+) -> Result<String, String> {
+    github::repo_create(&dir, &name, &visibility, &description, &remote, push)
+}
+
+#[tauri::command]
 pub fn gh_pr_list(dir: String, state: String, limit: Option<u32>) -> Result<Value, String> {
     github::pr_list(&dir, &state, limit.unwrap_or(30))
 }

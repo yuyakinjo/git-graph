@@ -75,6 +75,8 @@ pub fn run() {
             commands::git_worktree_remove,
             commands::git_worktree_prune,
             commands::gh_status,
+            commands::gh_owners,
+            commands::gh_repo_create,
             commands::gh_pr_list,
             commands::gh_pr_for_branch,
             commands::gh_pr_view,

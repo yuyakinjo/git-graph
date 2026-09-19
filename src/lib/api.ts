@@ -93,6 +93,17 @@ export const api = {
 
   // GitHub (gh CLI)
   ghStatus: (dir: string) => invoke<GhStatus>("gh_status", { dir }),
+  ghOwners: (dir: string) => invoke<string[]>("gh_owners", { dir }),
+  ghRepoCreate: (
+    dir: string,
+    p: {
+      name: string;
+      visibility: string;
+      description: string;
+      remote: string;
+      push: boolean;
+    },
+  ) => invoke<string>("gh_repo_create", { dir, ...p }),
   prList: (dir: string, state = "open", limit = 30) =>
     invoke<PullRequest[]>("gh_pr_list", { dir, state, limit }),
   prForBranch: (dir: string, branch: string) =>
