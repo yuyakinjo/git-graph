@@ -345,7 +345,8 @@ pub fn branches(dir: &str) -> Result<Vec<BranchInfo>, String> {
         }
         let full = f[0].to_string();
         let name = f[1].to_string();
-        if name.ends_with("/HEAD") {
+        // refs/remotes/origin/HEAD は refname:short が "origin" に縮むので full で弾く
+        if full.ends_with("/HEAD") {
             continue;
         }
         let kind = if full.starts_with("refs/heads/") {

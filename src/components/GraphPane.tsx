@@ -677,6 +677,8 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
                   const url = showNodeAvatar
                     ? s.avatars[c.authorEmail.trim().toLowerCase()]
                     : undefined;
+                  // マージだけは塗りつぶしの丸にして、合流点をひと目で分かるようにする
+                  const isMerge = c.parents.length > 1;
                   return (
                     <g key={c.hash} opacity={matches && !matches.has(c.hash) ? 0.3 : 1}>
                       {isSel ? (
@@ -690,7 +692,16 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
                           opacity="0.5"
                         />
                       ) : null}
-                      {showNodeAvatar ? (
+                      {isMerge ? (
+                        <circle
+                          cx={x}
+                          cy={y}
+                          r={showNodeAvatar ? AVATAR_R : isRailway ? RAILWAY_NODE_R : 4.5}
+                          fill={color}
+                          stroke={color}
+                          strokeWidth={isRailway ? 2 : isHead ? 3 : 2}
+                        />
+                      ) : showNodeAvatar ? (
                         <>
                           {/* 画像が無い / 読めないときはこの地色 + イニシャルがそのまま見える */}
                           <circle
@@ -717,7 +728,7 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
                               clipPath="url(#node-avatar-clip)"
                             />
                           ) : null}
-                          {/* レーン色の輪郭で枝の対応を保つ (マージは二重線) */}
+                          {/* レーン色の輪郭で枝の対応を保つ */}
                           <circle
                             cx={x}
                             cy={y}
@@ -726,23 +737,12 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
                             stroke={color}
                             strokeWidth={isHead ? 2.5 : 1.8}
                           />
-                          {c.parents.length > 1 ? (
-                            <circle
-                              cx={x}
-                              cy={y}
-                              r={AVATAR_R + 2}
-                              fill="none"
-                              stroke={color}
-                              strokeWidth="1"
-                              opacity="0.7"
-                            />
-                          ) : null}
                         </>
                       ) : (
                         <circle
                           cx={x}
                           cy={y}
-                          r={isRailway ? RAILWAY_NODE_R : c.parents.length > 1 ? 4 : 4.5}
+                          r={isRailway ? RAILWAY_NODE_R : 4.5}
                           fill={isHead ? color : "var(--color-bg-1)"}
                           stroke={color}
                           strokeWidth={isRailway ? 2 : isHead ? 3 : 2}

@@ -77,7 +77,11 @@ function Section({
 }) {
   const open = isOpen(id);
   return (
-    <section className={`flex flex-col first:mt-auto ${open ? "min-h-7 flex-1" : "shrink-0"}`}>
+    <section
+      className={`flex flex-col border-line-soft border-t first:mt-auto first:border-t-0 ${
+        open ? "min-h-7 flex-1" : "shrink-0"
+      }`}
+    >
       <header className={SIDE_HEADER} onClick={() => toggle(id)}>
         <Icon name={open ? "chevronDown" : "chevronRight"} size={12} />
         <Icon name={icon} size={13} />
