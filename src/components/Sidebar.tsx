@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { buildBranchTree, type BranchNode } from "../lib/branchTree";
 import { relativeTime } from "../lib/format";
 import type { BranchInfo, PullRequest } from "../lib/types";
 import { useActions } from "../state/actions";
@@ -22,6 +23,15 @@ const sideLabel = (current = false) =>
   }`;
 
 const SIDE_NOTE = "pt-1 pr-3.5 pb-2 pl-3.5 text-[11.5px] text-fg-faint";
+
+/** ブランチ名の左に出す PR リンク。行 (26px) を広げないよう小さめに作る */
+const PR_LINK =
+  "inline-flex h-[18px] w-[18px] flex-none cursor-pointer items-center justify-center rounded border-0 bg-transparent p-0 text-fg-dim hover:bg-bg-3 hover:text-fg";
+
+/** ツリーの 1 段ぶんの字下げ。SIDE_ITEM の pl-3.5 (14px) に足し込む */
+const INDENT_BASE = 14;
+const INDENT_STEP = 11;
+const indent = (depth: number) => ({ paddingLeft: INDENT_BASE + depth * INDENT_STEP });
 
 const OPEN_KEY = "gitgraph.sections";
 /** 件数が多くなりがちなセクションは初期状態を閉じておく */
@@ -85,12 +95,18 @@ function Section({
   );
 }
 
-function BranchItem({ b }: { b: BranchInfo }) {
+/** リモート追跡ブランチは "origin/foo" なので、PR の headRefName と揃えて "foo" にする */
+const headRefOf = (b: BranchInfo) =>
+  b.kind === "remote" ? b.name.split("/").slice(1).join("/") : b.name;
+
+function BranchItem({ b, label, depth = 0 }: { b: BranchInfo; label?: string; depth?: number }) {
   const s = useStore();
   const act = useActions();
   const openMenu = useMenu();
-  const last = b.name.split("/").slice(-1)[0];
-  const prefix = b.name.slice(0, b.name.length - last.length);
+  const last = label ?? b.name.split("/").slice(-1)[0];
+  /** PR 提出済みなら、ブランチ名の左に GitHub アイコンを出して PR へ飛べるようにする */
+  const headRef = headRefOf(b);
+  const pr = useMemo(() => s.prs.find((p) => p.headRefName === headRef), [s.prs, headRef]);
 
   /** upstream に追いついていないローカルブランチだけ pull を出す */
   const behind = b.kind === "local" && b.upstream ? b.behind : 0;
@@ -126,6 +142,15 @@ function BranchItem({ b }: { b: BranchInfo }) {
         onClick: () => (b.kind === "remote" ? act.checkoutRemote(b.name) : act.checkout(b.name)),
       },
       { label: "ここからブランチを作成", icon: "plus", onClick: () => act.createBranch(b.name) },
+      ...(pr
+        ? [
+            {
+              label: `PR #${pr.number} をブラウザで開く`,
+              icon: "github",
+              onClick: () => act.webOpen(pr.url),
+            },
+          ]
+        : []),
       {
         label: "worktree を追加",
         icon: "worktree",
@@ -150,6 +175,7 @@ function BranchItem({ b }: { b: BranchInfo }) {
   return (
     <div
       className={b.isHead ? SIDE_ITEM_CURRENT : SIDE_ITEM_PLAIN}
+      style={indent(depth)}
       title={`${b.name}${b.upstream ? ` → ${b.upstream}` : ""}\n${b.subject}`}
       onClick={() => s.select({ kind: "commit", sha: b.hash })}
       onDoubleClick={() =>
@@ -160,10 +186,20 @@ function BranchItem({ b }: { b: BranchInfo }) {
       <span className={sideIcon(b.isHead)}>
         <Icon name={b.kind === "remote" ? "remote" : "branch"} size={13} />
       </span>
-      <span className={sideLabel(b.isHead)}>
-        {prefix ? <em className={dim}>{prefix}</em> : null}
-        {last}
-      </span>
+      {pr ? (
+        <button
+          className={PR_LINK}
+          title={`PR #${pr.number} を GitHub で開く\n${pr.title}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            act.webOpen(pr.url);
+          }}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          <Icon name="github" size={12} />
+        </button>
+      ) : null}
+      <span className={sideLabel(b.isHead)}>{last}</span>
       {b.worktreePath && !b.isHead ? (
         <span className={miniPill()} title={`worktree: ${b.worktreePath}`}>
           <Icon name="worktree" size={10} />
@@ -173,6 +209,92 @@ function BranchItem({ b }: { b: BranchInfo }) {
       {b.ahead ? <span className={miniPill("ahead")}>↑{b.ahead}</span> : null}
       {b.behind ? <span className={miniPill("behind")}>↓{b.behind}</span> : null}
     </div>
+  );
+}
+
+const FOLDER_KEY = "gitgraph.branchFolders";
+
+/** 閉じたフォルダだけを覚える (初期状態は全開き) */
+function useFolders() {
+  const [closed, setClosed] = useState<Set<string>>(() => {
+    try {
+      return new Set<string>(JSON.parse(localStorage.getItem(FOLDER_KEY) ?? "[]"));
+    } catch {
+      return new Set();
+    }
+  });
+  const toggle = (key: string) =>
+    setClosed((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(key)) next.add(key);
+      localStorage.setItem(FOLDER_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  return { isOpen: (key: string) => !closed.has(key), toggle };
+}
+
+function BranchNodes({
+  nodes,
+  depth,
+  isOpen,
+  toggle,
+}: {
+  nodes: BranchNode[];
+  depth: number;
+  isOpen: (k: string) => boolean;
+  toggle: (k: string) => void;
+}) {
+  return (
+    <>
+      {nodes.map((node) =>
+        node.type === "leaf" ? (
+          <BranchItem key={node.key} b={node.branch} label={node.label} depth={depth} />
+        ) : (
+          <BranchFolder
+            key={node.key}
+            node={node}
+            depth={depth}
+            open={isOpen(node.key)}
+            isOpen={isOpen}
+            toggle={toggle}
+          />
+        ),
+      )}
+    </>
+  );
+}
+
+function BranchFolder({
+  node,
+  depth,
+  open,
+  isOpen,
+  toggle,
+}: {
+  node: Extract<BranchNode, { type: "folder" }>;
+  depth: number;
+  open: boolean;
+  isOpen: (k: string) => boolean;
+  toggle: (k: string) => void;
+}) {
+  return (
+    <>
+      <div
+        className={`${SIDE_ITEM_PLAIN} cursor-pointer`}
+        style={indent(depth)}
+        title={node.key}
+        onClick={() => toggle(node.key)}
+      >
+        <span className="flex flex-none text-fg-faint">
+          <Icon name={open ? "chevronDown" : "chevronRight"} size={12} />
+        </span>
+        <span className={`${sideLabel()} text-fg-dim`}>{node.label}</span>
+        <span className="flex-none text-[10px] text-fg-faint">{node.count}</span>
+      </div>
+      {open ? (
+        <BranchNodes nodes={node.children} depth={depth + 1} isOpen={isOpen} toggle={toggle} />
+      ) : null}
+    </>
   );
 }
 
@@ -219,9 +341,13 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
   const act = useActions();
   const openMenu = useMenu();
   const { isOpen, toggle } = useSections();
+  /** ローカル / リモートで状態を共有したいので、ここで 1 つだけ持つ */
+  const folders = useFolders();
 
   const locals = useMemo(() => s.branches.filter((b) => b.kind === "local"), [s.branches]);
   const remotes = useMemo(() => s.branches.filter((b) => b.kind === "remote"), [s.branches]);
+  const localTree = useMemo(() => buildBranchTree(locals), [locals]);
+  const remoteTree = useMemo(() => buildBranchTree(remotes), [remotes]);
   /** リモート未設定なら、フェッチではなく GitHub リポジトリ作成を出す */
   const noRemote = (s.repo?.remotes.length ?? 0) === 0;
 
@@ -244,9 +370,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
           </button>
         }
       >
-        {locals.map((b) => (
-          <BranchItem key={b.full} b={b} />
-        ))}
+        <BranchNodes nodes={localTree} depth={0} {...folders} />
       </Section>
 
       <Section
@@ -287,7 +411,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
             </button>
           </>
         ) : (
-          remotes.map((b) => <BranchItem key={b.full} b={b} />)
+          <BranchNodes nodes={remoteTree} depth={0} {...folders} />
         )}
       </Section>
 

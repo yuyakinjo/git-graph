@@ -557,6 +557,9 @@ export function useActions() {
 
     const prOpen = (pr: PullRequest) => openUrl(pr.url).catch(() => undefined);
 
+    /** 既定のブラウザで URL を開く (GitHub リンク用) */
+    const webOpen = (url: string) => openUrl(url).catch(() => undefined);
+
     const prMerge = async (pr: PullRequest) => {
       const res = await dialogs.form({
         title: `PR #${pr.number} をマージ`,
@@ -618,6 +621,7 @@ export function useActions() {
       prCheckout,
       prOpen,
       prMerge,
+      webOpen,
     };
   }, [s, dialogs]);
 }

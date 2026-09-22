@@ -241,18 +241,24 @@ function ZoomStatus() {
 
 export function StatusBar() {
   const s = useStore();
+  const act = useActions();
+  const ghUrl = s.gh?.url ?? null;
   return (
     <footer className="flex h-6 flex-none items-center gap-3.5 border-t border-line bg-bg-0 px-3 text-[11px] text-fg-dim">
-      <span className={`${SB_ITEM} font-mono text-[12px]`}>{s.repo?.root ?? ""}</span>
-      <span className={`${SB_ITEM} flex-1`} />
       {s.gh?.repo ? (
-        <span className={SB_ITEM} title={s.gh.url ?? undefined}>
-          <Icon name="pr" size={12} /> {s.gh.repo}
+        <button
+          className={`${SB_ITEM} h-5 cursor-pointer rounded border-0 bg-transparent px-1.5 text-[11px] text-fg-dim hover:bg-bg-3 hover:text-fg disabled:cursor-default`}
+          title={ghUrl ? `GitHub で開く: ${ghUrl}` : s.gh.repo}
+          disabled={!ghUrl}
+          onClick={() => ghUrl && act.webOpen(ghUrl)}
+        >
+          <Icon name="github" size={12} /> {s.gh.repo}
           {s.gh.login ? ` (${s.gh.login})` : ""}
-        </span>
+        </button>
       ) : s.gh && !s.gh.installed ? (
         <span className={`${SB_ITEM} text-amber`}>gh CLI 未検出</span>
       ) : null}
+      <span className={`${SB_ITEM} flex-1`} />
       <ZoomStatus />
       {s.graph ? <span className={SB_ITEM}>{s.graph.commits.length} コミット</span> : null}
       {s.stashes.length ? <span className={SB_ITEM}>スタッシュ {s.stashes.length}</span> : null}
