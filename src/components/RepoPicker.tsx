@@ -89,21 +89,35 @@ export function RepoPicker({ x, y, onClose }: { x: number; y: number; onClose: (
     void s.openRepo(path);
   };
 
+  // ここで処理したキーは stopPropagation して、背後のグラフ (GraphPane の ↑↓)
+  // やアプリ全体の Escape に届かないようにする。
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       e.stopPropagation();
       onClose();
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
+      e.stopPropagation();
       setActive(items.length ? (index + 1) % items.length : 0);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
+      e.stopPropagation();
       setActive(items.length ? (index - 1 + items.length) % items.length : 0);
     } else if (e.key === "Enter") {
       e.preventDefault();
+      e.stopPropagation();
       const target = items[index];
       if (target) choose(target.path);
     }
+  };
+
+  /**
+   * 検索欄から focus が外れるとキー操作が効かなくなるので、パネル内の mousedown は
+   * 既定動作 (focus 移動) を止めて検索欄に focus を残す。click は別途飛ぶのでボタンは動く。
+   */
+  const keepFocus = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!(e.target instanceof HTMLInputElement)) e.preventDefault();
   };
 
   const left = Math.min(x, window.innerWidth - 380);
@@ -114,7 +128,8 @@ export function RepoPicker({ x, y, onClose }: { x: number; y: number; onClose: (
       <div
         className="fixed z-[81] flex max-h-[420px] w-[360px] flex-col overflow-hidden rounded-[10px] border border-line bg-bg-2 shadow-[0_18px_44px_rgba(0,0,0,0.5)]"
         style={{ left: Math.max(8, left), top: Math.max(8, top) }}
-        onMouseDown={(e) => e.stopPropagation()}
+        tabIndex={-1}
+        onMouseDown={keepFocus}
         onKeyDown={onKeyDown}
         role="dialog"
         aria-label="リポジトリを選択"
