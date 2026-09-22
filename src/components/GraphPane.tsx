@@ -4,22 +4,46 @@ import { absoluteTime, avatarColor, initials, laneColor, relativeTime } from "..
 import type { GraphCommit, GraphEdge, RefDeco } from "../lib/types";
 import { groupRefs } from "../lib/graphRefs";
 import { useActions } from "../state/actions";
-import { GRAPH_COLUMNS, useStore } from "../state/store";
+import {
+  DEFAULT_COLUMN_WIDTHS,
+  type GraphColumnKey,
+  type GraphColumnWidthKey,
+  GRAPH_COLUMNS,
+  useStore,
+} from "../state/store";
 import { Avatar } from "./Avatar";
 import { btn, ctxBackdrop, ctxIconGap, ctxItem, ctxSep, iconBtn, popMenu } from "./classes";
 import { Icon } from "./ui";
 import { useMenu } from "./ui-context";
 
 /** 行と見出しで同じ幅を使うため、列のクラスは 1 か所にまとめる */
-const COL_TAGS = "group/tags relative flex w-8 flex-none items-center";
-/** ブランチ列。グラフの左に置くので幅を固定し、線の始点と揃うよう右寄せにする */
-const REFS_W = 180;
+const COL_TAGS = "group/tags relative flex flex-none items-center";
+/** ブランチ列。グラフの左に置くので線の始点と揃うよう右寄せにする */
 const COL_REFS = "flex flex-none items-center justify-end overflow-hidden pr-1";
 const COL_MSG = "flex min-w-0 flex-auto items-center gap-[5px] overflow-hidden pl-1.5";
-const COL_AUTHOR =
-  "flex w-[170px] flex-none items-center gap-1.5 overflow-hidden text-[12px] text-fg-dim";
-const COL_SHA = "w-[74px] flex-none text-fg-faint";
-const COL_DATE = "w-[92px] flex-none text-right text-[11.5px] text-fg-dim";
+const COL_AUTHOR = "flex flex-none items-center gap-1.5 overflow-hidden text-[12px] text-fg-dim";
+const COL_SHA = "flex-none overflow-hidden text-fg-faint";
+const COL_DATE = "flex-none overflow-hidden text-right text-[11.5px] text-fg-dim";
+
+/** 列見出しの行。行と同じ列構成・同じ幅を使って位置を揃える */
+const HEADER_ROW =
+  "relative flex h-5.5 flex-none items-center border-b border-line bg-bg-1 pr-2.5 text-[10.5px] tracking-wider text-fg-faint uppercase select-none";
+/** 見出しの並び。行の列順に合わせる。col が無い列 (メッセージ) は幅を変えられない */
+const HEADER_CELLS: { key: GraphColumnKey; col: GraphColumnWidthKey | null; label: string }[] = [
+  { key: "refs", col: "refs", label: "ブランチ" },
+  { key: "tags", col: "tags", label: "タグ" },
+  { key: "graph", col: "graph", label: "グラフ" },
+  { key: "subject", col: null, label: "メッセージ" },
+  { key: "author", col: "author", label: "作者" },
+  { key: "sha", col: "sha", label: "SHA" },
+  { key: "date", col: "date", label: "日時" },
+];
+
+/** 見出しのセル。区切り線を右端に引き、文字は左揃えにする */
+const HEADER_CELL = "relative flex h-full items-center border-r border-line px-1.5 text-left";
+/** 列の境目。掴みやすいよう線より広く取り、はみ出しぶんは隣の列に重ねる */
+const HEADER_GRIP =
+  "absolute top-0 -right-[3px] z-10 h-full w-[7px] cursor-col-resize hover:bg-accent/40 active:bg-accent/60";
 
 const PANE = "flex min-w-0 flex-auto flex-col bg-bg-1";
 
@@ -214,16 +238,18 @@ function CommitRefs({
 /** タグ列。アイコンだけを置き、ホバーで中身 (タグのバッジ) を開く。 */
 function TagCell({
   tags,
+  width,
   onCheckout,
   onMenu,
 }: {
   tags: RefDeco[];
+  width: number;
   onCheckout: (d: RefDeco) => void;
   onMenu: (d: RefDeco) => (e: React.MouseEvent) => void;
 }) {
-  if (!tags.length) return <div className={COL_TAGS} />;
+  if (!tags.length) return <div className={COL_TAGS} style={{ width }} />;
   return (
-    <div className={COL_TAGS}>
+    <div className={COL_TAGS} style={{ width }}>
       <span
         className="inline-flex h-4.5 cursor-default items-center gap-0.5 rounded-[9px] border border-amber-30 bg-amber-12 px-1 text-amber [&>svg]:flex-none"
         title={tags.map((t) => t.name).join("\n")}
@@ -278,6 +304,71 @@ function ColumnMenu() {
   );
 }
 
+const MONO_FONT = "ui-monospace, SFMono-Regular, Menlo, monospace";
+/** バッジの枠・アイコン・余白ぶん。見出しのダブルクリックで幅を測るときに足す */
+const REF_BADGE_CHROME = 34;
+/** セルの左右余白 + 少しの余裕 */
+const FIT_PAD = 14;
+
+let measureCtx: CanvasRenderingContext2D | null = null;
+/** canvas で文字幅を測る。DOM を作らずに済むので行数が多くても軽い */
+function textWidth(text: string, font: string): number {
+  if (!measureCtx) measureCtx = document.createElement("canvas").getContext("2d");
+  if (!measureCtx) return text.length * 7;
+  measureCtx.font = font;
+  return measureCtx.measureText(text).width;
+}
+
+function uiFont(size: number, weight = 400): string {
+  const family = getComputedStyle(document.body).fontFamily || "sans-serif";
+  return `${weight} ${size}px ${family}`;
+}
+
+/** 列の境目。ドラッグで幅を変え、ダブルクリックで内容に合わせる。 */
+function ColumnGrip({
+  col,
+  width,
+  onResize,
+  onAutoFit,
+}: {
+  col: GraphColumnWidthKey;
+  width: number;
+  onResize: (col: GraphColumnWidthKey, px: number) => void;
+  onAutoFit: (col: GraphColumnWidthKey) => void;
+}) {
+  return (
+    <span
+      className={HEADER_GRIP}
+      role="separator"
+      aria-orientation="vertical"
+      title="ドラッグで幅を変更・ダブルクリックで内容に合わせる"
+      onDoubleClick={() => onAutoFit(col)}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const el = e.currentTarget;
+        const startX = e.clientX;
+        const startW = width;
+        el.setPointerCapture(e.pointerId);
+        const prevCursor = document.body.style.cursor;
+        document.body.style.cursor = "col-resize";
+        const move = (ev: PointerEvent) => onResize(col, startW + (ev.clientX - startX));
+        const end = () => {
+          document.body.style.cursor = prevCursor;
+          el.releasePointerCapture?.(e.pointerId);
+          el.removeEventListener("pointermove", move);
+          el.removeEventListener("pointerup", end);
+          el.removeEventListener("pointercancel", end);
+        };
+        el.addEventListener("pointermove", move);
+        el.addEventListener("pointerup", end);
+        el.addEventListener("pointercancel", end);
+      }}
+    />
+  );
+}
+
 export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
   const s = useStore();
   const act = useActions();
@@ -318,11 +409,54 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
   const lineWidth = isRailway ? RAILWAY_LINE_W : 1.8;
   const laneW = showNodeAvatar ? LANE_W_AVATAR : LANE_W;
   const cx = (col: number) => cxOf(col, laneW);
-  const graphW = cols.graph
-    ? Math.min(Math.max(cx((s.graph?.maxColumn ?? 0) + 1) + 6, 56), 360)
-    : 0;
+  const w = s.columnWidths;
+  /** レーン数から決まるグラフ列の幅。ユーザーが掴んで広げていなければこれを使う */
+  const graphAutoW = Math.min(Math.max(cx((s.graph?.maxColumn ?? 0) + 1) + 6, 56), 360);
+  const graphW = cols.graph ? (w.graph > 0 ? w.graph : graphAutoW) : 0;
   // グラフはブランチ／タグ列の右に来るので、SVG も同じぶんだけ右へずらす
-  const graphX = (cols.refs ? REFS_W : 0) + (cols.tags ? 32 : 0);
+  const graphX = (cols.refs ? w.refs : 0) + (cols.tags ? w.tags : 0);
+
+  const setColumnWidth = s.setColumnWidth;
+  /** 見出しのダブルクリック。読み込み済みのコミットから必要な幅を測って合わせる */
+  const autoFitColumn = useCallback(
+    (key: GraphColumnWidthKey) => {
+      if (key === "tags") {
+        setColumnWidth("tags", DEFAULT_COLUMN_WIDTHS.tags);
+        return;
+      }
+      // グラフ列は 0 = レーン数に合わせる (自動) に戻す
+      if (key === "graph") {
+        setColumnWidth("graph", 0);
+        return;
+      }
+      let content = 0;
+      if (key === "author") {
+        const font = uiFont(12);
+        for (const c of commits) content = Math.max(content, textWidth(c.authorName, font));
+        // アバターとその右の隙間
+        if (content) content += 22;
+      } else if (key === "sha") {
+        const font = `12px ${MONO_FONT}`;
+        for (const c of commits) content = Math.max(content, textWidth(c.short, font));
+      } else if (key === "date") {
+        const font = uiFont(11.5);
+        for (const c of commits)
+          content = Math.max(content, textWidth(relativeTime(c.timestamp), font));
+      } else if (key === "refs") {
+        const font = uiFont(11, 600);
+        for (const c of commits) {
+          let row = 0;
+          for (const d of c.refs) {
+            if (d.kind === "tag" && cols.tags) continue;
+            row += textWidth(d.name, font) + REF_BADGE_CHROME;
+          }
+          content = Math.max(content, row);
+        }
+      }
+      setColumnWidth(key, content ? content + FIT_PAD : DEFAULT_COLUMN_WIDTHS[key]);
+    },
+    [commits, cols.tags, setColumnWidth],
+  );
 
   // ref コールバックで購読し、クリーンアップも同じ場所で返す (useEffect 不要)
   const attachScroll = useCallback((el: HTMLDivElement | null) => {
@@ -488,16 +622,16 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
             onOpenDetail();
           }}
         >
-          {cols.refs ? <div className={COL_REFS} style={{ width: REFS_W }} /> : null}
-          {cols.tags ? <div className={COL_TAGS} /> : null}
+          {cols.refs ? <div className={COL_REFS} style={{ width: w.refs }} /> : null}
+          {cols.tags ? <div className={COL_TAGS} style={{ width: w.tags }} /> : null}
           {cols.graph ? <div className="flex-none" style={{ width: graphW }} /> : null}
           <div className={COL_MSG}>
             <span className="font-bold text-amber">未コミットの変更</span>
             <span className="ml-2 text-[11.5px] text-fg-faint">{count} ファイル</span>
           </div>
-          {cols.author ? <div className={COL_AUTHOR} /> : null}
-          {cols.sha ? <div className={COL_SHA} /> : null}
-          {cols.date ? <div className={COL_DATE} /> : null}
+          {cols.author ? <div className={COL_AUTHOR} style={{ width: w.author }} /> : null}
+          {cols.sha ? <div className={COL_SHA} style={{ width: w.sha }} /> : null}
+          {cols.date ? <div className={COL_DATE} style={{ width: w.date }} /> : null}
         </div>,
       );
       continue;
@@ -524,7 +658,7 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
         }}
       >
         {cols.refs ? (
-          <div className={COL_REFS} style={{ width: REFS_W }}>
+          <div className={COL_REFS} style={{ width: w.refs }}>
             <CommitRefs
               refs={c.refs.filter((d) => d.kind !== "tag" || !cols.tags)}
               upstreams={upstreams}
@@ -535,6 +669,7 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
         ) : null}
         {cols.tags ? (
           <TagCell
+            width={w.tags}
             tags={c.refs.filter((d) => d.kind === "tag")}
             onCheckout={checkoutRef}
             onMenu={refMenu}
@@ -552,15 +687,24 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
           ) : null}
         </div>
         {cols.author ? (
-          <div className={COL_AUTHOR} title={`${c.authorName} <${c.authorEmail}>`}>
+          <div
+            className={COL_AUTHOR}
+            style={{ width: w.author }}
+            title={`${c.authorName} <${c.authorEmail}>`}
+          >
             <Avatar name={c.authorName} email={c.authorEmail} />
             <span className="overflow-hidden text-ellipsis whitespace-nowrap">{c.authorName}</span>
           </div>
         ) : null}
-        {cols.sha ? <div className={`${COL_SHA} font-mono text-[12px]`}>{c.short}</div> : null}
+        {cols.sha ? (
+          <div className={`${COL_SHA} font-mono text-[12px]`} style={{ width: w.sha }}>
+            {c.short}
+          </div>
+        ) : null}
         {cols.date ? (
           <div
             className={COL_DATE}
+            style={{ width: w.date }}
             tabIndex={0}
             title={absoluteTime(c.timestamp)}
             aria-label={absoluteTime(c.timestamp)}
@@ -601,11 +745,29 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
         >
           HEADへ
         </button>
-        <div className="ml-auto flex text-[10.5px] tracking-wider text-fg-faint uppercase">
-          {cols.author ? <span className={COL_AUTHOR}>作者</span> : null}
-          {cols.sha ? <span className={COL_SHA}>SHA</span> : null}
-          {cols.date ? <span className={COL_DATE}>日時</span> : null}
-        </div>
+      </div>
+      <div className={HEADER_ROW}>
+        {HEADER_CELLS.map((h) => {
+          if (!cols[h.key]) return null;
+          const width = h.col === "graph" ? graphW : h.col ? w[h.col] : undefined;
+          return (
+            <div
+              key={h.key}
+              className={`${HEADER_CELL} ${h.col ? "flex-none" : "min-w-0 flex-1"}`}
+              style={width === undefined ? undefined : { width }}
+            >
+              <span className="truncate">{h.label}</span>
+              {h.col ? (
+                <ColumnGrip
+                  col={h.col}
+                  width={width ?? 0}
+                  onResize={setColumnWidth}
+                  onAutoFit={autoFitColumn}
+                />
+              ) : null}
+            </div>
+          );
+        })}
       </div>
       <div
         className="relative flex-1 overflow-auto"

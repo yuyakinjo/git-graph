@@ -67,6 +67,7 @@ const DEPTH_KEY = "gitgraph.scanDepth";
 const DEFAULT_DEPTH = 3;
 // グラフ一覧の列。表示順もこの並びに合わせる。
 const COLS_KEY = "gitgraph.graphColumns";
+const COL_W_KEY = "gitgraph.graphColumnWidths";
 const GRAPH_STYLE_KEY = "gitgraph.graphStyle";
 // 差分ビューのシンタックスハイライトのテーマ
 const DIFF_THEME_KEY = "gitgraph.diffTheme";
@@ -93,6 +94,53 @@ const DEFAULT_COLUMNS = {
   author: false,
   nodeAvatar: false,
 } as GraphColumns;
+
+/** 幅を変えられる列。メッセージ列は残り幅を埋めるので含めない。 */
+export const RESIZABLE_COLUMNS = ["refs", "tags", "graph", "author", "sha", "date"] as const;
+export type GraphColumnWidthKey = (typeof RESIZABLE_COLUMNS)[number];
+export type GraphColumnWidths = Record<GraphColumnWidthKey, number>;
+
+/** グラフ列の 0 は「レーン数に合わせて自動」を表す。 */
+export const DEFAULT_COLUMN_WIDTHS: GraphColumnWidths = {
+  refs: 180,
+  tags: 32,
+  graph: 0,
+  author: 170,
+  sha: 74,
+  date: 92,
+};
+
+export const MIN_COLUMN_WIDTHS: GraphColumnWidths = {
+  refs: 48,
+  tags: 24,
+  graph: 24,
+  author: 60,
+  sha: 48,
+  date: 56,
+};
+
+export const MAX_COLUMN_WIDTH = 600;
+
+export function clampColumnWidth(key: GraphColumnWidthKey, px: number): number {
+  return Math.round(Math.min(Math.max(px, MIN_COLUMN_WIDTHS[key]), MAX_COLUMN_WIDTH));
+}
+
+function loadColumnWidths(): GraphColumnWidths {
+  const next = { ...DEFAULT_COLUMN_WIDTHS };
+  try {
+    const saved = JSON.parse(localStorage.getItem(COL_W_KEY) ?? "{}");
+    if (!saved || typeof saved !== "object") return next;
+    for (const key of RESIZABLE_COLUMNS) {
+      const v = saved[key];
+      // グラフ列だけは 0 (自動) も保存される値として認める
+      if (typeof v !== "number" || !Number.isFinite(v)) continue;
+      next[key] = v === 0 && key === "graph" ? 0 : clampColumnWidth(key, v);
+    }
+  } catch {
+    /* 壊れていれば既定幅に戻す */
+  }
+  return next;
+}
 
 function loadColumns(): GraphColumns {
   const next = { ...DEFAULT_COLUMNS };
@@ -181,6 +229,7 @@ export function useStoreValue(boot: BootData | null) {
   const [tabDirty, setTabDirty] = useState<Record<string, boolean>>({});
   const [autoFetch, setAutoFetch] = useState(() => localStorage.getItem(AUTOFETCH_KEY) !== "off");
   const [columns, setColumns] = useState<GraphColumns>(loadColumns);
+  const [columnWidths, setColumnWidths] = useState<GraphColumnWidths>(loadColumnWidths);
   const [graphStyle, setGraphStyleState] = useState<GraphStyle>(() =>
     localStorage.getItem(GRAPH_STYLE_KEY) === "japanese-railway" ? "japanese-railway" : "default",
   );
@@ -729,6 +778,20 @@ export function useStoreValue(boot: BootData | null) {
   const resetColumns = useCallback(() => {
     setColumns({ ...DEFAULT_COLUMNS });
     localStorage.setItem(COLS_KEY, JSON.stringify(DEFAULT_COLUMNS));
+    setColumnWidths({ ...DEFAULT_COLUMN_WIDTHS });
+    localStorage.setItem(COL_W_KEY, JSON.stringify(DEFAULT_COLUMN_WIDTHS));
+  }, []);
+
+  /** 列幅を変える。ドラッグ中に何度も呼ばれるので、同じ値なら state を触らない。 */
+  const setColumnWidth = useCallback((key: GraphColumnWidthKey, px: number) => {
+    setColumnWidths((prev) => {
+      // グラフ列の 0 (自動) だけは clamp せずそのまま通す
+      const w = px === 0 && key === "graph" ? 0 : clampColumnWidth(key, px);
+      if (prev[key] === w) return prev;
+      const next = { ...prev, [key]: w };
+      localStorage.setItem(COL_W_KEY, JSON.stringify(next));
+      return next;
+    });
   }, []);
 
   /** 表示倍率を変える。範囲外は丸める。 */
@@ -813,6 +876,8 @@ export function useStoreValue(boot: BootData | null) {
     columns,
     toggleColumn,
     resetColumns,
+    columnWidths,
+    setColumnWidth,
     graphStyle,
     setGraphStyle,
     diffTheme,
