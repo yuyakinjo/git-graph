@@ -126,7 +126,7 @@ export function RepoPicker({ x, y, onClose }: { x: number; y: number; onClose: (
   return (
     <div className={ctxBackdrop} onMouseDown={onClose}>
       <div
-        className="fixed z-[81] flex max-h-[420px] w-[360px] flex-col overflow-hidden rounded-[10px] border border-line bg-bg-2 shadow-[0_18px_44px_rgba(0,0,0,0.5)]"
+        className="fixed z-81 flex max-h-105 w-90 flex-col overflow-hidden rounded-[10px] border border-line bg-bg-2 shadow-[0_18px_44px_rgba(0,0,0,0.5)]"
         style={{ left: Math.max(8, left), top: Math.max(8, top) }}
         tabIndex={-1}
         onMouseDown={keepFocus}
@@ -134,7 +134,7 @@ export function RepoPicker({ x, y, onClose }: { x: number; y: number; onClose: (
         role="dialog"
         aria-label="リポジトリを選択"
       >
-        <div className="flex items-center gap-[7px] border-b border-line-soft px-2.5 py-2 text-fg-dim">
+        <div className="flex items-center gap-1.75 border-b border-line-soft px-2.5 py-2 text-fg-dim">
           <Icon name="search" size={14} />
           <input
             className="min-w-0 flex-1 border-none bg-transparent text-[13px] text-fg outline-none"
@@ -156,7 +156,7 @@ export function RepoPicker({ x, y, onClose }: { x: number; y: number; onClose: (
               <button
                 key={c.path}
                 ref={i === index ? keepVisible : undefined}
-                className={`flex w-full cursor-pointer items-center gap-2 rounded-md border-none px-2 py-[5px] text-left text-[13px] text-fg ${
+                className={`flex w-full cursor-pointer items-center gap-2 rounded-md border-none px-2 py-1.25 text-left text-[13px] text-fg ${
                   i === index ? "bg-accent-soft" : "bg-transparent"
                 }`}
                 onMouseEnter={() => setActive(i)}

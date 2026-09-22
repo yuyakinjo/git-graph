@@ -12,6 +12,9 @@ import { useMenu } from "./ui-context";
 
 /** 行と見出しで同じ幅を使うため、列のクラスは 1 か所にまとめる */
 const COL_TAGS = "group/tags relative flex w-8 flex-none items-center";
+/** ブランチ列。グラフの左に置くので幅を固定し、線の始点と揃うよう右寄せにする */
+const REFS_W = 180;
+const COL_REFS = "flex flex-none items-center justify-end overflow-hidden pr-1";
 const COL_MSG = "flex min-w-0 flex-auto items-center gap-[5px] overflow-hidden pl-1.5";
 const COL_AUTHOR =
   "flex w-[170px] flex-none items-center gap-1.5 overflow-hidden text-[12px] text-fg-dim";
@@ -318,6 +321,8 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
   const graphW = cols.graph
     ? Math.min(Math.max(cx((s.graph?.maxColumn ?? 0) + 1) + 6, 56), 360)
     : 0;
+  // グラフはブランチ／タグ列の右に来るので、SVG も同じぶんだけ右へずらす
+  const graphX = (cols.refs ? REFS_W : 0) + (cols.tags ? 32 : 0);
 
   // ref コールバックで購読し、クリーンアップも同じ場所で返す (useEffect 不要)
   const attachScroll = useCallback((el: HTMLDivElement | null) => {
@@ -483,8 +488,9 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
             onOpenDetail();
           }}
         >
-          {cols.graph ? <div className="flex-none" style={{ width: graphW }} /> : null}
+          {cols.refs ? <div className={COL_REFS} style={{ width: REFS_W }} /> : null}
           {cols.tags ? <div className={COL_TAGS} /> : null}
+          {cols.graph ? <div className="flex-none" style={{ width: graphW }} /> : null}
           <div className={COL_MSG}>
             <span className="font-bold text-amber">未コミットの変更</span>
             <span className="ml-2 text-[11.5px] text-fg-faint">{count} ファイル</span>
@@ -517,23 +523,25 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
           commitMenu(c)(e);
         }}
       >
-        {cols.graph ? <div className="flex-none" style={{ width: graphW }} /> : null}
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 pl-1.5">
-          {cols.refs ? (
+        {cols.refs ? (
+          <div className={COL_REFS} style={{ width: REFS_W }}>
             <CommitRefs
               refs={c.refs.filter((d) => d.kind !== "tag" || !cols.tags)}
               upstreams={upstreams}
               onCheckout={checkoutRef}
               onMenu={refMenu}
             />
-          ) : null}
-          {cols.tags && c.refs.some((d) => d.kind === "tag") ? (
-            <TagCell
-              tags={c.refs.filter((d) => d.kind === "tag")}
-              onCheckout={checkoutRef}
-              onMenu={refMenu}
-            />
-          ) : null}
+          </div>
+        ) : null}
+        {cols.tags ? (
+          <TagCell
+            tags={c.refs.filter((d) => d.kind === "tag")}
+            onCheckout={checkoutRef}
+            onMenu={refMenu}
+          />
+        ) : null}
+        {cols.graph ? <div className="flex-none" style={{ width: graphW }} /> : null}
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 pl-1.5">
           {cols.subject ? (
             <span
               className={`min-w-0 flex-1 truncate ${cols.refs && c.refs.some((d) => d.kind !== "tag") ? "text-fg-dim" : "text-fg"}`}
@@ -608,10 +616,10 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
           <div className="absolute inset-0">{rows}</div>
           {cols.graph ? (
             <svg
-              className="pointer-events-none absolute top-0 left-0"
+              className="pointer-events-none absolute top-0"
               width={graphW}
               height={totalRows * ROW_H}
-              style={{ height: totalRows * ROW_H }}
+              style={{ height: totalRows * ROW_H, left: graphX }}
             >
               {/* 単位円なので全アバターで使い回せる */}
               <defs>

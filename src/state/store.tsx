@@ -75,7 +75,7 @@ export type GraphStyle = "default" | "japanese-railway";
 export const GRAPH_COLUMNS = [
   { key: "graph", label: "グラフ" },
   // 列ではなくグラフ内の見た目の切り替えだが、同じメニューで扱うためここに置く
-  { key: "nodeAvatar", label: "ノードにアバター" },
+  { key: "nodeAvatar", label: "ノード" },
   { key: "refs", label: "ブランチ" },
   { key: "tags", label: "タグ" },
   { key: "subject", label: "メッセージ" },
