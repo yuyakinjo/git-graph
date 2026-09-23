@@ -593,6 +593,18 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
             title={t.name}
             onClick={() => s.select({ kind: "commit", sha: t.hash })}
             onDoubleClick={() => act.checkout(t.name)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              openMenu(e, [
+                { label: "チェックアウト", icon: "tag", onClick: () => act.checkout(t.name) },
+                { separator: true },
+                {
+                  label: "名前をコピー",
+                  icon: "copy",
+                  onClick: () => navigator.clipboard.writeText(t.name).catch(() => undefined),
+                },
+              ]);
+            }}
           >
             <span className={sideIcon()}>
               <Icon name="tag" size={13} />
