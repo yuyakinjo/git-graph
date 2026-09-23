@@ -533,6 +533,13 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
         icon: "copy",
         onClick: () => navigator.clipboard.writeText(c.subject).catch(() => undefined),
       },
+      /** 付いているブランチ・タグ名もここからコピーできるようにする */
+      ...(c.refs.length ? [{ separator: true } as MenuItem] : []),
+      ...c.refs.map((d): MenuItem => ({
+        label: `${d.name} をコピー`,
+        icon: d.kind === "tag" ? "tag" : d.kind === "remote" ? "remote" : "branch",
+        onClick: () => navigator.clipboard.writeText(d.name).catch(() => undefined),
+      })),
     ]);
   };
 
