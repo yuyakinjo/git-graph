@@ -9,7 +9,7 @@ import { Sidebar } from "./components/Sidebar";
 import { TitleBar } from "./components/TitleBar";
 import { StatusBar, Toolbar } from "./components/Toolbar";
 import { btn, iconBtn } from "./components/classes";
-import { Icon, Spinner } from "./components/ui";
+import { Icon, ProgressBar, Spinner } from "./components/ui";
 import { api } from "./lib/api";
 import { useWindowEvent } from "./lib/effects";
 import type { PullRequest } from "./lib/types";
@@ -236,6 +236,7 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col">
+      {s.busy ? <ProgressBar /> : null}
       <TitleBar />
       <Toolbar />
       {s.repo ? (

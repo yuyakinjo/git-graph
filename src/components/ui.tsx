@@ -633,6 +633,15 @@ export function Spinner({ size = 14 }: { size?: number }) {
   );
 }
 
+/** git 操作中にウィンドウ上端を流れる細いバー。 */
+export function ProgressBar() {
+  return (
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-100 h-0.5 animate-veil-in overflow-hidden">
+      <div className="h-full w-[30%] animate-progress bg-linear-to-r from-transparent via-accent to-transparent" />
+    </div>
+  );
+}
+
 export function Badge({ children, color }: { children: ReactNode; color?: string }) {
   return (
     <span
