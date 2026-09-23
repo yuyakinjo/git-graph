@@ -1014,7 +1014,7 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
                   const url = showNodeAvatar
                     ? s.avatars[c.authorEmail.trim().toLowerCase()]
                     : undefined;
-                  // マージだけは塗りつぶしの丸にして、合流点をひと目で分かるようにする
+                  // マージは二重丸にして、合流点をひと目で分かるようにする
                   const isMerge = c.parents.length > 1;
                   // stash は内部的にはマージコミットなので、判定を先に行って箱アイコンで描く
                   const isStash = stashHashes.has(c.hash) || c.refs.some((r) => r.kind === "stash");
@@ -1064,14 +1064,23 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
                           </g>
                         </>
                       ) : isMerge ? (
-                        <circle
-                          cx={x}
-                          cy={y}
-                          r={showNodeAvatar ? AVATAR_R : isRailway ? RAILWAY_NODE_R : 4.5}
-                          fill={color}
-                          stroke={color}
-                          strokeWidth={isRailway ? 2 : isHead ? 3 : 2}
-                        />
+                        <>
+                          {/* 二重丸 = 乗換駅。HEAD (塗り) とも通常 (中抜き) とも形で見分けられる */}
+                          <circle
+                            cx={x}
+                            cy={y}
+                            r={showNodeAvatar ? AVATAR_R : isRailway ? RAILWAY_NODE_R + 1.5 : 5.5}
+                            fill="var(--color-bg-1)"
+                            stroke={color}
+                            strokeWidth={isHead ? 2.5 : 1.8}
+                          />
+                          <circle
+                            cx={x}
+                            cy={y}
+                            r={showNodeAvatar ? AVATAR_R * 0.45 : 2.2}
+                            fill={color}
+                          />
+                        </>
                       ) : showNodeAvatar ? (
                         <>
                           {/* 画像が無い / 読めないときはこの地色 + イニシャルがそのまま見える */}
