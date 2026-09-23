@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   BranchInfo,
+  CommitContext,
   CommitDetail,
   DiffFile,
   GhStatus,
@@ -32,6 +33,9 @@ export const api = {
   diffText: (dir: string, kind: string, path: string, sha?: string, context = 3) =>
     invoke<string>("diff_text", { dir, kind, path, sha, context }),
   lastCommitMessage: (dir: string) => invoke<string>("last_commit_message", { dir }),
+  /** 次のコミットに入る差分 (AI のコミットメッセージ生成用) */
+  commitContext: (dir: string, amend: boolean) =>
+    invoke<CommitContext>("commit_context", { dir, amend }),
   scanRepos: (roots: string[], depth: number) =>
     invoke<ProjectEntry[]>("scan_repos", { roots, depth }),
   homeDir: () => invoke<string>("home_dir"),
@@ -130,4 +134,13 @@ export const api = {
   ghAvatars: (dir: string, queries: { email: string; sha: string }[]) =>
     invoke<Record<string, string | null>>("gh_avatars", { dir, queries }),
   ghAvatarsClear: () => invoke<void>("gh_avatars_clear"),
+
+  // AI の API キー (macOS キーチェーン)
+  aiKeyGet: () => invoke<string | null>("ai_key_get"),
+  /** 空文字なら削除 */
+  aiKeySet: (key: string) => invoke<void>("ai_key_set", { key }),
+  aiKeyDelete: () => invoke<void>("ai_key_delete"),
+  /** Claude Code (`claude -p`) に一回だけ答えさせる */
+  claudeGenerate: (system: string, prompt: string, model: string, effort?: string) =>
+    invoke<string>("claude_generate", { system, prompt, model, effort }),
 };

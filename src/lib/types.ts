@@ -204,3 +204,11 @@ export type Selection =
   | { kind: "wip" }
   | { kind: "commit"; sha: string }
   | { kind: "stash"; refname: string; message: string };
+
+/** AI でコミットメッセージを作るときに渡す、次のコミットの中身 */
+export interface CommitContext {
+  diff: string;
+  truncated: boolean;
+  recentSubjects: string[];
+  previousMessage: string | null;
+}

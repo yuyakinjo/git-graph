@@ -1,4 +1,13 @@
+import { useState } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import {
+  AI_MODELS,
+  AI_PROVIDERS,
+  CLAUDE_CODE_MODELS,
+  isAiModel,
+  isAiProvider,
+  isClaudeCodeModel,
+} from "../lib/ai";
 import { DIFF_THEMES, isDiffTheme } from "../lib/highlight";
 import { useStore } from "../state/store";
 import { btn, dialogDesc, field, fieldInput, fieldLabel, hint, iconBtn } from "./classes";
@@ -11,10 +20,18 @@ const shortPath = (p: string) => p.replace(/^\/Users\/[^/]+/, "~");
 const DEPTHS = [1, 2, 3, 4, 5, 6];
 
 /**
- * 設定 (Cmd+,)。グラフの見た目、プロジェクトの場所、作者アイコンを扱う。
+ * 設定 (Cmd+,)。グラフの見た目、プロジェクトの場所、AI、作者アイコンを扱う。
  */
 export function Settings() {
   const s = useStore();
+  // キーは表示しない。入力したものを「保存」でキーチェーンに書く。
+  const [aiKeyDraft, setAiKeyDraft] = useState("");
+  const [aiKeySaving, setAiKeySaving] = useState(false);
+  const saveAiKey = async (key: string) => {
+    setAiKeySaving(true);
+    if (await s.saveAiKey(key)) setAiKeyDraft("");
+    setAiKeySaving(false);
+  };
 
   const addRoot = async () => {
     const picked = await openDialog({ directory: true, multiple: true });
@@ -159,6 +176,122 @@ export function Settings() {
               : ` 現在 ${s.projects.length} 件のリポジトリを認識しています。`}
           </em>
         </div>
+      </section>
+
+      <section>
+        <h3 className={SECTION_H3}>AI コミットメッセージ</h3>
+        <p className={dialogDesc}>
+          コミット欄の「AI で生成」ボタンで、差分をもとにメッセージを作ります。 生成時には差分が
+          Anthropic に送られます。
+        </p>
+        <div className={field}>
+          <label className={fieldLabel} htmlFor="ai-provider">
+            生成方法
+          </label>
+          <select
+            className={`${fieldInput} font-sans text-[12.5px]`}
+            id="ai-provider"
+            value={s.aiProvider}
+            onChange={(e) => {
+              if (isAiProvider(e.target.value)) s.setAiProvider(e.target.value);
+            }}
+          >
+            {AI_PROVIDERS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+          <em className={hint}>
+            {s.aiProvider === "claude-code"
+              ? "インストール済みの Claude Code (claude コマンド) を使います。Claude のサブスクリプションでログインしていれば、キーの登録は不要です。"
+              : "Anthropic Console で発行した API キーで直接呼び出します。料金は API の従量課金です。"}
+          </em>
+        </div>
+
+        {s.aiProvider === "claude-code" ? (
+          <div className={field}>
+            <label className={fieldLabel} htmlFor="ai-cli-model">
+              モデル
+            </label>
+            <select
+              className={`${fieldInput} font-sans text-[12.5px]`}
+              id="ai-cli-model"
+              value={s.aiCliModel}
+              onChange={(e) => {
+                if (isClaudeCodeModel(e.target.value)) s.setAiCliModel(e.target.value);
+              }}
+            >
+              {CLAUDE_CODE_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <>
+            <div className={field}>
+              <label className={fieldLabel} htmlFor="ai-key">
+                API キー
+              </label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  className={`${fieldInput} min-w-0 flex-1`}
+                  id="ai-key"
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={s.aiKeySet ? "登録済み（変更するときだけ入力）" : "sk-ant-api..."}
+                  value={aiKeyDraft}
+                  onChange={(e) => setAiKeyDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && aiKeyDraft.trim()) void saveAiKey(aiKeyDraft);
+                  }}
+                />
+                <button
+                  className={btn("primary")}
+                  disabled={aiKeySaving || !aiKeyDraft.trim()}
+                  onClick={() => void saveAiKey(aiKeyDraft)}
+                >
+                  保存
+                </button>
+                {s.aiKeySet ? (
+                  <button
+                    className={btn("ghost")}
+                    disabled={aiKeySaving}
+                    onClick={() => void saveAiKey("")}
+                  >
+                    削除
+                  </button>
+                ) : null}
+              </div>
+              <em className={hint}>
+                {s.aiKeySet ? "macOS のキーチェーンに登録済みです。" : "未登録です。"}{" "}
+                console.anthropic.com で発行できます。
+              </em>
+            </div>
+            <div className={field}>
+              <label className={fieldLabel} htmlFor="ai-model">
+                モデル
+              </label>
+              <select
+                className={`${fieldInput} font-sans text-[12.5px]`}
+                id="ai-model"
+                value={s.aiModel}
+                onChange={(e) => {
+                  if (isAiModel(e.target.value)) s.setAiModel(e.target.value);
+                }}
+              >
+                {AI_MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
       </section>
 
       <section>

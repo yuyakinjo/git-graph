@@ -3,6 +3,7 @@ mod commands;
 mod github;
 mod graph;
 mod repo;
+mod secret;
 mod sh;
 mod tidy;
 
@@ -92,6 +93,11 @@ pub fn run() {
             commands::scan_repos,
             commands::home_dir,
             commands::last_commit_message,
+            commands::commit_context,
+            commands::ai_key_get,
+            commands::ai_key_set,
+            commands::ai_key_delete,
+            commands::claude_generate,
             commands::initial_repo,
         ])
         .run(tauri::generate_context!())

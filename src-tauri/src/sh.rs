@@ -1,5 +1,6 @@
+use std::io::Write;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 /// GUI プロセスは PATH が最小限になりがちなので、よくあるインストール先を足しておく。
 /// (gh / git を Homebrew や asdf 経由で入れているケースを救う)
@@ -21,6 +22,8 @@ fn patched_path() -> String {
     }
     if let Ok(home) = std::env::var("HOME") {
         parts.push(format!("{home}/.local/bin"));
+        // Claude Code の旧来のローカルインストール先
+        parts.push(format!("{home}/.claude/local"));
     }
     parts.join(":")
 }
@@ -55,6 +58,16 @@ impl Out {
 }
 
 pub fn exec<S: AsRef<str>>(cwd: &str, program: &str, args: &[S]) -> Result<Out, String> {
+    exec_with_stdin(cwd, program, args, None)
+}
+
+/// stdin に文字列を流し込んで実行する (引数に載せきれない大きな入力用)
+pub fn exec_with_stdin<S: AsRef<str>>(
+    cwd: &str,
+    program: &str,
+    args: &[S],
+    stdin: Option<&str>,
+) -> Result<Out, String> {
     if !cwd.is_empty() && !Path::new(cwd).exists() {
         return Err(format!("ディレクトリが存在しません: {cwd}"));
     }
@@ -76,12 +89,28 @@ pub fn exec<S: AsRef<str>>(cwd: &str, program: &str, args: &[S]) -> Result<Out, 
     cmd.env("GH_PROMPT_DISABLED", "1");
     cmd.env("NO_COLOR", "1");
 
-    let output = cmd.output().map_err(|e| match e.kind() {
+    let spawn_err = |e: std::io::Error| match e.kind() {
         std::io::ErrorKind::NotFound => {
             format!("`{program}` が見つかりません。インストールと PATH を確認してください。")
         }
         _ => format!("`{program}` の実行に失敗しました: {e}"),
-    })?;
+    };
+    let output = match stdin {
+        None => cmd.output().map_err(spawn_err)?,
+        Some(input) => {
+            cmd.stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped());
+            let mut child = cmd.spawn().map_err(spawn_err)?;
+            // 書き込みは別スレッドで行い、出力が詰まってのデッドロックを避ける
+            let mut pipe = child.stdin.take().expect("stdin is piped");
+            let input = input.to_string();
+            let writer = std::thread::spawn(move || pipe.write_all(input.as_bytes()));
+            let output = child.wait_with_output().map_err(spawn_err)?;
+            let _ = writer.join();
+            output
+        }
+    };
 
     Ok(Out {
         code: output.status.code().unwrap_or(-1),

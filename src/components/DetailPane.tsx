@@ -1,4 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  describeAiError,
+  generateWithApi,
+  generateWithClaudeCode,
+  invalidAiKeyReason,
+} from "../lib/ai";
 import { api } from "../lib/api";
 import { absoluteTime, basename, dirname, relativeTime } from "../lib/format";
 import type { DiffFile, FileEntry } from "../lib/types";
@@ -7,7 +13,7 @@ import type { FileTarget } from "../state/store";
 import { useStore } from "../state/store";
 import { Avatar } from "./Avatar";
 import { FSTATUS_COLOR, btn, fstatAdd, fstatDel, fstats, iconBtn } from "./classes";
-import { Icon } from "./ui";
+import { Icon, Spinner } from "./ui";
 import { useMenu } from "./ui-context";
 
 const DETAIL = "flex h-full min-w-0 flex-col";
@@ -173,6 +179,47 @@ function WipPanel() {
   };
 
   const canCommit = (stagedCount > 0 || changedCount > 0 || amend) && !s.busy;
+
+  const [generating, setGenerating] = useState(false);
+  /** 次のコミットに入る差分から AI にメッセージを書かせ、入力欄を置き換える */
+  const generate = async () => {
+    setGenerating(true);
+    try {
+      const ctx = await api.commitContext(s.dir, amend);
+      if (!ctx.diff.trim()) {
+        s.toast({ kind: "info", title: "コミットする差分がありません" });
+        return;
+      }
+      if (s.aiProvider === "claude-code") {
+        setMessage(await generateWithClaudeCode(s.aiCliModel, ctx));
+        return;
+      }
+      const key = await api.aiKeyGet();
+      if (!key) {
+        s.setAiKeySet(false);
+        s.toast({
+          kind: "error",
+          title: "API キーがキーチェーンにありません",
+          detail: "設定で登録し直してください。",
+        });
+        return;
+      }
+      const invalid = invalidAiKeyReason(key);
+      if (invalid) {
+        s.toast({ kind: "error", title: "API キーではありません", detail: invalid });
+        return;
+      }
+      setMessage(await generateWithApi(key, s.aiModel, ctx));
+    } catch (e) {
+      s.toast({
+        kind: "error",
+        title: "コミットメッセージを生成できませんでした",
+        detail: describeAiError(e),
+      });
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   return (
     <div className={DETAIL}>
@@ -341,18 +388,31 @@ function WipPanel() {
             />
             <span>直前のコミットを修正 (amend)</span>
           </label>
-          <button
-            className={btn("primary")}
-            disabled={!canCommit || (!message.trim() && !amend)}
-            onClick={() => act.commit(message, amend).then((ok) => ok && setMessage(""))}
-          >
-            <Icon name="check" size={14} />
-            {amend
-              ? "コミットを修正"
-              : stagedCount === 0
-                ? "すべてコミット"
-                : `${stagedCount} 件をコミット`}
-          </button>
+          <div className="flex items-center gap-1.5">
+            {s.aiProvider === "claude-code" || s.aiKeySet ? (
+              <button
+                className={btn("ghost")}
+                title="差分から AI でコミットメッセージを生成"
+                disabled={!canCommit || generating}
+                onClick={() => void generate()}
+              >
+                {generating ? <Spinner /> : <Icon name="sparkle" size={14} />}
+                {generating ? "生成中…" : "AI で生成"}
+              </button>
+            ) : null}
+            <button
+              className={btn("primary")}
+              disabled={!canCommit || generating || (!message.trim() && !amend)}
+              onClick={() => act.commit(message, amend).then((ok) => ok && setMessage(""))}
+            >
+              <Icon name="check" size={14} />
+              {amend
+                ? "コミットを修正"
+                : stagedCount === 0
+                  ? "すべてコミット"
+                  : `${stagedCount} 件をコミット`}
+            </button>
+          </div>
         </div>
       </div>
     </div>

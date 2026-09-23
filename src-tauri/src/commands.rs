@@ -8,6 +8,7 @@ use crate::avatar;
 use crate::github;
 use crate::graph;
 use crate::repo;
+use crate::secret;
 use crate::sh;
 use crate::tidy;
 
@@ -499,6 +500,173 @@ pub fn last_commit_message(dir: String) -> Result<String, String> {
         .unwrap_or_default()
         .trim_end()
         .to_string())
+}
+
+/// AI に渡す差分の上限 (文字数)。lock ファイルなどで膨らんだときに打ち切る。
+const COMMIT_DIFF_LIMIT: usize = 200_000;
+/// 空のツリー。親の無いコミットを amend するときの比較元に使う。
+const EMPTY_TREE: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitContext {
+    /// これからコミットされる内容の差分
+    diff: String,
+    /// 差分を COMMIT_DIFF_LIMIT で打ち切ったか
+    truncated: bool,
+    /// 直近のコミットの件名 (書き方を合わせるため)
+    recent_subjects: Vec<String>,
+    /// amend 時の直前のコミットメッセージ
+    previous_message: Option<String>,
+}
+
+/// コミットメッセージ生成用に、次のコミットに入る差分を集める。
+/// git_commit と同じく、ステージ済みが無ければ全部ステージされる前提で差分を取る。
+#[tauri::command]
+pub fn commit_context(dir: String, amend: bool) -> Result<CommitContext, String> {
+    let has_head = sh::git(&dir, &["rev-parse", "--verify", "-q", "HEAD"]).is_ok();
+    let has_staged = !sh::exec(&dir, "git", &["diff", "--cached", "--quiet"])?.ok();
+    let base_args = ["diff", "--no-color", "--no-ext-diff", "-M"];
+
+    let mut diff = String::new();
+    if amend && has_head {
+        // 直前のコミット + いまステージしている分 = 修正後のコミットの中身
+        let parent = sh::git(&dir, &["rev-parse", "--verify", "-q", "HEAD^"])
+            .map(|s| s.trim().to_string())
+            .unwrap_or_else(|_| EMPTY_TREE.to_string());
+        let mut args: Vec<&str> = base_args.to_vec();
+        args.extend(["--cached", parent.as_str()]);
+        diff.push_str(&sh::git(&dir, &args)?);
+    } else if has_staged || amend {
+        let mut args: Vec<&str> = base_args.to_vec();
+        args.push("--cached");
+        diff.push_str(&sh::git(&dir, &args)?);
+    } else {
+        // 「すべてコミット」: 追跡中の変更 + 未追跡ファイル
+        if has_head {
+            let mut args: Vec<&str> = base_args.to_vec();
+            args.push("HEAD");
+            diff.push_str(&sh::git(&dir, &args)?);
+        }
+        let untracked = sh::git(&dir, &["ls-files", "--others", "--exclude-standard", "-z"])?;
+        for path in untracked.split('\0').filter(|p| !p.is_empty()) {
+            if diff.len() > COMMIT_DIFF_LIMIT {
+                break;
+            }
+            // --no-index は差分があると終了コード 1 を返すので exec で受ける
+            let out = sh::exec(
+                &dir,
+                "git",
+                &["diff", "--no-color", "--no-index", "--", "/dev/null", path],
+            )?;
+            diff.push_str(&out.stdout);
+        }
+    }
+
+    let truncated = diff.len() > COMMIT_DIFF_LIMIT;
+    if truncated {
+        let mut cut = COMMIT_DIFF_LIMIT;
+        while !diff.is_char_boundary(cut) {
+            cut -= 1;
+        }
+        diff.truncate(cut);
+    }
+
+    let recent_subjects = if has_head {
+        sh::git(&dir, &["log", "-15", "--format=%s"])
+            .unwrap_or_default()
+            .lines()
+            .map(|s| s.to_string())
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let previous_message = if amend && has_head {
+        last_commit_message(dir).ok().filter(|m| !m.is_empty())
+    } else {
+        None
+    };
+
+    Ok(CommitContext {
+        diff,
+        truncated,
+        recent_subjects,
+        previous_message,
+    })
+}
+
+// ------------------------------------------------------------------ AI の API キー (キーチェーン)
+
+#[tauri::command]
+pub fn ai_key_get() -> Result<Option<String>, String> {
+    secret::get_ai_key()
+}
+
+#[tauri::command]
+pub fn ai_key_set(key: String) -> Result<(), String> {
+    let key = key.trim();
+    if key.is_empty() {
+        return secret::delete_ai_key();
+    }
+    secret::set_ai_key(key)
+}
+
+#[tauri::command]
+pub fn ai_key_delete() -> Result<(), String> {
+    secret::delete_ai_key()
+}
+
+// ------------------------------------------------------------------ Claude Code (claude CLI)
+
+/// Claude Code の `claude -p` に一回だけ答えさせる (サブスクリプションのログインで動く)。
+/// ツール・MCP・設定ファイル・セッション保存はすべて切り、テキスト生成だけをさせる。
+/// 数秒以上かかるので、メインスレッドを塞がないよう async で動かす。
+#[tauri::command(async)]
+pub fn claude_generate(
+    system: String,
+    prompt: String,
+    model: String,
+    effort: Option<String>,
+) -> Result<String, String> {
+    let mut args: Vec<String> = [
+        "-p",
+        "--output-format",
+        "json",
+        "--tools",
+        "",
+        "--strict-mcp-config",
+        "--setting-sources",
+        "",
+        "--disable-slash-commands",
+        "--no-session-persistence",
+        "--system-prompt",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
+    args.push(system);
+    args.extend(["--model".into(), model]);
+    if let Some(e) = effort {
+        args.extend(["--effort".into(), e]);
+    }
+    // リポジトリの CLAUDE.md などを拾わないよう、作業ディレクトリは一時ディレクトリにする
+    let cwd = std::env::temp_dir().to_string_lossy().to_string();
+    let out = sh::exec_with_stdin(&cwd, "claude", &args, Some(&prompt))?;
+
+    // 失敗時も JSON で理由が返ることが多いので、先に中身を見る
+    let parsed: Option<Value> = serde_json::from_str(out.stdout.trim()).ok();
+    if let Some(v) = parsed {
+        let result = v.get("result").and_then(Value::as_str).unwrap_or_default();
+        if v.get("is_error").and_then(Value::as_bool).unwrap_or(false) || !out.ok() {
+            return Err(if result.is_empty() {
+                out.message()
+            } else {
+                result.to_string()
+            });
+        }
+        return Ok(result.trim().to_string());
+    }
+    Err(out.message())
 }
 
 /// 起動時に開くリポジトリ: コマンドライン引数 → GIT_GRAPH_REPO → カレントディレクトリ
