@@ -13,7 +13,7 @@ import {
 } from "../state/store";
 import { Avatar } from "./Avatar";
 import { btn, ctxBackdrop, ctxIconGap, ctxItem, ctxSep, iconBtn, popMenu } from "./classes";
-import { Icon } from "./ui";
+import { Icon, type MenuItem } from "./ui";
 import { useMenu } from "./ui-context";
 
 /** 行と見出しで同じ幅を使うため、列のクラスは 1 か所にまとめる */
@@ -540,6 +540,11 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
     deco.kind === "remote" ? act.checkoutRemote(deco.name) : act.checkout(deco.name);
 
   const refMenu = (deco: RefDeco) => (e: React.MouseEvent) => {
+    const copyName: MenuItem = {
+      label: "名前をコピー",
+      icon: "copy",
+      onClick: () => navigator.clipboard.writeText(deco.name).catch(() => undefined),
+    };
     if (deco.kind === "head") {
       const branch = s.branches.find((b) => b.name === deco.name && b.kind === "local");
       openMenu(e, [
@@ -549,6 +554,7 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
           onClick: () => act.checkout(deco.name),
         },
         { separator: true },
+        copyName,
         {
           label: "ブランチを削除",
           icon: "trash",
@@ -568,6 +574,7 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
           onClick: () => act.checkoutRemote(deco.name),
         },
         { separator: true },
+        copyName,
         {
           label: "リモートブランチを削除",
           icon: "trash",
@@ -583,6 +590,8 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
         icon: "tag",
         onClick: () => act.checkout(deco.name),
       },
+      { separator: true },
+      copyName,
     ]);
   };
 
