@@ -23,7 +23,6 @@ tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-window-state = "2"
-keyring = { version = "3", features = ["apple-native"] }
 
 [profile.release]
 codegen-units = 1

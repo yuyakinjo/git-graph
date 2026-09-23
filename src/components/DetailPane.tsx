@@ -1,10 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import {
-  describeAiError,
-  generateWithApi,
-  generateWithClaudeCode,
-  invalidAiKeyReason,
-} from "../lib/ai";
+import { generateCommitMessage } from "../lib/ai";
 import { api } from "../lib/api";
 import { absoluteTime, basename, dirname, relativeTime } from "../lib/format";
 import type { DiffFile, FileEntry } from "../lib/types";
@@ -190,31 +185,12 @@ function WipPanel() {
         s.toast({ kind: "info", title: "コミットする差分がありません" });
         return;
       }
-      if (s.aiProvider === "claude-code") {
-        setMessage(await generateWithClaudeCode(s.aiCliModel, ctx));
-        return;
-      }
-      const key = await api.aiKeyGet();
-      if (!key) {
-        s.setAiKeySet(false);
-        s.toast({
-          kind: "error",
-          title: "API キーがキーチェーンにありません",
-          detail: "設定で登録し直してください。",
-        });
-        return;
-      }
-      const invalid = invalidAiKeyReason(key);
-      if (invalid) {
-        s.toast({ kind: "error", title: "API キーではありません", detail: invalid });
-        return;
-      }
-      setMessage(await generateWithApi(key, s.aiModel, ctx));
+      setMessage(await generateCommitMessage(s.aiCliModel, ctx));
     } catch (e) {
       s.toast({
         kind: "error",
         title: "コミットメッセージを生成できませんでした",
-        detail: describeAiError(e),
+        detail: String(e),
       });
     } finally {
       setGenerating(false);
@@ -389,17 +365,15 @@ function WipPanel() {
             <span>直前のコミットを修正 (amend)</span>
           </label>
           <div className="flex items-center gap-1.5">
-            {s.aiProvider === "claude-code" || s.aiKeySet ? (
-              <button
-                className={btn("ghost")}
-                title="差分から AI でコミットメッセージを生成"
-                disabled={!canCommit || generating}
-                onClick={() => void generate()}
-              >
-                {generating ? <Spinner /> : <Icon name="sparkle" size={14} />}
-                {generating ? "生成中…" : "AI で生成"}
-              </button>
-            ) : null}
+            <button
+              className={btn("ghost")}
+              title="差分から Claude Code でコミットメッセージを生成"
+              disabled={!canCommit || generating}
+              onClick={() => void generate()}
+            >
+              {generating ? <Spinner /> : <Icon name="sparkle" size={14} />}
+              {generating ? "生成中…" : "AI で生成"}
+            </button>
             <button
               className={btn("primary")}
               disabled={!canCommit || generating || (!message.trim() && !amend)}

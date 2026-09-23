@@ -8,7 +8,6 @@ use crate::avatar;
 use crate::github;
 use crate::graph;
 use crate::repo;
-use crate::secret;
 use crate::sh;
 use crate::tidy;
 
@@ -593,27 +592,6 @@ pub fn commit_context(dir: String, amend: bool) -> Result<CommitContext, String>
         recent_subjects,
         previous_message,
     })
-}
-
-// ------------------------------------------------------------------ AI の API キー (キーチェーン)
-
-#[tauri::command]
-pub fn ai_key_get() -> Result<Option<String>, String> {
-    secret::get_ai_key()
-}
-
-#[tauri::command]
-pub fn ai_key_set(key: String) -> Result<(), String> {
-    let key = key.trim();
-    if key.is_empty() {
-        return secret::delete_ai_key();
-    }
-    secret::set_ai_key(key)
-}
-
-#[tauri::command]
-pub fn ai_key_delete() -> Result<(), String> {
-    secret::delete_ai_key()
 }
 
 // ------------------------------------------------------------------ Claude Code (claude CLI)

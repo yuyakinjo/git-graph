@@ -1,18 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import type { ThemedToken } from "shiki";
-import {
-  AI_KEY_SET_FLAG,
-  DEFAULT_AI_MODEL,
-  DEFAULT_AI_PROVIDER,
-  DEFAULT_CLAUDE_CODE_MODEL,
-  invalidAiKeyReason,
-  isAiModel,
-  isAiProvider,
-  isClaudeCodeModel,
-  type AiModel,
-  type AiProvider,
-  type ClaudeCodeModel,
-} from "../lib/ai";
+import { DEFAULT_CLAUDE_CODE_MODEL, isClaudeCodeModel, type ClaudeCodeModel } from "../lib/ai";
 import { api } from "../lib/api";
 import { parseDiff, tokenizeDiff, type DiffLine } from "../lib/diff";
 import { DEFAULT_DIFF_THEME, isDiffTheme, type DiffTheme } from "../lib/highlight";
@@ -85,9 +73,7 @@ const COL_W_KEY = "gitgraph.graphColumnWidths";
 const GRAPH_STYLE_KEY = "gitgraph.graphStyle";
 // 差分ビューのシンタックスハイライトのテーマ
 const DIFF_THEME_KEY = "gitgraph.diffTheme";
-// AI によるコミットメッセージ生成の経路とモデル (API キー本体はキーチェーン)
-const AI_PROVIDER_KEY = "gitgraph.aiProvider";
-const AI_MODEL_KEY = "gitgraph.aiModel";
+// AI (Claude Code) によるコミットメッセージ生成のモデル
 const AI_CLI_MODEL_KEY = "gitgraph.aiClaudeCodeModel";
 export type GraphStyle = "default" | "japanese-railway";
 
@@ -283,17 +269,6 @@ export function useStoreValue(boot: BootData | null) {
     return isDiffTheme(saved) ? saved : DEFAULT_DIFF_THEME;
   });
 
-  const [aiKeySet, setAiKeySetState] = useState(
-    () => localStorage.getItem(AI_KEY_SET_FLAG) === "1",
-  );
-  const [aiProvider, setAiProviderState] = useState<AiProvider>(() => {
-    const saved = localStorage.getItem(AI_PROVIDER_KEY);
-    return isAiProvider(saved) ? saved : DEFAULT_AI_PROVIDER;
-  });
-  const [aiModel, setAiModelState] = useState<AiModel>(() => {
-    const saved = localStorage.getItem(AI_MODEL_KEY);
-    return isAiModel(saved) ? saved : DEFAULT_AI_MODEL;
-  });
   const [aiCliModel, setAiCliModelState] = useState<ClaudeCodeModel>(() => {
     const saved = localStorage.getItem(AI_CLI_MODEL_KEY);
     return isClaudeCodeModel(saved) ? saved : DEFAULT_CLAUDE_CODE_MODEL;
@@ -856,44 +831,6 @@ export function useStoreValue(boot: BootData | null) {
     localStorage.setItem(GRAPH_STYLE_KEY, style);
   }, []);
 
-  /** 「登録済みか」の表示だけを更新する (キーチェーンから消えていたときにも使う) */
-  const setAiKeySet = useCallback((set: boolean) => {
-    setAiKeySetState(set);
-    if (set) localStorage.setItem(AI_KEY_SET_FLAG, "1");
-    else localStorage.removeItem(AI_KEY_SET_FLAG);
-  }, []);
-
-  /** キーチェーンに保存する。空なら削除。成功したら true */
-  const saveAiKey = useCallback(
-    async (key: string) => {
-      const v = key.trim();
-      const invalid = v ? invalidAiKeyReason(v) : null;
-      if (invalid) {
-        toast({ kind: "error", title: "API キーではありません", detail: invalid });
-        return false;
-      }
-      try {
-        await (v ? api.aiKeySet(v) : api.aiKeyDelete());
-        setAiKeySet(!!v);
-        return true;
-      } catch (e) {
-        toast({ kind: "error", title: "API キーを保存できませんでした", detail: String(e) });
-        return false;
-      }
-    },
-    [setAiKeySet, toast],
-  );
-
-  const setAiModel = useCallback((model: AiModel) => {
-    setAiModelState(model);
-    localStorage.setItem(AI_MODEL_KEY, model);
-  }, []);
-
-  const setAiProvider = useCallback((provider: AiProvider) => {
-    setAiProviderState(provider);
-    localStorage.setItem(AI_PROVIDER_KEY, provider);
-  }, []);
-
   const setAiCliModel = useCallback((model: ClaudeCodeModel) => {
     setAiCliModelState(model);
     localStorage.setItem(AI_CLI_MODEL_KEY, model);
@@ -961,13 +898,6 @@ export function useStoreValue(boot: BootData | null) {
     setGraphStyle,
     diffTheme,
     setDiffTheme,
-    aiKeySet,
-    setAiKeySet,
-    saveAiKey,
-    aiModel,
-    setAiModel,
-    aiProvider,
-    setAiProvider,
     aiCliModel,
     setAiCliModel,
     zoom,

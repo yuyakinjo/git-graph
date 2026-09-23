@@ -135,11 +135,6 @@ export const api = {
     invoke<Record<string, string | null>>("gh_avatars", { dir, queries }),
   ghAvatarsClear: () => invoke<void>("gh_avatars_clear"),
 
-  // AI の API キー (macOS キーチェーン)
-  aiKeyGet: () => invoke<string | null>("ai_key_get"),
-  /** 空文字なら削除 */
-  aiKeySet: (key: string) => invoke<void>("ai_key_set", { key }),
-  aiKeyDelete: () => invoke<void>("ai_key_delete"),
   /** Claude Code (`claude -p`) に一回だけ答えさせる */
   claudeGenerate: (system: string, prompt: string, model: string, effort?: string) =>
     invoke<string>("claude_generate", { system, prompt, model, effort }),
