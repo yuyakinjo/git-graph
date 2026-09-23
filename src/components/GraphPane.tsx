@@ -18,8 +18,8 @@ import { useMenu } from "./ui-context";
 
 /** 行と見出しで同じ幅を使うため、列のクラスは 1 か所にまとめる */
 const COL_TAGS = "group/tags relative flex flex-none items-center";
-/** ブランチ列。グラフの左に置くので線の始点と揃うよう右寄せにする */
-const COL_REFS = "flex flex-none items-center justify-end overflow-hidden pr-1";
+/** ブランチ列。見出しと同じ左揃えにし、右端はグラフの線と少し間を空ける */
+const COL_REFS = "flex flex-none items-center justify-start overflow-hidden pr-1 pl-1.5";
 const COL_MSG = "flex min-w-0 flex-auto items-center gap-[5px] overflow-hidden pl-1.5";
 const COL_AUTHOR = "flex flex-none items-center gap-1.5 overflow-hidden text-[12px] text-fg-dim";
 const COL_SHA = "flex-none overflow-hidden text-fg-faint";
