@@ -365,13 +365,22 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         isOpen={isOpen}
         toggle={toggle}
         action={
-          <button
-            className={iconBtn({ tiny: true })}
-            title="ブランチを作成"
-            onClick={() => act.createBranch()}
-          >
-            <Icon name="plus" size={13} />
-          </button>
+          <>
+            <button
+              className={iconBtn({ tiny: true })}
+              title="マージ済みのブランチと worktree を整理"
+              onClick={() => act.tidy()}
+            >
+              <Icon name="sweep" size={13} />
+            </button>
+            <button
+              className={iconBtn({ tiny: true })}
+              title="ブランチを作成"
+              onClick={() => act.createBranch()}
+            >
+              <Icon name="plus" size={13} />
+            </button>
+          </>
         }
       >
         <BranchNodes nodes={localTree} depth={0} {...folders} />

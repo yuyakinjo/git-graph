@@ -11,6 +11,9 @@ import type {
   StashInfo,
   StatusData,
   TagInfo,
+  TidyItem,
+  TidyPlan,
+  TidyResult,
   WorktreeInfo,
 } from "./types";
 
@@ -90,6 +93,12 @@ export const api = {
   worktreeRemove: (dir: string, path: string, force = false) =>
     invoke<string>("git_worktree_remove", { dir, path, force }),
   worktreePrune: (dir: string) => invoke<string>("git_worktree_prune", { dir }),
+
+  // tidy (マージ済みブランチ / worktree の整理)
+  /** 判定だけ行う。fetch=true なら先に origin を fetch --prune する */
+  tidyPlan: (dir: string, fetch = true) => invoke<TidyPlan>("git_tidy_plan", { dir, fetch }),
+  tidyApply: (dir: string, ops: Pick<TidyItem, "kind" | "target" | "sha">[]) =>
+    invoke<TidyResult[]>("git_tidy_apply", { dir, ops }),
 
   // GitHub (gh CLI)
   ghStatus: (dir: string) => invoke<GhStatus>("gh_status", { dir }),

@@ -9,6 +9,7 @@ use crate::github;
 use crate::graph;
 use crate::repo;
 use crate::sh;
+use crate::tidy;
 
 // ------------------------------------------------------------------ 読み取り
 
@@ -362,6 +363,23 @@ pub fn git_worktree_remove(dir: String, path: String, force: bool) -> Result<Str
 #[tauri::command]
 pub fn git_worktree_prune(dir: String) -> Result<String, String> {
     sh::git_log(&dir, &["worktree", "prune", "-v"])
+}
+
+// ------------------------------------------------------------------ tidy
+
+/// マージ済みのブランチ / worktree を判定する (何も消さない)。
+/// fetch と gh を挟んで時間がかかるので、UI を止めないよう別スレッドで動かす。
+#[tauri::command(async)]
+pub fn git_tidy_plan(dir: String, fetch: bool) -> Result<tidy::TidyPlan, String> {
+    tidy::plan(&dir, fetch)
+}
+
+#[tauri::command(async)]
+pub fn git_tidy_apply(
+    dir: String,
+    ops: Vec<tidy::TidyOp>,
+) -> Result<Vec<tidy::TidyResult>, String> {
+    tidy::apply(&dir, ops)
 }
 
 // ------------------------------------------------------------------ GitHub (gh CLI)

@@ -170,6 +170,15 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M3.5 17.3 12 22l8.5-4.7" />
     </>
   ),
+  /** ほうき (tidy) */
+  sweep: (
+    <>
+      <path d="M19.5 3.5 12 11" />
+      <path d="M9.5 9.5 14.5 14.5" />
+      <path d="M9.5 9.5C6.5 10 4.5 12.5 3.5 20.5c8-1 10.5-3 11-6" />
+      <path d="M7 17.5l2-2" />
+    </>
+  ),
   copy: (
     <>
       <path d="M9 9h10.5v11.5H9z" />

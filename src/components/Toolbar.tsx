@@ -34,6 +34,8 @@ export function Toolbar() {
       { label: "プル (rebase)", icon: "pull", onClick: () => act.pull(true) },
       { separator: true },
       { label: "フェッチ (--prune)", icon: "fetch", onClick: () => act.fetch() },
+      { separator: true },
+      { label: "マージ済みを整理 (tidy)…", icon: "sweep", onClick: () => act.tidy() },
     ]);
 
   const pushMenu = (e: React.MouseEvent) =>

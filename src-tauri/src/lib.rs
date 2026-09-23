@@ -4,6 +4,7 @@ mod github;
 mod graph;
 mod repo;
 mod sh;
+mod tidy;
 
 use tauri::{Manager, WindowEvent};
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
@@ -74,6 +75,8 @@ pub fn run() {
             commands::git_worktree_add,
             commands::git_worktree_remove,
             commands::git_worktree_prune,
+            commands::git_tidy_plan,
+            commands::git_tidy_apply,
             commands::gh_status,
             commands::gh_owners,
             commands::gh_repo_create,

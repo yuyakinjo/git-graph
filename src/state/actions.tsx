@@ -5,7 +5,15 @@ import { api } from "../lib/api";
 import { useDialogs } from "../components/ui-context";
 import { useStore } from "./store";
 import type { FormField } from "../components/ui";
-import type { BranchInfo, PullRequest, StashInfo, WorktreeInfo } from "../lib/types";
+import type {
+  BranchInfo,
+  PullRequest,
+  StashInfo,
+  TidyItem,
+  TidyPlan,
+  TidyResult,
+  WorktreeInfo,
+} from "../lib/types";
 
 export function useActions() {
   const s = useStore();
@@ -339,6 +347,47 @@ export function useActions() {
 
     const worktreePrune = () => s.run("worktree を整理", () => api.worktreePrune(dir));
 
+    // ---------------------------------------------------------- 6.5. tidy
+    /**
+     * `my git tidy` 相当。origin を fetch --prune してから、マージ済みのブランチと
+     * worktree を判定してダイアログに出す。消すのはダイアログで選んだものだけ。
+     */
+    const tidy = async () => {
+      const got: { plan?: TidyPlan } = {};
+      const ok = await s.run(
+        "整理対象を確認",
+        async () => {
+          got.plan = await api.tidyPlan(dir);
+          return "";
+        },
+        { silentSuccess: true },
+      );
+      if (ok && got.plan) s.setTidy({ dir, plan: got.plan });
+    };
+
+    const tidyLabel = (r: Pick<TidyResult, "kind" | "target">) =>
+      r.kind === "fastForward"
+        ? `${r.target} を早送り`
+        : r.kind === "branch"
+          ? `ブランチ ${r.target}`
+          : `worktree ${r.target}`;
+
+    const tidyApply = async (target: string, items: TidyItem[]) => {
+      s.setTidy(null);
+      if (!items.length) return;
+      await s.run(`${items.length} 件を整理`, async () => {
+        const results = await api.tidyApply(
+          target,
+          items.map(({ kind, target, sha }) => ({ kind, target, sha })),
+        );
+        const lines = results.map((r) =>
+          r.ok ? `✓ ${tidyLabel(r)}` : `✗ ${tidyLabel(r)}: ${r.message}`,
+        );
+        if (results.some((r) => !r.ok)) throw lines.join("\n");
+        return lines.join("\n");
+      });
+    };
+
     // ---------------------------------------------------------- 7.5. remote
     /**
      * リモート未設定のリポジトリに GitHub の新規リポジトリを作って origin に登録する。
@@ -616,6 +665,8 @@ export function useActions() {
       worktreeAdd,
       worktreeRemove,
       worktreePrune,
+      tidy,
+      tidyApply,
       remoteCreate,
       prCreate,
       prCheckout,

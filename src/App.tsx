@@ -3,6 +3,7 @@ import { DetailPane } from "./components/DetailPane";
 import { DiffModal } from "./components/DiffModal";
 import { GraphPane } from "./components/GraphPane";
 import { PrModal } from "./components/PrModal";
+import { TidyModal } from "./components/TidyModal";
 import { Settings } from "./components/Settings";
 import { Sidebar } from "./components/Sidebar";
 import { TitleBar } from "./components/TitleBar";
@@ -193,6 +194,7 @@ export default function App() {
       !e.defaultPrevented &&
       !s.diffModal &&
       !s.settingsOpen &&
+      !s.tidy &&
       !pr &&
       !(e.target instanceof HTMLInputElement) &&
       !(e.target instanceof HTMLTextAreaElement)
@@ -271,6 +273,9 @@ export default function App() {
       {s.diffModal ? <DiffModal /> : null}
       {pr ? <PrModal pr={pr} onClose={() => setPr(null)} /> : null}
       {s.settingsOpen ? <Settings /> : null}
+      {s.tidy ? (
+        <TidyModal dir={s.tidy.dir} plan={s.tidy.plan} onClose={() => s.setTidy(null)} />
+      ) : null}
     </div>
   );
 }

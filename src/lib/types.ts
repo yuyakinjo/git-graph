@@ -104,6 +104,38 @@ export interface WorktreeInfo {
   isCurrent: boolean;
 }
 
+/** `git_tidy_plan` の判定 1 件 */
+export interface TidyItem {
+  kind: "branch" | "worktree" | "prune" | "fastForward";
+  /** ブランチ名 / worktree のパス */
+  target: string;
+  /** 判定時の SHA。apply 時にずれていたら消さない */
+  sha: string;
+  /** true なら削除 (早送り) 候補 */
+  remove: boolean;
+  reason: string;
+  prNumber: number | null;
+  /** このブランチを消すには先に消す必要がある worktree のパス */
+  requires: string | null;
+  /** worktree のブランチ名 */
+  branch: string | null;
+}
+
+export interface TidyPlan {
+  main: string;
+  upstream: string;
+  /** gh が使えず PR の判定を省いたときの理由 */
+  ghNote: string | null;
+  items: TidyItem[];
+}
+
+export interface TidyResult {
+  kind: TidyItem["kind"];
+  target: string;
+  ok: boolean;
+  message: string;
+}
+
 export interface DiffFile {
   path: string;
   origPath: string | null;

@@ -30,6 +30,7 @@ import type {
   StashInfo,
   StatusData,
   TagInfo,
+  TidyPlan,
   WorktreeInfo,
 } from "../lib/types";
 
@@ -244,6 +245,8 @@ export function useStoreValue(boot: BootData | null) {
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [scanning, setScanning] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** マージ済みブランチ / worktree の整理ダイアログ。判定したリポジトリと結果を持つ */
+  const [tidy, setTidy] = useState<{ dir: string; plan: TidyPlan } | null>(null);
 
   // ---- 選択 (どこを見ているか) と、その中身 ----
   const [selection, setSelection] = useState<Selection>({ kind: "wip" });
@@ -891,6 +894,8 @@ export function useStoreValue(boot: BootData | null) {
     projects,
     scanning,
     scanProjects,
+    tidy,
+    setTidy,
     settingsOpen,
     openSettings,
     closeSettings,
