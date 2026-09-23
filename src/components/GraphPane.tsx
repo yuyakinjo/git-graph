@@ -915,7 +915,8 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
         style={gutter ? { paddingRight: `calc(0.625rem + ${gutter}px)` } : undefined}
       >
         {HEADER_CELLS.map((h) => {
-          if (!cols[h.key]) return null;
+          // メッセージ列は行側で常に余白 (flex-1) として残るので、見出しも非表示時は空セルで残す
+          if (!cols[h.key] && h.key !== "subject") return null;
           const width = h.col === "graph" ? graphW : h.col ? w[h.col] : undefined;
           return (
             <div
@@ -923,7 +924,7 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
               className={`${HEADER_CELL} ${h.col ? "flex-none" : "min-w-0 flex-1"}`}
               style={width === undefined ? undefined : { width }}
             >
-              <span className="truncate">{h.label}</span>
+              {cols[h.key] ? <span className="truncate">{h.label}</span> : null}
               {h.col ? (
                 <ColumnGrip
                   col={h.col}
