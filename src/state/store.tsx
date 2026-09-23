@@ -79,6 +79,7 @@ export const GRAPH_COLUMNS = [
   // 列ではなくグラフ内の見た目の切り替えだが、同じメニューで扱うためここに置く
   { key: "nodeAvatar", label: "ノード" },
   { key: "refs", label: "ブランチ" },
+  // 独立した列ではなく、ブランチ列にタグを並べるかどうか
   { key: "tags", label: "タグ" },
   { key: "subject", label: "メッセージ" },
   { key: "author", label: "作者" },
@@ -97,14 +98,13 @@ const DEFAULT_COLUMNS = {
 } as GraphColumns;
 
 /** 幅を変えられる列。メッセージ列は残り幅を埋めるので含めない。 */
-export const RESIZABLE_COLUMNS = ["refs", "tags", "graph", "author", "sha", "date"] as const;
+export const RESIZABLE_COLUMNS = ["refs", "graph", "author", "sha", "date"] as const;
 export type GraphColumnWidthKey = (typeof RESIZABLE_COLUMNS)[number];
 export type GraphColumnWidths = Record<GraphColumnWidthKey, number>;
 
 /** グラフ列の 0 は「レーン数に合わせて自動」を表す。 */
 export const DEFAULT_COLUMN_WIDTHS: GraphColumnWidths = {
   refs: 180,
-  tags: 32,
   graph: 0,
   author: 170,
   sha: 74,
@@ -112,8 +112,8 @@ export const DEFAULT_COLUMN_WIDTHS: GraphColumnWidths = {
 };
 
 export const MIN_COLUMN_WIDTHS: GraphColumnWidths = {
-  refs: 48,
-  tags: 24,
+  // チェックアウト中 + 追跡リモートのアイコンだけのバッジ (約 45px) と左右余白が入る幅
+  refs: 60,
   graph: 24,
   author: 60,
   sha: 48,

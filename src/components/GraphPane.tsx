@@ -17,8 +17,7 @@ import { Icon, type MenuItem } from "./ui";
 import { useMenu } from "./ui-context";
 
 /** 行と見出しで同じ幅を使うため、列のクラスは 1 か所にまとめる */
-const COL_TAGS = "group/tags relative flex flex-none items-center";
-/** ブランチ列。見出しと同じ左揃えにし、右端はグラフの線と少し間を空ける */
+/** ブランチ列 (タグも並べる)。見出しと同じ左揃えにし、右端はグラフの線と少し間を空ける */
 const COL_REFS = "flex flex-none items-center justify-start overflow-hidden pr-1 pl-1.5";
 const COL_MSG = "flex min-w-0 flex-auto items-center gap-[5px] overflow-hidden pl-1.5";
 const COL_AUTHOR = "flex flex-none items-center gap-1.5 overflow-hidden text-[12px] text-fg-dim";
@@ -30,8 +29,7 @@ const HEADER_ROW =
   "relative flex h-5.5 flex-none items-center border-b border-line bg-bg-1 pr-2.5 text-[10.5px] tracking-wider text-fg-faint uppercase select-none";
 /** 見出しの並び。行の列順に合わせる。col が無い列 (メッセージ) は幅を変えられない */
 const HEADER_CELLS: { key: GraphColumnKey; col: GraphColumnWidthKey | null; label: string }[] = [
-  { key: "refs", col: "refs", label: "ブランチ" },
-  { key: "tags", col: "tags", label: "タグ" },
+  { key: "refs", col: "refs", label: "ブランチ / タグ" },
   { key: "graph", col: "graph", label: "グラフ" },
   { key: "subject", col: null, label: "メッセージ" },
   { key: "author", col: "author", label: "作者" },
@@ -54,13 +52,16 @@ const ROW_SELECTED = `${ROW_BASE} focus-within:z-[3] bg-accent-soft shadow-[inse
 const ROW_PLAIN = `${ROW_BASE} focus-within:z-[3] hover:z-[2] hover:bg-row-hover`;
 
 const REF_BADGE_BASE =
-  "inline-flex min-w-0 max-w-full shrink cursor-default items-center gap-[3px] overflow-hidden rounded-[10px] border py-px pr-[7px] pl-[5px] text-[11px] font-semibold whitespace-nowrap [&>svg]:flex-none";
+  "inline-flex cursor-default items-center gap-[3px] overflow-hidden rounded-[10px] border py-px pl-[5px] text-[11px] font-semibold whitespace-nowrap [&>svg]:flex-none";
 const REF_BADGE_KIND: Record<string, string> = {
   head: "bg-accent-14 border-accent-35 text-accent",
   remote: "bg-violet-12 border-violet-30 text-violet",
   tag: "bg-amber-12 border-amber-30 text-amber",
   commit: "bg-bg-3 border-transparent text-fg-dim",
 };
+/** 名前付きは列に合わせて縮めて省略する。アイコンだけのときは縮めず、アイコンが潰れないようにする */
+const REF_BADGE_FULL = "min-w-0 max-w-full shrink pr-[7px]";
+const REF_BADGE_COMPACT = "flex-none pr-[5px]";
 /** チェックアウト中のブランチだけ塗りつぶす */
 const REF_BADGE_IS_HEAD = "bg-accent border-accent text-on-accent";
 
@@ -124,9 +125,12 @@ function RefBadge({
   onCheckout,
   onMenu,
   tracking,
+  compact,
 }: {
   tracking?: RefDeco;
   deco: RefDeco;
+  /** 幅が足りないときは名前を隠してアイコンだけにする (名前は title で見られる) */
+  compact?: boolean;
   onCheckout: () => void;
   onMenu: (e: React.MouseEvent) => void;
 }) {
@@ -142,7 +146,7 @@ function RefBadge({
             : "commit";
   return (
     <span
-      className={`${REF_BADGE_BASE} ${
+      className={`${REF_BADGE_BASE} ${compact ? REF_BADGE_COMPACT : REF_BADGE_FULL} ${
         deco.kind === "head" && deco.isHead
           ? REF_BADGE_IS_HEAD
           : (REF_BADGE_KIND[deco.kind] ?? REF_BADGE_KIND.commit)
@@ -159,11 +163,11 @@ function RefBadge({
       }}
     >
       {deco.isHead && deco.kind === "head" ? (
-        <span className="h-1.25 w-1.25 rounded-full bg-current" />
+        <span className="h-1.25 w-1.25 flex-none rounded-full bg-current" />
       ) : null}
       <Icon name={icon} size={11} />
       {tracking ? <Icon name="remote" size={11} /> : null}
-      <span className="truncate">{deco.name}</span>
+      {compact ? null : <span className="truncate">{deco.name}</span>}
     </span>
   );
 }
@@ -172,11 +176,13 @@ function RefBadge({
 function CommitRefs({
   refs,
   upstreams,
+  compact,
   onCheckout,
   onMenu,
 }: {
   refs: RefDeco[];
   upstreams: Map<string, string>;
+  compact?: boolean;
   onCheckout: (d: RefDeco) => void;
   onMenu: (d: RefDeco) => (e: React.MouseEvent) => void;
 }) {
@@ -188,6 +194,7 @@ function CommitRefs({
       <RefBadge
         deco={primary}
         tracking={tracking}
+        compact={compact}
         onCheckout={() => onCheckout(primary)}
         onMenu={onMenu(primary)}
       />
@@ -237,38 +244,84 @@ function CommitRefs({
   );
 }
 
-/** タグ列。アイコンだけを置き、ホバーで中身 (タグのバッジ) を開く。 */
-function TagCell({
+/**
+ * 幅が足りない行のタグ。アイコン (と件数) だけを置き、ホバーで中身 (タグのバッジ) を開く。
+ * ブランチ列は overflow-hidden なので、一覧は行を基準にしてブランチ列の右隣へ出す。
+ */
+function TagChip({
   tags,
-  width,
+  columnWidth,
   onCheckout,
   onMenu,
 }: {
   tags: RefDeco[];
-  width: number;
+  columnWidth: number;
   onCheckout: (d: RefDeco) => void;
   onMenu: (d: RefDeco) => (e: React.MouseEvent) => void;
 }) {
-  if (!tags.length) return <div className={COL_TAGS} style={{ width }} />;
   return (
-    <div className={COL_TAGS} style={{ width }}>
+    <span className="group/tags flex flex-none items-center">
       <span
         className="inline-flex h-4.5 cursor-default items-center gap-0.5 rounded-[9px] border border-amber-30 bg-amber-12 px-1 text-amber [&>svg]:flex-none"
         title={tags.map((t) => t.name).join("\n")}
       >
         <Icon name="tag" size={12} />
         {tags.length > 1 ? <span className="text-[10px] font-bold">{tags.length}</span> : null}
-        <span className="absolute top-1/2 left-[calc(100%+6px)] hidden max-w-115 -translate-y-1/2 items-center gap-1.25 overflow-hidden rounded-lg border border-line bg-bg-3 px-1.5 py-1 whitespace-nowrap shadow-[0_6px_18px_rgba(0,0,0,0.45)] group-hover/tags:flex">
+        <span
+          className="absolute top-1/2 z-10 hidden max-w-115 -translate-y-1/2 items-center gap-1.25 overflow-hidden rounded-lg border border-line bg-bg-3 px-1.5 py-1 whitespace-nowrap shadow-[0_6px_18px_rgba(0,0,0,0.45)] group-hover/tags:flex"
+          style={{ left: columnWidth + 6 }}
+        >
           {tags.map((d) => (
             <RefBadge key={d.full} deco={d} onCheckout={() => onCheckout(d)} onMenu={onMenu(d)} />
           ))}
         </span>
       </span>
+    </span>
+  );
+}
+
+/**
+ * ブランチ列の中身。ブランチの右にタグを並べる。
+ * 収まらない行では、まずタグをアイコンにまとめ、それでも足りなければブランチもアイコンだけにする。
+ */
+function RefsCell({
+  refs,
+  showTags,
+  width,
+  upstreams,
+  onCheckout,
+  onMenu,
+}: {
+  refs: RefDeco[];
+  showTags: boolean;
+  width: number;
+  upstreams: Map<string, string>;
+  onCheckout: (d: RefDeco) => void;
+  onMenu: (d: RefDeco) => (e: React.MouseEvent) => void;
+}) {
+  const branches = refs.filter((d) => d.kind !== "tag");
+  const tags = showTags ? refs.filter((d) => d.kind === "tag") : [];
+  const fit = refsFit(branches, tags, upstreams, width - REFS_CELL_PAD);
+  return (
+    <div className="flex min-w-0 max-w-full items-center gap-1">
+      <CommitRefs
+        refs={branches}
+        upstreams={upstreams}
+        compact={fit === "icons"}
+        onCheckout={onCheckout}
+        onMenu={onMenu}
+      />
+      {tags.length === 0 ? null : fit === "full" ? (
+        tags.map((d) => (
+          <RefBadge key={d.full} deco={d} onCheckout={() => onCheckout(d)} onMenu={onMenu(d)} />
+        ))
+      ) : (
+        <TagChip tags={tags} columnWidth={width} onCheckout={onCheckout} onMenu={onMenu} />
+      )}
     </div>
   );
 }
 
-/** 列の表示・非表示を選ぶポップオーバー。 */
 function ColumnMenu() {
   const s = useStore();
   const [open, setOpen] = useState(false);
@@ -311,6 +364,14 @@ const MONO_FONT = "ui-monospace, SFMono-Regular, Menlo, monospace";
 const REF_BADGE_CHROME = 34;
 /** セルの左右余白 + 少しの余裕 */
 const FIT_PAD = 14;
+/** ブランチ列の左右余白 (pl-1.5 + pr-1) */
+const REFS_CELL_PAD = 10;
+/** バッジ同士の隙間 (gap-1) */
+const REFS_GAP = 4;
+/** 追跡リモートのアイコンと隙間 */
+const TRACKING_ICON_W = 14;
+/** まとめたタグのチップ (枠・余白・アイコン)。件数の文字幅は別に足す */
+const TAG_CHIP_W = 22;
 
 let measureCtx: CanvasRenderingContext2D | null = null;
 /** canvas で文字幅を測る。DOM を作らずに済むので行数が多くても軽い */
@@ -324,6 +385,38 @@ function textWidth(text: string, font: string): number {
 function uiFont(size: number, weight = 400): string {
   const family = getComputedStyle(document.body).fontFamily || "sans-serif";
   return `${weight} ${size}px ${family}`;
+}
+
+/**
+ * ブランチ列の 1 行をどこまで縮めれば収まるか。
+ * - full: ブランチもタグも名前付き
+ * - tags: タグだけアイコンにまとめる
+ * - icons: ブランチもアイコンだけにする (これでも足りなければはみ出たぶんは切れる)
+ */
+function refsFit(
+  branches: RefDeco[],
+  tags: RefDeco[],
+  upstreams: Map<string, string>,
+  avail: number,
+): "full" | "tags" | "icons" {
+  const font = uiFont(11, 600);
+  const badge = (d: RefDeco) => textWidth(d.name, font) + REF_BADGE_CHROME;
+  const { primary, tracking, others } = groupRefs(branches, upstreams);
+  let branchFull = 0;
+  if (primary) {
+    let extra = tracking ? TRACKING_ICON_W : 0;
+    if (others.length) extra += REFS_GAP + textWidth(`+${others.length}`, uiFont(11)) + 8;
+    branchFull = badge(primary) + extra;
+  }
+  let tagsFull = 0;
+  for (const t of tags) tagsFull += (tagsFull ? REFS_GAP : 0) + badge(t);
+  const tagsChip = tags.length
+    ? TAG_CHIP_W + (tags.length > 1 ? textWidth(String(tags.length), uiFont(10, 700)) + 2 : 0)
+    : 0;
+  const gap = primary && tags.length ? REFS_GAP : 0;
+  if (branchFull + gap + tagsFull <= avail) return "full";
+  if (branchFull + gap + tagsChip <= avail) return "tags";
+  return "icons";
 }
 
 /** 列の境目。ドラッグで幅を変え、ダブルクリックで内容に合わせる。 */
@@ -416,16 +509,12 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
   const graphAutoW = Math.min(Math.max(cx((s.graph?.maxColumn ?? 0) + 1) + 6, 56), 360);
   const graphW = cols.graph ? (w.graph > 0 ? w.graph : graphAutoW) : 0;
   // グラフはブランチ／タグ列の右に来るので、SVG も同じぶんだけ右へずらす
-  const graphX = (cols.refs ? w.refs : 0) + (cols.tags ? w.tags : 0);
+  const graphX = cols.refs ? w.refs : 0;
 
   const setColumnWidth = s.setColumnWidth;
   /** 見出しのダブルクリック。読み込み済みのコミットから必要な幅を測って合わせる */
   const autoFitColumn = useCallback(
     (key: GraphColumnWidthKey) => {
-      if (key === "tags") {
-        setColumnWidth("tags", DEFAULT_COLUMN_WIDTHS.tags);
-        return;
-      }
       // グラフ列は 0 = レーン数に合わせる (自動) に戻す
       if (key === "graph") {
         setColumnWidth("graph", 0);
@@ -449,7 +538,7 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
         for (const c of commits) {
           let row = 0;
           for (const d of c.refs) {
-            if (d.kind === "tag" && cols.tags) continue;
+            if (d.kind === "tag" && !cols.tags) continue;
             row += textWidth(d.name, font) + REF_BADGE_CHROME;
           }
           content = Math.max(content, row);
@@ -694,7 +783,6 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
           }}
         >
           {cols.refs ? <div className={COL_REFS} style={{ width: w.refs }} /> : null}
-          {cols.tags ? <div className={COL_TAGS} style={{ width: w.tags }} /> : null}
           {cols.graph ? <div className="flex-none" style={{ width: graphW }} /> : null}
           <div className={COL_MSG}>
             <span className="font-bold text-amber">未コミットの変更</span>
@@ -735,21 +823,15 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
       >
         {cols.refs ? (
           <div className={COL_REFS} style={{ width: w.refs }}>
-            <CommitRefs
-              refs={c.refs.filter((d) => d.kind !== "tag" || !cols.tags)}
+            <RefsCell
+              refs={c.refs}
+              showTags={cols.tags}
+              width={w.refs}
               upstreams={upstreams}
               onCheckout={checkoutRef}
               onMenu={refMenu}
             />
           </div>
-        ) : null}
-        {cols.tags ? (
-          <TagCell
-            width={w.tags}
-            tags={c.refs.filter((d) => d.kind === "tag")}
-            onCheckout={checkoutRef}
-            onMenu={refMenu}
-          />
         ) : null}
         {cols.graph ? <div className="flex-none" style={{ width: graphW }} /> : null}
         <div className="flex min-w-0 flex-1 items-center gap-1.5 pl-1.5">
