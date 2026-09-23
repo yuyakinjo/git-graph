@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::sh;
 
@@ -114,14 +114,29 @@ pub fn load(dir: &str, limit: usize) -> Result<GraphData, String> {
         FS = FS,
         RS = RS
     );
-    let args = vec![
+    // --all が拾う stash は refs/stash (最新の 1 件) だけなので、stash@{1} 以降も明示的に渡す。
+    // stash の第二親以降 (index / untracked の控え) は内部用のコミットなので、グラフには出さない。
+    let mut stashes: Vec<String> = vec![];
+    let mut stash_helpers: HashSet<String> = HashSet::new();
+    for line in sh::git(dir, &["stash", "list", "--format=%H %P"])
+        .unwrap_or_default()
+        .lines()
+    {
+        let mut it = line.split_whitespace();
+        let Some(hash) = it.next() else { continue };
+        stashes.push(hash.to_string());
+        stash_helpers.extend(it.skip(1).map(|s| s.to_string()));
+    }
+
+    let mut args = vec![
         "log".to_string(),
         "--all".to_string(),
         "--date-order".to_string(),
         "--decorate=full".to_string(),
-        format!("--max-count={}", limit + 1),
+        format!("--max-count={}", limit + 1 + stash_helpers.len()),
         format,
     ];
+    args.extend(stashes.iter().cloned());
     let raw = sh::git(dir, &args)?;
 
     let mut commits: Vec<GraphCommit> = vec![];
@@ -135,14 +150,28 @@ pub fn load(dir: &str, limit: usize) -> Result<GraphData, String> {
             continue;
         }
         let hash = f[0].trim().to_string();
-        if hash.is_empty() {
+        if hash.is_empty() || stash_helpers.contains(&hash) {
             continue;
         }
-        let parents: Vec<String> = f[1]
+        let mut parents: Vec<String> = f[1]
             .split_whitespace()
             .map(|s| s.to_string())
             .filter(|s| !s.is_empty())
             .collect();
+        // 控えのコミットを隠したので、stash は元にしたコミットだけを親に持つ形にする
+        parents.retain(|p| !stash_helpers.contains(p));
+        // refs/stash は最新の 1 件にしか付かないので、どの stash にも stash@{n} を付け直す
+        let mut refs = parse_refs(f[5]);
+        if let Some(i) = stashes.iter().position(|s| *s == hash) {
+            refs.retain(|r| r.kind != "stash");
+            let name = format!("stash@{{{i}}}");
+            refs.push(RefDeco {
+                kind: "stash".into(),
+                name: name.clone(),
+                full: name,
+                is_head: false,
+            });
+        }
         commits.push(GraphCommit {
             short: hash.chars().take(7).collect(),
             hash,
@@ -150,7 +179,7 @@ pub fn load(dir: &str, limit: usize) -> Result<GraphData, String> {
             author_name: f[2].to_string(),
             author_email: f[3].to_string(),
             timestamp: f[4].trim().parse::<i64>().unwrap_or(0),
-            refs: parse_refs(f[5]),
+            refs,
             subject: f[6].to_string(),
             row: 0,
             column: 0,
@@ -162,7 +191,13 @@ pub fn load(dir: &str, limit: usize) -> Result<GraphData, String> {
 
     // --- レーン割り当て ---
     // lanes[i] = そのレーンが次に描画を待っているコミットハッシュ
-    let mut lanes: Vec<Option<String>> = vec![];
+    // HEAD のレーンは先頭から空けておく。未コミットの変更の線は最上段から HEAD まで
+    // このレーンを下るので、HEAD より上のコミット (stash など) が同じレーンに乗ると線が重なる。
+    let head = commits
+        .iter()
+        .find(|c| c.refs.iter().any(|r| r.is_head))
+        .map(|c| c.hash.clone());
+    let mut lanes: Vec<Option<String>> = head.into_iter().map(Some).collect();
     let mut max_column = 0usize;
 
     for row in 0..commits.len() {

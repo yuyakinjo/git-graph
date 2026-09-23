@@ -121,6 +121,11 @@
     cursor: col-resize;
     user-select: none;
   }
+  /* 上下方向のスプリッタ (DetailPane.tsx の wip 分割) */
+  body.dragging-row {
+    cursor: row-resize;
+    user-select: none;
+  }
 
   ::-webkit-scrollbar {
     width: 10px;

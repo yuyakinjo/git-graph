@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { absoluteTime, basename, dirname, relativeTime } from "../lib/format";
 import type { DiffFile, FileEntry } from "../lib/types";
@@ -19,8 +19,13 @@ const DETAIL_TOOLS = "mt-[9px] flex gap-1.5";
 
 const SECTION_HEAD =
   "flex h-7 flex-none items-center justify-between gap-2 border-b border-line-soft bg-bg-1 px-2.5 text-[11.5px] font-semibold text-fg-dim";
-/** wip 側は一覧をスクロールさせるので見出しを貼り付けておく */
-const SECTION_HEAD_STICKY = `${SECTION_HEAD} sticky top-0 z-[1]`;
+/** wip 側の「変更」と「ステージ済み」を仕切る上下方向のスプリッタ */
+const ROW_SPLITTER =
+  "h-1 flex-none cursor-row-resize bg-line-soft transition-[background] duration-150 ease-[ease] hover:bg-accent";
+/** 分割時に「変更」側へ最低限残す高さ (見出し + 1 行分) */
+const WIP_LIST_MIN = 56;
+/** 「ステージ済み」セクションの最小高さ (見出しのみ) */
+const SECTION_MIN = 28;
 
 const LIST_EMPTY = "px-3 py-2 text-[11.5px] text-fg-faint";
 
@@ -81,6 +86,49 @@ function FileRow({
 
 // ------------------------------------------------------------------ WIP (add / commit)
 
+const STAGED_KEY = "gitgraph.stagedH";
+
+/**
+ * 「ステージ済み」セクションの高さ。App.tsx の usePaneWidth と同じくポインタキャプチャで追従し、
+ * 高さはコンテナ下端からポインタまでの距離で決める。
+ */
+function useStagedHeight(initial: number) {
+  const [height, setHeight] = useState(() => Number(localStorage.getItem(STAGED_KEY)) || initial);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
+
+  const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragging.current = true;
+    document.body.classList.add("dragging-row");
+  }, []);
+
+  const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const box = containerRef.current?.getBoundingClientRect();
+    if (!dragging.current || !box) return;
+    const max = box.height - WIP_LIST_MIN;
+    setHeight(Math.max(SECTION_MIN, Math.min(max, box.bottom - e.clientY)));
+  }, []);
+
+  const onPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!dragging.current) return;
+      dragging.current = false;
+      document.body.classList.remove("dragging-row");
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      localStorage.setItem(STAGED_KEY, String(height));
+    },
+    [height],
+  );
+
+  return {
+    height,
+    containerRef,
+    handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp },
+  };
+}
+
 function WipPanel() {
   const s = useStore();
   const act = useActions();
@@ -88,6 +136,7 @@ function WipPanel() {
   const [message, setMessage] = useState("");
   const [amend, setAmend] = useState(false);
   const sel = s.file;
+  const { height: stagedH, containerRef, handlers: splitter } = useStagedHeight(200);
 
   /** ファイル行のクリックは差分ダイアログを開く */
   const open = (target: FileTarget) => {
@@ -142,9 +191,9 @@ function WipPanel() {
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-auto flex-col overflow-y-auto">
-        <section className="flex min-h-0 flex-none flex-col">
-          <div className={SECTION_HEAD_STICKY}>
+      <div ref={containerRef} className="flex min-h-0 flex-auto flex-col">
+        <section className="flex min-h-0 flex-auto flex-col">
+          <div className={SECTION_HEAD}>
             <span>変更 ({changedCount})</span>
             <button
               className={btn("default", "tiny")}
@@ -154,7 +203,7 @@ function WipPanel() {
               <Icon name="plus" size={12} /> すべてステージ
             </button>
           </div>
-          <div className="flex-none overflow-visible">
+          <div className="min-h-0 flex-auto overflow-y-auto">
             {status?.conflicts.map((f) => (
               <FileRow
                 key={`c-${f.path}`}
@@ -218,8 +267,13 @@ function WipPanel() {
           </div>
         </section>
 
-        <section className="flex min-h-0 flex-none flex-col">
-          <div className={SECTION_HEAD_STICKY}>
+        <div className={ROW_SPLITTER} {...splitter} />
+
+        <section
+          className="flex min-h-0 flex-none flex-col"
+          style={{ height: stagedH, maxHeight: `calc(100% - ${WIP_LIST_MIN}px)` }}
+        >
+          <div className={SECTION_HEAD}>
             <span>ステージ済み ({stagedCount})</span>
             <button
               className={btn("default", "tiny")}
@@ -229,7 +283,7 @@ function WipPanel() {
               <Icon name="minus" size={12} /> すべて解除
             </button>
           </div>
-          <div className="flex-none overflow-visible">
+          <div className="min-h-0 flex-auto overflow-y-auto">
             {status?.staged.map((f) => (
               <FileRow
                 key={`s-${f.path}`}

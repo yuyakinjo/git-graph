@@ -742,20 +742,33 @@ pub fn diff_text(
             ],
         )?,
         "stash" => {
+            // `git stash show` はパス指定を受け付けないので、元のコミット (^1) との差分を取る。
+            // 追跡中のファイルは stash 本体、未追跡のファイルは第三親 (^3) に入っている。
             let sha = sha.ok_or("stash の参照が必要です")?;
-            sh::exec(
-                dir,
-                "git",
-                &[
-                    "stash".to_string(),
-                    "show".to_string(),
-                    "-p".to_string(),
-                    ctx,
-                    sha,
-                    "--".to_string(),
-                    path.to_string(),
-                ],
-            )?
+            let diff = |to: String| {
+                sh::exec(
+                    dir,
+                    "git",
+                    &[
+                        "diff".to_string(),
+                        "-M".to_string(),
+                        ctx.clone(),
+                        format!("{sha}^1"),
+                        to,
+                        "--".to_string(),
+                        path.to_string(),
+                    ],
+                )
+            };
+            let tracked = diff(sha.clone())?;
+            if tracked.ok() && tracked.stdout.trim().is_empty() {
+                match diff(format!("{sha}^3")) {
+                    Ok(o) if o.ok() => o,
+                    _ => tracked,
+                }
+            } else {
+                tracked
+            }
         }
         _ => return Err(format!("未知の diff 種別: {kind}")),
     };
@@ -770,10 +783,13 @@ pub fn diff_text(
 pub fn stash_files(dir: &str, refname: &str) -> Result<Vec<DiffFile>, String> {
     let ns = sh::git(
         dir,
-        &["stash", "show", "--name-status", "-z", "-M", refname],
+        &["stash", "show", "--include-untracked", "--name-status", "-z", "-M", refname],
     )
     .unwrap_or_default();
-    let num = sh::git(dir, &["stash", "show", "--numstat", "-z", "-M", refname])
-        .unwrap_or_default();
+    let num = sh::git(
+        dir,
+        &["stash", "show", "--include-untracked", "--numstat", "-z", "-M", refname],
+    )
+    .unwrap_or_default();
     Ok(parse_files(&ns, &num))
 }

@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useWindowEvent } from "../lib/effects";
 import { absoluteTime, avatarColor, initials, laneColor, relativeTime } from "../lib/format";
-import type { GraphCommit, GraphEdge, RefDeco } from "../lib/types";
+import type { GraphCommit, GraphEdge, RefDeco, StashInfo } from "../lib/types";
 import { groupRefs } from "../lib/graphRefs";
 import { useActions } from "../state/actions";
 import {
@@ -137,7 +137,9 @@ function RefBadge({
         ? "remote"
         : deco.kind === "head"
           ? "branch"
-          : "commit";
+          : deco.kind === "stash"
+            ? "stash"
+            : "commit";
   return (
     <span
       className={`${REF_BADGE_BASE} ${
@@ -491,6 +493,8 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
 
   const matches = useMemo(() => findMatches(commits, query), [commits, query]);
 
+  const stashHashes = useMemo(() => new Set(s.stashes.map((st) => st.hash)), [s.stashes]);
+
   // 入力イベントを起点に「絞り込み + 最初のヒットへスクロール」をまとめて行う
   const onQueryChange = (next: string) => {
     setQuery(next);
@@ -512,9 +516,55 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
     });
   }, [edges, start, end, rowOffset, commits.length]);
 
-  const selectedSha = s.selection.kind === "commit" ? s.selection.sha : null;
+  const sel = s.selection;
+  const selectedSha =
+    sel.kind === "commit"
+      ? sel.sha
+      : sel.kind === "stash"
+        ? (s.stashes.find((st) => st.name === sel.refname)?.hash ?? null)
+        : null;
+
+  /** stash の行は詳細ペインも stash 用 (未追跡ファイル込みの一覧) に切り替える */
+  const selectRow = (c: GraphCommit) => {
+    const stash = s.stashes.find((st) => st.hash === c.hash);
+    s.select(
+      stash
+        ? { kind: "stash", refname: stash.name, message: stash.message }
+        : { kind: "commit", sha: c.hash },
+    );
+  };
+
+  const stashMenuItems = (stash: StashInfo): MenuItem[] => [
+    { label: "apply", icon: "check", onClick: () => act.stashApply(stash, false) },
+    { label: "pop", icon: "stash", onClick: () => act.stashApply(stash, true) },
+  ];
+  const stashDropItem = (stash: StashInfo): MenuItem => ({
+    label: "drop",
+    icon: "trash",
+    danger: true,
+    onClick: () => act.stashDrop(stash),
+  });
 
   const commitMenu = (c: GraphCommit) => (e: React.MouseEvent) => {
+    const stash = s.stashes.find((st) => st.hash === c.hash);
+    if (stash) {
+      openMenu(e, [
+        ...stashMenuItems(stash),
+        { separator: true },
+        {
+          label: `${stash.name} をコピー`,
+          icon: "copy",
+          onClick: () => navigator.clipboard.writeText(stash.name).catch(() => undefined),
+        },
+        {
+          label: "SHA をコピー",
+          icon: "copy",
+          onClick: () => navigator.clipboard.writeText(c.hash).catch(() => undefined),
+        },
+        stashDropItem(stash),
+      ]);
+      return;
+    }
     openMenu(e, [
       {
         label: `${c.short} をチェックアウト`,
@@ -591,6 +641,11 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
       ]);
       return;
     }
+    const stash = deco.kind === "stash" ? s.stashes.find((st) => st.name === deco.name) : undefined;
+    if (stash) {
+      openMenu(e, [...stashMenuItems(stash), { separator: true }, copyName, stashDropItem(stash)]);
+      return;
+    }
     openMenu(e, [
       {
         label: `${deco.name} をチェックアウト`,
@@ -610,12 +665,12 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "j" && e.key !== "k") return;
     const down = e.key === "ArrowDown" || e.key === "j";
     e.preventDefault();
-    const sel = s.selection;
-    const cur = sel.kind === "commit" ? commits.findIndex((c) => c.hash === sel.sha) : -1;
+    const cur = selectedSha ? commits.findIndex((c) => c.hash === selectedSha) : -1;
     let next = cur + (down ? 1 : -1);
     if (!hasWip && next < 0) next = 0;
     if (next >= commits.length) next = commits.length - 1;
-    s.select(next < 0 ? { kind: "wip" } : { kind: "commit", sha: commits[next].hash });
+    if (next < 0) s.select({ kind: "wip" });
+    else selectRow(commits[next]);
     revealRow(Math.max(next, 0) + rowOffset);
   });
 
@@ -663,13 +718,18 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
         }`}
         style={{ top: r * ROW_H }}
         onClick={() => {
-          s.select({ kind: "commit", sha: c.hash });
+          selectRow(c);
           onOpenDetail();
         }}
-        onDoubleClick={() => act.checkout(c.hash, c.short)}
+        onDoubleClick={() => {
+          // サイドバーと同じく、stash はダブルクリックで apply
+          const stash = s.stashes.find((st) => st.hash === c.hash);
+          if (stash) act.stashApply(stash, false);
+          else act.checkout(c.hash, c.short);
+        }}
         onContextMenu={(e) => {
           e.preventDefault();
-          s.select({ kind: "commit", sha: c.hash });
+          selectRow(c);
           commitMenu(c)(e);
         }}
       >
@@ -865,6 +925,9 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
                     : undefined;
                   // マージだけは塗りつぶしの丸にして、合流点をひと目で分かるようにする
                   const isMerge = c.parents.length > 1;
+                  // stash は内部的にはマージコミットなので、判定を先に行って箱アイコンで描く
+                  const isStash = stashHashes.has(c.hash) || c.refs.some((r) => r.kind === "stash");
+                  const h = showNodeAvatar ? AVATAR_R : 6;
                   return (
                     <g key={c.hash} opacity={matches && !matches.has(c.hash) ? 0.3 : 1}>
                       {isSel ? (
@@ -878,7 +941,38 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
                           opacity="0.5"
                         />
                       ) : null}
-                      {isMerge ? (
+                      {isStash ? (
+                        <>
+                          {/* 破線の四角 = まだコミットではない退避物 */}
+                          <rect
+                            x={x - h}
+                            y={y - h}
+                            width={h * 2}
+                            height={h * 2}
+                            rx={2}
+                            fill="var(--color-bg-1)"
+                            stroke={color}
+                            strokeWidth="1.5"
+                            strokeDasharray="2.5 1.5"
+                          />
+                          {/* 箱: 蓋 + 本体 + 取っ手 */}
+                          <g
+                            fill="none"
+                            stroke={color}
+                            strokeWidth="1.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path
+                              d={`M${x - h * 0.6} ${y - h * 0.45}h${h * 1.2}v${h * 0.35}h${-h * 1.2}z`}
+                            />
+                            <path
+                              d={`M${x - h * 0.45} ${y - h * 0.1}v${h * 0.6}h${h * 0.9}v${-h * 0.6}`}
+                            />
+                            <path d={`M${x - h * 0.15} ${y + h * 0.18}h${h * 0.3}`} />
+                          </g>
+                        </>
+                      ) : isMerge ? (
                         <circle
                           cx={x}
                           cy={y}
