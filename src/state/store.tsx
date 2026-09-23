@@ -126,7 +126,7 @@ export function clampColumnWidth(key: GraphColumnWidthKey, px: number): number {
   return Math.round(Math.min(Math.max(px, MIN_COLUMN_WIDTHS[key]), MAX_COLUMN_WIDTH));
 }
 
-function loadColumnWidths(): GraphColumnWidths {
+export function loadColumnWidths(): GraphColumnWidths {
   const next = { ...DEFAULT_COLUMN_WIDTHS };
   try {
     const saved = JSON.parse(localStorage.getItem(COL_W_KEY) ?? "{}");
@@ -143,7 +143,7 @@ function loadColumnWidths(): GraphColumnWidths {
   return next;
 }
 
-function loadColumns(): GraphColumns {
+export function loadColumns(): GraphColumns {
   const next = { ...DEFAULT_COLUMNS };
   try {
     const saved = JSON.parse(localStorage.getItem(COLS_KEY) ?? "{}");
@@ -157,7 +157,7 @@ function loadColumns(): GraphColumns {
   return next;
 }
 
-function loadPaths(key: string): string[] {
+export function loadPaths(key: string): string[] {
   try {
     const v = JSON.parse(localStorage.getItem(key) ?? "[]");
     return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
@@ -175,13 +175,13 @@ function sameJson(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-function hasChanges(status: StatusData | null): boolean {
+export function hasChanges(status: StatusData | null): boolean {
   if (!status) return false;
   return status.staged.length + status.unstaged.length + status.conflicts.length > 0;
 }
 
 /** 再読込後も同じファイルを選び続けるため、新しい status から対象を引き直す。 */
-function resolveWipTarget(
+export function resolveWipTarget(
   status: StatusData | null,
   path: string,
   prefer: DiffSource,
