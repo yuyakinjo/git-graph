@@ -21,7 +21,7 @@ import { useMenu } from "./ui-context";
 const COL_REFS = "flex flex-none items-center justify-start overflow-hidden pr-1 pl-1.5";
 const COL_MSG = "flex min-w-0 flex-auto items-center gap-[5px] overflow-hidden pl-1.5";
 const COL_AUTHOR = "flex flex-none items-center gap-1.5 overflow-hidden text-[12px] text-fg-dim";
-const COL_SHA = "flex-none overflow-hidden text-fg-faint";
+const COL_SHA = "flex-none overflow-hidden px-1.5 text-ellipsis whitespace-nowrap text-fg-faint";
 const COL_DATE = "flex-none overflow-hidden text-right text-[11.5px] text-fg-dim";
 
 /** 列見出しの行。行と同じ列構成・同じ幅を使って位置を揃える */
@@ -471,6 +471,8 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewH, setViewH] = useState(600);
+  /** 本体側の縦スクロールバーの幅。見出しにも同じだけ右余白を足して列位置を揃える */
+  const [gutter, setGutter] = useState(0);
   const [query, setQuery] = useState("");
   const loadMoreGraph = s.loadMoreGraph;
 
@@ -553,8 +555,12 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
   const attachScroll = useCallback((el: HTMLDivElement | null) => {
     scrollRef.current = el;
     if (!el) return;
-    setViewH(el.clientHeight);
-    const ro = new ResizeObserver(() => setViewH(el.clientHeight));
+    const measure = () => {
+      setViewH(el.clientHeight);
+      setGutter(el.offsetWidth - el.clientWidth);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => {
       ro.disconnect();
@@ -904,7 +910,10 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
           HEADへ
         </button>
       </div>
-      <div className={HEADER_ROW}>
+      <div
+        className={HEADER_ROW}
+        style={gutter ? { paddingRight: `calc(0.625rem + ${gutter}px)` } : undefined}
+      >
         {HEADER_CELLS.map((h) => {
           if (!cols[h.key]) return null;
           const width = h.col === "graph" ? graphW : h.col ? w[h.col] : undefined;
