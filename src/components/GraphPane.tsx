@@ -997,11 +997,11 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
                 <circle
                   cx={cx(headRow >= 0 ? commits[headRow].column : 0)}
                   cy={cy(0)}
-                  r={isRailway ? RAILWAY_NODE_R : 4.5}
+                  r={showNodeAvatar ? AVATAR_R : isRailway ? RAILWAY_NODE_R : 4.5}
                   fill="var(--color-bg-1)"
                   stroke={laneColor(headRow >= 0 ? commits[headRow].column : 0)}
                   strokeWidth="1.8"
-                  strokeDasharray="2.5 2"
+                  strokeDasharray={showNodeAvatar ? "3.5 2.5" : "2.5 2"}
                 />
               ) : null}
               {commits
