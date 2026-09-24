@@ -86,13 +86,16 @@ function Section({
         <Icon name={open ? "chevronDown" : "chevronRight"} size={12} />
         <Icon name={icon} size={13} />
         <span className="flex-1 overflow-hidden text-ellipsis">{title}</span>
+        {action ? (
+          <span
+            className="flex opacity-0 group-hover:opacity-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {action}
+          </span>
+        ) : null}
+        {/* 件数は常に右端に置き、アクションの有無で位置がずれないようにする */}
         {count !== undefined ? <span className="text-[10px] text-fg-faint">{count}</span> : null}
-        <span
-          className="flex opacity-0 group-hover:opacity-100"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {action}
-        </span>
       </header>
       {open ? <div className="min-h-0 overflow-y-auto pb-1.5">{children}</div> : null}
     </section>

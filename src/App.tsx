@@ -137,22 +137,22 @@ const TOAST_ICON: Record<string, string> = {
 function Toasts() {
   const s = useStore();
   return (
-    <div className="fixed right-3.5 bottom-8.5 z-90 flex max-w-105 flex-col gap-2">
+    <div className="fixed right-4 bottom-9 z-90 flex max-w-130 flex-col gap-2.5">
       {s.toasts.map((t) => (
         <div
           key={t.id}
-          className={`flex animate-toast-in cursor-pointer gap-2.25 rounded-lg border border-pop-line border-l-[3px] bg-pop px-3 py-2.5 shadow-[0_12px_30px_rgba(0,0,0,0.45)] ${TOAST_EDGE[t.kind] ?? TOAST_EDGE.info}`}
+          className={`flex min-w-80 animate-toast-in cursor-pointer gap-3 rounded-lg border border-pop-line border-l-4 bg-pop px-4 py-3.5 shadow-[0_12px_30px_rgba(0,0,0,0.45)] ${TOAST_EDGE[t.kind] ?? TOAST_EDGE.info}`}
           onClick={() => s.dismissToast(t.id)}
         >
           <Icon
             name={t.kind === "error" ? "x" : t.kind === "success" ? "check" : "commit"}
-            size={14}
-            className={TOAST_ICON[t.kind] ?? TOAST_ICON.info}
+            size={18}
+            className={`mt-px flex-none ${TOAST_ICON[t.kind] ?? TOAST_ICON.info}`}
           />
-          <div>
-            <strong className="text-[12.5px] font-[650]">{t.title}</strong>
+          <div className="min-w-0">
+            <strong className="text-[14px] font-[650]">{t.title}</strong>
             {t.detail ? (
-              <pre className="mx-0 mt-1 mb-0 max-h-40 overflow-auto font-mono text-[11px] wrap-break-word whitespace-pre-wrap text-fg-dim">
+              <pre className="mx-0 mt-1.5 mb-0 max-h-60 overflow-auto font-mono text-[12.5px] wrap-break-word whitespace-pre-wrap text-fg-dim">
                 {t.detail}
               </pre>
             ) : null}
