@@ -9,7 +9,7 @@
  */
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 
-const ZOOM_KEY = "gitgraph.zoom";
+const ZOOM_KEY = "gitsquid.zoom";
 export const ZOOM_STEP = 0.05;
 export const ZOOM_MIN = 0.5;
 export const ZOOM_MAX = 2;

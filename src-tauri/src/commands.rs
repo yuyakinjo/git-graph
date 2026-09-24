@@ -454,7 +454,7 @@ pub fn gh_pr_template(dir: String) -> Result<Option<String>, String> {
     Ok(github::pr_template(&dir))
 }
 
-/// アバターキャッシュの置き場 (~/Library/Caches/dev.gitgraph.app/avatars.json など)
+/// アバターキャッシュの置き場 (~/Library/Caches/dev.gitsquid.app/avatars.json など)
 fn avatar_cache_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let dir = app
         .path()
@@ -706,14 +706,14 @@ pub fn claude_generate(
     Err(out.message())
 }
 
-/// 起動時に開くリポジトリ: コマンドライン引数 → GIT_GRAPH_REPO → カレントディレクトリ
+/// 起動時に開くリポジトリ: コマンドライン引数 → GIT_SQUID_REPO → カレントディレクトリ
 #[tauri::command]
 pub fn initial_repo() -> Option<String> {
     let arg = std::env::args()
         .skip(1)
         .find(|a| !a.starts_with('-') && std::path::Path::new(a).is_dir());
     let candidate = arg
-        .or_else(|| std::env::var("GIT_GRAPH_REPO").ok())
+        .or_else(|| std::env::var("GIT_SQUID_REPO").ok())
         .or_else(|| {
             std::env::current_dir()
                 .ok()

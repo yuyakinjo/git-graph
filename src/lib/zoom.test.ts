@@ -26,9 +26,9 @@ describe("loadZoom / saveZoom", () => {
   });
 
   test("壊れた値・範囲外の値は補正する", () => {
-    localStorage.setItem("gitgraph.zoom", "abc");
+    localStorage.setItem("gitsquid.zoom", "abc");
     expect(loadZoom()).toBe(1);
-    localStorage.setItem("gitgraph.zoom", "10");
+    localStorage.setItem("gitsquid.zoom", "10");
     expect(loadZoom()).toBe(2);
   });
 });

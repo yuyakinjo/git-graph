@@ -59,22 +59,22 @@ export interface DiffState {
   loading: boolean;
 }
 
-const RECENT_KEY = "gitgraph.recent";
-const TABS_KEY = "gitgraph.tabs";
-const AUTOFETCH_KEY = "gitgraph.autofetch";
+const RECENT_KEY = "gitsquid.recent";
+const TABS_KEY = "gitsquid.tabs";
+const AUTOFETCH_KEY = "gitsquid.autofetch";
 const AUTOFETCH_MS = 180_000;
 // 設定 (Cmd+,) で決めるプロジェクト置き場と、その探索の深さ
-const ROOTS_KEY = "gitgraph.projectRoots";
-const DEPTH_KEY = "gitgraph.scanDepth";
+const ROOTS_KEY = "gitsquid.projectRoots";
+const DEPTH_KEY = "gitsquid.scanDepth";
 const DEFAULT_DEPTH = 3;
 // グラフ一覧の列。表示順もこの並びに合わせる。
-const COLS_KEY = "gitgraph.graphColumns";
-const COL_W_KEY = "gitgraph.graphColumnWidths";
-const GRAPH_STYLE_KEY = "gitgraph.graphStyle";
+const COLS_KEY = "gitsquid.graphColumns";
+const COL_W_KEY = "gitsquid.graphColumnWidths";
+const GRAPH_STYLE_KEY = "gitsquid.graphStyle";
 // 差分ビューのシンタックスハイライトのテーマ
-const DIFF_THEME_KEY = "gitgraph.diffTheme";
+const DIFF_THEME_KEY = "gitsquid.diffTheme";
 // AI (Claude Code) によるコミットメッセージ生成のモデル
-const AI_CLI_MODEL_KEY = "gitgraph.aiClaudeCodeModel";
+const AI_CLI_MODEL_KEY = "gitsquid.aiClaudeCodeModel";
 export type GraphStyle = "default" | "japanese-railway";
 
 export const GRAPH_COLUMNS = [

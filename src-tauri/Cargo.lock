@@ -1340,7 +1340,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "git-graph"
+name = "git-squid"
 version = "0.1.0"
 dependencies = [
  "log",

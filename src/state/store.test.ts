@@ -39,20 +39,20 @@ describe("clampColumnWidth", () => {
 describe("loadColumnWidths", () => {
   test("未保存・壊れた JSON なら既定幅", () => {
     expect(loadColumnWidths()).toEqual(DEFAULT_COLUMN_WIDTHS);
-    localStorage.setItem("gitgraph.graphColumnWidths", "{broken");
+    localStorage.setItem("gitsquid.graphColumnWidths", "{broken");
     expect(loadColumnWidths()).toEqual(DEFAULT_COLUMN_WIDTHS);
   });
 
   test("保存値を範囲に収めて読み、数でない値は無視する", () => {
     localStorage.setItem(
-      "gitgraph.graphColumnWidths",
+      "gitsquid.graphColumnWidths",
       JSON.stringify({ refs: 5, sha: 100, author: "wide", date: null }),
     );
     expect(loadColumnWidths()).toEqual({ ...DEFAULT_COLUMN_WIDTHS, refs: 60, sha: 100 });
   });
 
   test("0 (自動) はグラフ列だけ認める", () => {
-    localStorage.setItem("gitgraph.graphColumnWidths", JSON.stringify({ graph: 0, sha: 0 }));
+    localStorage.setItem("gitsquid.graphColumnWidths", JSON.stringify({ graph: 0, sha: 0 }));
     const w = loadColumnWidths();
     expect(w.graph).toBe(0);
     expect(w.sha).toBe(48);
@@ -71,7 +71,7 @@ describe("loadColumns", () => {
 
   test("保存された真偽値だけを上書きする", () => {
     localStorage.setItem(
-      "gitgraph.graphColumns",
+      "gitsquid.graphColumns",
       JSON.stringify({ sha: true, graph: "no", unknown: true }),
     );
     const cols = loadColumns();

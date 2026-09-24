@@ -12,7 +12,7 @@ test.describe("起動", () => {
       const { page, repo } = app;
       app.stub("plugin:dialog|open", () => repo.dir);
 
-      await expect(page.getByRole("heading", { name: "Git Graph" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "GitSquid" })).toBeVisible();
       // タイトルバーにも同名のアイコンボタンがあるので、文字の出ている方を押す
       await page
         .getByRole("button", { name: "リポジトリを開く" })

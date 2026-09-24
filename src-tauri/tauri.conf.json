@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "git-graph",
+  "productName": "GitSquid",
   "version": "0.1.0",
-  "identifier": "dev.gitgraph.app",
+  "identifier": "dev.gitsquid.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Git Graph",
+        "title": "GitSquid",
         "width": 1480,
         "height": 920,
         "minWidth": 960,

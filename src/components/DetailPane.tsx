@@ -87,7 +87,7 @@ function FileRow({
 
 // ------------------------------------------------------------------ WIP (add / commit)
 
-const STAGED_KEY = "gitgraph.stagedH";
+const STAGED_KEY = "gitsquid.stagedH";
 
 /**
  * 「ステージ済み」セクションの高さ。App.tsx の usePaneWidth と同じくポインタキャプチャで追従し、

@@ -19,7 +19,7 @@ import type {
 export const GRAPH_LIMIT = 200;
 /** 追加読み込み 1 回分の件数 */
 export const GRAPH_PAGE = 200;
-export const LAST_KEY = "gitgraph.last";
+export const LAST_KEY = "gitsquid.last";
 
 /** リポジトリ 1 つ分の読み取り結果。store の state はこれをそのまま反映する。 */
 export interface RepoSnapshot {

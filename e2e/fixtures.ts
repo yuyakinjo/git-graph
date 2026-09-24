@@ -71,7 +71,7 @@ export class TestRepo {
   constructor() {
     // macOS の /var → /private/var のようなシンボリックリンクを解決しておく
     // (アプリ側は git rev-parse --show-toplevel の実パスで扱うため)
-    this.#root = realpathSync(mkdtempSync(join(tmpdir(), "git-graph-e2e-")));
+    this.#root = realpathSync(mkdtempSync(join(tmpdir(), "git-squid-e2e-")));
     this.origin = join(this.#root, "origin.git");
     this.dir = join(this.#root, "work");
     execFileSync("git", ["clone", "-q", "--bare", MIRROR_DIR, this.origin]);
@@ -209,7 +209,7 @@ export const test = base.extend<Options & { repo: TestRepo; app: App }, { bridge
         };
         // 起動時に開くリポジトリ (bootApp が最初に見る)
         if (path && !sessionStorage.getItem("e2e.booted")) {
-          localStorage.setItem("gitgraph.last", path);
+          localStorage.setItem("gitsquid.last", path);
           sessionStorage.setItem("e2e.booted", "1");
         }
       },

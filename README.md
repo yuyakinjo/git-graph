@@ -1,4 +1,4 @@
-# git-graph
+# GitSquid
 
 GitKraken 風のコミットグラフを持つ、シンプルな Git GUI (Tauri v2 + React)。
 「よく使う 8 つの操作」だけに機能を絞り、GitHub 連携は `gh` CLI に委譲しています。
@@ -26,7 +26,7 @@ GitKraken 風のコミットグラフを持つ、シンプルな Git GUI (Tauri 
 ```sh
 bun install
 bun run tauri dev          # 起動時はカレント or 最後に開いたリポジトリを復元
-GIT_GRAPH_REPO=/path/to/repo bun run tauri dev
+GIT_SQUID_REPO=/path/to/repo bun run tauri dev
 ```
 
 ## E2E テスト (Playwright)

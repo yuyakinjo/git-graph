@@ -17,8 +17,8 @@ import { ZOOM_STEP, zoomKeyAction } from "./lib/zoom";
 import { useActions } from "./state/actions";
 import { useStore } from "./state/store";
 
-const SIDEBAR_KEY = "gitgraph.sidebarW";
-const DETAIL_KEY = "gitgraph.detailW";
+const SIDEBAR_KEY = "gitsquid.sidebarW";
+const DETAIL_KEY = "gitsquid.detailW";
 
 /**
  * スプリッタの幅。ポインタキャプチャを使うので window 購読は不要で、
@@ -67,7 +67,7 @@ function Welcome() {
   return (
     <div className="flex flex-1 items-center justify-center bg-[radial-gradient(circle_at_30%_10%,#1d2735_0%,var(--color-bg-1)_60%)]">
       <div className="w-120 max-w-[88vw] text-center">
-        <h1 className="mx-0 mt-0 mb-1.5 text-[26px] tracking-[-0.01em]">Git Graph</h1>
+        <h1 className="mx-0 mt-0 mb-1.5 text-[26px] tracking-[-0.01em]">GitSquid</h1>
         <p className="mx-0 mt-0 mb-5 text-fg-dim">
           シンプルな操作に絞った git GUI。GitHub 操作は gh CLI を使います。
         </p>

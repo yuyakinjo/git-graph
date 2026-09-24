@@ -33,7 +33,7 @@ const INDENT_BASE = 14;
 const INDENT_STEP = 11;
 const indent = (depth: number) => ({ paddingLeft: INDENT_BASE + depth * INDENT_STEP });
 
-const OPEN_KEY = "gitgraph.sections";
+const OPEN_KEY = "gitsquid.sections";
 /** 件数が多くなりがちなセクションは初期状態を閉じておく */
 const DEFAULT_CLOSED = new Set(["tag"]);
 
@@ -219,7 +219,7 @@ function BranchItem({ b, label, depth = 0 }: { b: BranchInfo; label?: string; de
   );
 }
 
-const FOLDER_KEY = "gitgraph.branchFolders";
+const FOLDER_KEY = "gitsquid.branchFolders";
 
 /** 閉じたフォルダだけを覚える (初期状態は全開き) */
 function useFolders() {
