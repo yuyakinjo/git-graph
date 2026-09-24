@@ -126,11 +126,14 @@ function RefBadge({
   onMenu,
   tracking,
   compact,
+  minNameWidth,
 }: {
   tracking?: RefDeco;
   deco: RefDeco;
   /** 幅が足りないときは名前を隠してアイコンだけにする (名前は title で見られる) */
   compact?: boolean;
+  /** 名前を … で縮めるとき、これより狭くしない (px) */
+  minNameWidth?: number;
   onCheckout: () => void;
   onMenu: (e: React.MouseEvent) => void;
 }) {
@@ -151,6 +154,7 @@ function RefBadge({
           ? REF_BADGE_IS_HEAD
           : (REF_BADGE_KIND[deco.kind] ?? REF_BADGE_KIND.commit)
       }`}
+      style={minNameWidth === undefined ? undefined : { minWidth: minNameWidth + REF_BADGE_FRAME }}
       title={tracking ? `${deco.full}\n${tracking.full}（同位置）` : deco.full}
       onDoubleClick={(e) => {
         e.stopPropagation();
@@ -177,12 +181,15 @@ function CommitRefs({
   refs,
   upstreams,
   compact,
+  fixed,
   onCheckout,
   onMenu,
 }: {
   refs: RefDeco[];
   upstreams: Map<string, string>;
   compact?: boolean;
+  /** 縮めずに名前を全部見せる (タグのほうを縮めるとき) */
+  fixed?: boolean;
   onCheckout: (d: RefDeco) => void;
   onMenu: (d: RefDeco) => (e: React.MouseEvent) => void;
 }) {
@@ -190,7 +197,9 @@ function CommitRefs({
   const { primary, tracking, others } = groupRefs(refs, upstreams);
   if (!primary) return null;
   return (
-    <div className="relative flex min-w-0 max-w-full shrink items-center gap-1">
+    <div
+      className={`relative flex min-w-0 max-w-full items-center gap-1 ${fixed ? "flex-none" : "shrink"}`}
+    >
       <RefBadge
         deco={primary}
         tracking={tracking}
@@ -282,7 +291,8 @@ function TagChip({
 
 /**
  * ブランチ列の中身。ブランチの右にタグを並べる。
- * 収まらない行では、まずタグをアイコンにまとめ、それでも足りなければブランチもアイコンだけにする。
+ * 収まらない行では、まずタグ名を … で縮め、次にタグをアイコンにまとめ、
+ * さらにブランチ名を … で縮め、それでも足りなければブランチもアイコンだけにする。
  */
 function RefsCell({
   refs,
@@ -308,12 +318,19 @@ function RefsCell({
         refs={branches}
         upstreams={upstreams}
         compact={fit === "icons"}
+        fixed={fit === "tagsShort"}
         onCheckout={onCheckout}
         onMenu={onMenu}
       />
-      {tags.length === 0 ? null : fit === "full" ? (
+      {tags.length === 0 ? null : fit === "full" || fit === "tagsShort" ? (
         tags.map((d) => (
-          <RefBadge key={d.full} deco={d} onCheckout={() => onCheckout(d)} onMenu={onMenu(d)} />
+          <RefBadge
+            key={d.full}
+            deco={d}
+            minNameWidth={fit === "tagsShort" ? nameWidths(d.name).min : undefined}
+            onCheckout={() => onCheckout(d)}
+            onMenu={onMenu(d)}
+          />
         ))
       ) : (
         <TagChip tags={tags} columnWidth={width} onCheckout={onCheckout} onMenu={onMenu} />
@@ -362,6 +379,8 @@ function ColumnMenu() {
 const MONO_FONT = "ui-monospace, SFMono-Regular, Menlo, monospace";
 /** バッジの枠・アイコン・余白ぶん。見出しのダブルクリックで幅を測るときに足す */
 const REF_BADGE_CHROME = 34;
+/** バッジの名前以外の実寸 (枠・左右余白・アイコン・隙間)。名前を縮めるときの最小幅に足す */
+const REF_BADGE_FRAME = 28;
 /** セルの左右余白 + 少しの余裕 */
 const FIT_PAD = 14;
 /** ブランチ列の左右余白 (pl-1.5 + pr-1) */
@@ -372,6 +391,8 @@ const REFS_GAP = 4;
 const TRACKING_ICON_W = 14;
 /** まとめたタグのチップ (枠・余白・アイコン)。件数の文字幅は別に足す */
 const TAG_CHIP_W = 22;
+/** ブランチ名・タグ名を … で縮めるとき、最低限見せる先頭の文字数。これも入らなければアイコンにする */
+const MIN_NAME_CHARS = 4;
 
 let measureCtx: CanvasRenderingContext2D | null = null;
 /** canvas で文字幅を測る。DOM を作らずに済むので行数が多くても軽い */
@@ -387,10 +408,19 @@ function uiFont(size: number, weight = 400): string {
   return `${weight} ${size}px ${family}`;
 }
 
+/** バッジの名前の幅。min は先頭の数文字 + … に縮めたときの幅 (短い名前はそのまま) */
+function nameWidths(name: string): { full: number; min: number } {
+  const font = uiFont(11, 600);
+  const full = textWidth(name, font);
+  return { full, min: Math.min(full, textWidth(`${name.slice(0, MIN_NAME_CHARS)}…`, font)) };
+}
+
 /**
- * ブランチ列の 1 行をどこまで縮めれば収まるか。
+ * ブランチ列の 1 行をどこまで縮めれば収まるか。名前は CSS で … に縮むので、
+ * 先頭の数文字が見えるうちはアイコンにしない。
  * - full: ブランチもタグも名前付き
- * - tags: タグだけアイコンにまとめる
+ * - tagsShort: ブランチ名はそのままで、タグ名を … で縮める
+ * - tags: タグをアイコンにまとめ、ブランチ名は足りなければ … で縮める
  * - icons: ブランチもアイコンだけにする (これでも足りなければはみ出たぶんは切れる)
  */
 function refsFit(
@@ -398,24 +428,32 @@ function refsFit(
   tags: RefDeco[],
   upstreams: Map<string, string>,
   avail: number,
-): "full" | "tags" | "icons" {
-  const font = uiFont(11, 600);
-  const badge = (d: RefDeco) => textWidth(d.name, font) + REF_BADGE_CHROME;
+): "full" | "tagsShort" | "tags" | "icons" {
   const { primary, tracking, others } = groupRefs(branches, upstreams);
   let branchFull = 0;
+  let branchMin = 0;
   if (primary) {
     let extra = tracking ? TRACKING_ICON_W : 0;
     if (others.length) extra += REFS_GAP + textWidth(`+${others.length}`, uiFont(11)) + 8;
-    branchFull = badge(primary) + extra;
+    const name = nameWidths(primary.name);
+    branchFull = name.full + REF_BADGE_CHROME + extra;
+    branchMin = name.min + REF_BADGE_CHROME + extra;
   }
   let tagsFull = 0;
-  for (const t of tags) tagsFull += (tagsFull ? REFS_GAP : 0) + badge(t);
+  let tagsMin = 0;
+  for (const t of tags) {
+    const name = nameWidths(t.name);
+    const gap = tagsFull ? REFS_GAP : 0;
+    tagsFull += gap + name.full + REF_BADGE_CHROME;
+    tagsMin += gap + name.min + REF_BADGE_CHROME;
+  }
   const tagsChip = tags.length
     ? TAG_CHIP_W + (tags.length > 1 ? textWidth(String(tags.length), uiFont(10, 700)) + 2 : 0)
     : 0;
   const gap = primary && tags.length ? REFS_GAP : 0;
   if (branchFull + gap + tagsFull <= avail) return "full";
-  if (branchFull + gap + tagsChip <= avail) return "tags";
+  if (branchFull + gap + tagsMin <= avail) return "tagsShort";
+  if (branchMin + gap + tagsChip <= avail) return "tags";
   return "icons";
 }
 
