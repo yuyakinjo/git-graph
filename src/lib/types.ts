@@ -212,3 +212,13 @@ export interface CommitContext {
   recentSubjects: string[];
   previousMessage: string | null;
 }
+
+/** AI で PR のタイトルと本文を作るときに渡す、PR に含まれる変更 */
+export interface PrContext {
+  diff: string;
+  truncated: boolean;
+  /** PR に含まれるコミットのメッセージ (古い順) */
+  commits: string[];
+  /** リポジトリの PR テンプレート */
+  template: string | null;
+}

@@ -1,5 +1,6 @@
 use serde::Serialize;
 use serde_json::Value;
+use std::path::PathBuf;
 
 use crate::sh;
 
@@ -199,7 +200,14 @@ pub fn pr_template(dir: &str) -> Option<String> {
             return Some(text);
         }
     }
-    None
+    // 複数テンプレート形式 (.github/PULL_REQUEST_TEMPLATE/*.md) は名前順で先頭のものを使う
+    let mut files: Vec<PathBuf> = std::fs::read_dir(format!("{dir}/.github/PULL_REQUEST_TEMPLATE"))
+        .ok()?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case("md")))
+        .collect();
+    files.sort();
+    files.first().and_then(|p| std::fs::read_to_string(p).ok())
 }
 
 /// リポジトリの作成先に選べるアカウント (自分のログイン + 所属 org)。

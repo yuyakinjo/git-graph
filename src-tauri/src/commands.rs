@@ -562,14 +562,7 @@ pub fn commit_context(dir: String, amend: bool) -> Result<CommitContext, String>
         }
     }
 
-    let truncated = diff.len() > COMMIT_DIFF_LIMIT;
-    if truncated {
-        let mut cut = COMMIT_DIFF_LIMIT;
-        while !diff.is_char_boundary(cut) {
-            cut -= 1;
-        }
-        diff.truncate(cut);
-    }
+    let truncated = truncate_diff(&mut diff);
 
     let recent_subjects = if has_head {
         sh::git(&dir, &["log", "-15", "--format=%s"])
@@ -591,6 +584,72 @@ pub fn commit_context(dir: String, amend: bool) -> Result<CommitContext, String>
         truncated,
         recent_subjects,
         previous_message,
+    })
+}
+
+/// 差分を COMMIT_DIFF_LIMIT で打ち切る。打ち切ったら true。
+fn truncate_diff(diff: &mut String) -> bool {
+    if diff.len() <= COMMIT_DIFF_LIMIT {
+        return false;
+    }
+    let mut cut = COMMIT_DIFF_LIMIT;
+    while !diff.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    diff.truncate(cut);
+    true
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrContext {
+    /// base との分岐点から head までの差分
+    diff: String,
+    /// 差分を COMMIT_DIFF_LIMIT で打ち切ったか
+    truncated: bool,
+    /// PR に含まれるコミットのメッセージ (古い順)
+    commits: Vec<String>,
+    /// リポジトリの PR テンプレート
+    template: Option<String>,
+}
+
+/// PR の説明文生成用に、base から head までの変更を集める。
+/// base はリモート追跡ブランチ (origin/main など) があればそちらを優先する。
+#[tauri::command]
+pub fn pr_context(dir: String, remote: String, base: String, head: String) -> Result<PrContext, String> {
+    let remote_base = format!("{remote}/{base}");
+    let base_ref = [remote_base.as_str(), base.as_str()]
+        .into_iter()
+        .find(|r| sh::git(&dir, &["rev-parse", "--verify", "-q", r]).is_ok())
+        .ok_or_else(|| format!("マージ先のブランチ {base} が見つかりません"))?
+        .to_string();
+
+    let range = format!("{base_ref}...{head}");
+    let mut diff = sh::git(&dir, &["diff", "--no-color", "--no-ext-diff", "-M", &range])?;
+    let truncated = truncate_diff(&mut diff);
+
+    let log_range = format!("{base_ref}..{head}");
+    let commits = sh::git(
+        &dir,
+        &[
+            "log",
+            "--reverse",
+            "--no-merges",
+            "--format=%B%x00",
+            &log_range,
+        ],
+    )
+    .unwrap_or_default()
+    .split('\0')
+    .map(|m| m.trim().to_string())
+    .filter(|m| !m.is_empty())
+    .collect();
+
+    Ok(PrContext {
+        diff,
+        truncated,
+        commits,
+        template: github::pr_template(&dir),
     })
 }
 

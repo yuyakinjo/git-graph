@@ -93,6 +93,7 @@ pub fn run() {
             commands::home_dir,
             commands::last_commit_message,
             commands::commit_context,
+            commands::pr_context,
             commands::claude_generate,
             commands::initial_repo,
         ])

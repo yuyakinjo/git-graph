@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   BranchInfo,
   CommitContext,
+  PrContext,
   CommitDetail,
   DiffFile,
   GhStatus,
@@ -36,6 +37,8 @@ export const api = {
   /** 次のコミットに入る差分 (AI のコミットメッセージ生成用) */
   commitContext: (dir: string, amend: boolean) =>
     invoke<CommitContext>("commit_context", { dir, amend }),
+  prContext: (dir: string, p: { remote: string; base: string; head: string }) =>
+    invoke<PrContext>("pr_context", { dir, ...p }),
   scanRepos: (roots: string[], depth: number) =>
     invoke<ProjectEntry[]>("scan_repos", { roots, depth }),
   homeDir: () => invoke<string>("home_dir"),

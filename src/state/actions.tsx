@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
+import { generatePrDescription } from "../lib/ai";
 import { api } from "../lib/api";
 import { useDialogs } from "../components/ui-context";
 import { useStore } from "./store";
@@ -565,6 +566,34 @@ export function useActions() {
         title: "プルリクエストを作成",
         description: `${s.gh.repo ?? ""} — ${head.name} → ${s.gh.defaultBranch ?? "base"}`,
         width: 640,
+        action: {
+          label: "AI で生成",
+          busyLabel: "生成中…",
+          icon: "sparkle",
+          title: template
+            ? "PR テンプレートに沿って、差分から Claude Code でタイトルと本文を生成"
+            : "差分とコミットから Claude Code でタイトルと本文を生成",
+          run: async (values) => {
+            try {
+              const ctx = await api.prContext(dir, {
+                remote: s.repo?.remotes[0] ?? "origin",
+                base: String(values.base || s.gh?.defaultBranch || ""),
+                head: head.name,
+              });
+              if (!ctx.diff.trim()) {
+                s.toast({ kind: "info", title: "マージ先との差分がありません" });
+                return;
+              }
+              return await generatePrDescription(s.aiCliModel, ctx);
+            } catch (e) {
+              s.toast({
+                kind: "error",
+                title: "PR の説明を生成できませんでした",
+                detail: String(e),
+              });
+            }
+          },
+        },
         fields: [
           { name: "title", label: "タイトル", type: "text", required: true, value: defaultTitle },
           { name: "body", label: "本文", type: "textarea", rows: 10, value: defaultBody },

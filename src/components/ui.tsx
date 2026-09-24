@@ -346,10 +346,20 @@ export interface FormField {
   rows?: number;
 }
 
+/** フッター左に置く補助ボタン。返した値で入力欄を上書きする (AI 生成など) */
+export interface FormAction {
+  label: string;
+  busyLabel?: string;
+  icon?: string;
+  title?: string;
+  run: (values: FormResult) => Promise<Partial<FormResult> | void>;
+}
+
 export interface FormSpec {
   title: string;
   description?: ReactNode;
   fields: FormField[];
+  action?: FormAction;
   submitLabel?: string;
   danger?: boolean;
   width?: number;
@@ -379,10 +389,23 @@ function FormDialog({
   const missing = spec.fields.some(
     (f) => f.required && f.type !== "checkbox" && !String(values[f.name] ?? "").trim(),
   );
+  const action = spec.action;
+  const [actionBusy, setActionBusy] = useState(false);
 
   const submit = () => {
-    if (missing) return;
+    if (missing || actionBusy) return;
     resolve(values);
+  };
+
+  const runAction = async (action: FormAction) => {
+    if (actionBusy) return;
+    setActionBusy(true);
+    try {
+      const patch = await action.run(values);
+      if (patch) setValues((v) => ({ ...v, ...(patch as FormResult) }));
+    } finally {
+      setActionBusy(false);
+    }
   };
 
   const pickDir = async (name: string) => {
@@ -397,12 +420,30 @@ function FormDialog({
       onClose={() => resolve(null)}
       footer={
         <>
+          {action ? (
+            <>
+              <button
+                className={btn("ghost")}
+                title={action.title}
+                disabled={actionBusy}
+                onClick={() => void runAction(action)}
+              >
+                {actionBusy ? (
+                  <Spinner />
+                ) : action.icon ? (
+                  <Icon name={action.icon} size={14} />
+                ) : null}
+                {actionBusy ? (action.busyLabel ?? action.label) : action.label}
+              </button>
+              <span className="flex-1" />
+            </>
+          ) : null}
           <button className={btn("ghost")} onClick={() => resolve(null)}>
             キャンセル
           </button>
           <button
             className={btn(spec.danger ? "danger" : "primary")}
-            disabled={missing}
+            disabled={missing || actionBusy}
             onClick={submit}
           >
             {spec.submitLabel ?? "OK"}
