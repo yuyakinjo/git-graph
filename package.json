@@ -11,7 +11,9 @@
     "format:check": "oxfmt --check .",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "bun test"
+    "test": "bun test",
+    "e2e": "bun run e2e:bridge && playwright test",
+    "e2e:bridge": "cargo build --manifest-path src-tauri/Cargo.toml --features e2e --bin e2e-bridge"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
@@ -22,6 +24,7 @@
     "shiki": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.3",
     "@tauri-apps/cli": "^2.11.4",
     "@types/bun": "^1.4.2",

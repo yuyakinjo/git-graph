@@ -1,5 +1,6 @@
 mod avatar;
-mod commands;
+// E2E ブリッジ (src/bin/e2e-bridge.rs) から直接呼ぶので公開している
+pub mod commands;
 mod github;
 mod graph;
 mod repo;

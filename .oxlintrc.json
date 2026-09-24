@@ -3,7 +3,12 @@
   "plugins": ["react", "typescript", "oxc"],
   "rules": {
     "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }],
+    "react/only-export-components": [
+      "warn",
+      {
+        "allowConstantExport": true
+      }
+    ],
     "no-restricted-imports": [
       "error",
       {
@@ -29,6 +34,13 @@
       "files": ["src/state/store.tsx"],
       "rules": {
         "react/refs": "off"
+      }
+    },
+    {
+      "files": ["e2e/**"],
+      "rules": {
+        "react/rules-of-hooks": "off",
+        "no-empty-pattern": "off"
       }
     }
   ]

@@ -5,14 +5,7 @@ import { useActions } from "../state/actions";
 import type { FileTarget } from "../state/store";
 import { useStore } from "../state/store";
 import { DiffView } from "./DiffView";
-import {
-  FSTATUS_COLOR,
-  btn,
-  fstatAdd,
-  fstatDel,
-  fstats,
-  iconBtn,
-} from "./classes";
+import { FSTATUS_COLOR, btn, fstatAdd, fstatDel, fstats, iconBtn } from "./classes";
 import { Icon } from "./ui";
 
 interface Entry {
@@ -29,8 +22,7 @@ const GROUP_LABEL = { unstaged: "変更", staged: "ステージ済み" } as cons
 const GROUP_HEAD =
   "sticky top-0 z-1 flex h-6 items-center border-b border-line-soft bg-bg-1 px-2.5 text-[11px] font-semibold text-fg-dim";
 
-const ROW_BASE =
-  "flex h-6 w-full cursor-default items-center gap-[7px] px-2.5 text-[12px]";
+const ROW_BASE = "flex h-6 w-full cursor-default items-center gap-[7px] px-2.5 text-[12px]";
 const ROW_SELECTED = `${ROW_BASE} bg-accent-soft shadow-[inset_2px_0_0_var(--color-accent)]`;
 const ROW_PLAIN = `${ROW_BASE} hover:bg-bg-hover`;
 
@@ -51,9 +43,7 @@ function useEntries(): Entry[] {
         })),
         ...status.unstaged.map((f) => ({
           target: {
-            source: f.untracked
-              ? ("untracked" as const)
-              : ("unstaged" as const),
+            source: f.untracked ? ("untracked" as const) : ("unstaged" as const),
             path: f.path,
           },
           status: f.untracked ? "?" : f.workStatus,
@@ -94,9 +84,7 @@ export function DiffModal() {
   const entries = useEntries();
   const cur = s.file;
   const index = cur
-    ? entries.findIndex(
-        (e) => e.target.source === cur.source && e.target.path === cur.path,
-      )
+    ? entries.findIndex((e) => e.target.source === cur.source && e.target.path === cur.path)
     : -1;
 
   const close = () => s.setDiffModal(false);
@@ -105,9 +93,7 @@ export function DiffModal() {
   // 実行後は refresh がこのパスを新しい source で選び直すので、選択はそのまま残る。
   const staged = cur?.source === "staged";
   const canStage =
-    cur?.source === "staged" ||
-    cur?.source === "unstaged" ||
-    cur?.source === "untracked";
+    cur?.source === "staged" || cur?.source === "unstaged" || cur?.source === "untracked";
   const toggleStage = () => {
     if (!cur) return;
     void (staged ? act.unstage([cur.path]) : act.stage([cur.path]));
@@ -121,11 +107,7 @@ export function DiffModal() {
   };
 
   useWindowEvent("keydown", (e) => {
-    if (
-      e.target instanceof HTMLInputElement ||
-      e.target instanceof HTMLTextAreaElement
-    )
-      return;
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
     if (e.key === "Escape") {
       e.preventDefault();
       close();
@@ -176,9 +158,7 @@ export function DiffModal() {
           {canStage ? (
             <button
               className={btn(staged ? "default" : "primary", "tiny")}
-              title={
-                staged ? "このファイルをアンステージ" : "このファイルを git add"
-              }
+              title={staged ? "このファイルをアンステージ" : "このファイルを git add"}
               disabled={!!s.busy}
               onClick={toggleStage}
             >
@@ -219,20 +199,13 @@ export function DiffModal() {
             {entries.map((e, i) => [
               e.group && e.group !== entries[i - 1]?.group ? (
                 <div key={`group:${e.group}`} className={GROUP_HEAD}>
-                  {GROUP_LABEL[e.group]} (
-                  {entries.filter((x) => x.group === e.group).length})
+                  {GROUP_LABEL[e.group]} ({entries.filter((x) => x.group === e.group).length})
                 </div>
               ) : null,
               <button
                 key={`${e.target.source}:${e.target.path}`}
-                className={
-                  index >= 0 && entries[index] === e ? ROW_SELECTED : ROW_PLAIN
-                }
-                title={
-                  e.origPath
-                    ? `${e.origPath} → ${e.target.path}`
-                    : e.target.path
-                }
+                className={index >= 0 && entries[index] === e ? ROW_SELECTED : ROW_PLAIN}
+                title={e.origPath ? `${e.origPath} → ${e.target.path}` : e.target.path}
                 onClick={() => void s.openFile(e.target)}
               >
                 <span

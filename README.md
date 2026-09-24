@@ -29,6 +29,23 @@ bun run tauri dev          # 起動時はカレント or 最後に開いたリ�
 GIT_GRAPH_REPO=/path/to/repo bun run tauri dev
 ```
 
+## E2E テスト (Playwright)
+
+Tauri の WebView は Playwright から操作できないため、フロントは vite の dev server を Chromium で開き、
+`invoke` を Rust のブリッジ (`src-tauri/src/bin/e2e-bridge.rs`) へ転送します。
+git 操作はアプリと同じ Rust のコマンドが実リポジトリに対して行います。
+
+- テスト用リポジトリは [git-chat-ui-test-repo](https://github.com/yuyakinjo/git-chat-ui-test-repo) を
+  `e2e/.cache` に bare でキャッシュし、テストごとに複製します (origin も複製なので push は GitHub に届きません)
+- `gh` / Claude Code / ファイルダイアログはスタブします (`e2e/fixtures.ts`)
+- GitHub Actions では `.github/workflows/e2e.yml` で実行します
+
+```sh
+bunx playwright install chromium   # 初回のみ
+bun run e2e                        # ブリッジをビルドしてテストを実行
+bunx playwright test --ui          # ブリッジをビルド済みなら直接 UI モードで
+```
+
 ## フォーマット・静的解析
 
 コード整形には [Oxfmt](https://oxc.rs/docs/guide/usage/formatter) を使用します。
