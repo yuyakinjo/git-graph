@@ -75,31 +75,6 @@ fn is_ancestor(dir: &str, a: &str, b: &str) -> bool {
     ok(dir, &["merge-base", "--is-ancestor", a, b])
 }
 
-/// origin/HEAD が指す既定ブランチ。取れなければ main / master の順に探す
-fn default_branch(dir: &str) -> String {
-    let r = text(
-        dir,
-        &["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
-    );
-    if let Some(name) = r.strip_prefix("origin/") {
-        return name.to_string();
-    }
-    for name in ["main", "master"] {
-        if ok(
-            dir,
-            &[
-                "rev-parse",
-                "--verify",
-                "--quiet",
-                &format!("refs/remotes/origin/{name}"),
-            ],
-        ) {
-            return name.to_string();
-        }
-    }
-    "main".to_string()
-}
-
 /// マージ済み PR を head ブランチ名ごとにまとめる (gh は 1 回だけ呼ぶ)
 fn merged_prs(dir: &str) -> Result<HashMap<String, Vec<MergedPr>>, String> {
     let raw = sh::gh(
@@ -147,7 +122,7 @@ pub fn plan(dir: &str, fetch: bool) -> Result<TidyPlan, String> {
     if fetch && ok(dir, &["remote", "get-url", "origin"]) {
         sh::git_log(dir, &["fetch", "--prune", "--quiet", "origin"])?;
     }
-    let main = default_branch(dir);
+    let main = repo::default_branch(dir);
     let upstream = format!("origin/{main}");
     let has_upstream = ok(dir, &["rev-parse", "--verify", "--quiet", &upstream]);
 
@@ -382,7 +357,7 @@ fn delete_branch(dir: &str, op: &TidyOp) -> Result<String, String> {
 /// 早送り → worktree の削除 → prune → ブランチ削除 の順に実行する。
 /// worktree を消してからでないと、そこでチェックアウト中のブランチは消せない。
 pub fn apply(dir: &str, ops: Vec<TidyOp>) -> Result<Vec<TidyResult>, String> {
-    let upstream = format!("origin/{}", default_branch(dir));
+    let upstream = format!("origin/{}", repo::default_branch(dir));
     let trees = repo::worktree_list(dir)?;
     let by_kind = |k: &'static str| ops.iter().filter(move |o| o.kind == k);
     let mut out = vec![];

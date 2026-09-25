@@ -16,7 +16,40 @@ pub struct RepoInfo {
     pub detached: bool,
     pub remotes: Vec<String>,
     pub is_linked_worktree: bool,
+    /// origin/HEAD が指す既定ブランチ (取れなければ main / master)
+    pub default_branch: String,
     pub state: String, // clean | merging | rebasing | cherry-picking | reverting | bisecting
+}
+
+/// origin/HEAD が指す既定ブランチ。取れなければ main / master の順に探す
+pub fn default_branch(dir: &str) -> String {
+    let r = sh::git(
+        dir,
+        &["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+    )
+    .unwrap_or_default();
+    if let Some(name) = r.trim().strip_prefix("origin/") {
+        return name.to_string();
+    }
+    // リモートが無いリポジトリでもローカルの main / master を既定とみなす
+    for prefix in ["refs/remotes/origin", "refs/heads"] {
+        for name in ["main", "master"] {
+            let exists = sh::git(
+                dir,
+                &[
+                    "rev-parse",
+                    "--verify",
+                    "--quiet",
+                    &format!("{prefix}/{name}"),
+                ],
+            )
+            .is_ok();
+            if exists {
+                return name.to_string();
+            }
+        }
+    }
+    "main".to_string()
 }
 
 pub fn info(path: &str) -> Result<RepoInfo, String> {
@@ -83,12 +116,9 @@ pub fn info(path: &str) -> Result<RepoInfo, String> {
         "clean"
     };
 
-    let name = root
-        .rsplit('/')
-        .next()
-        .unwrap_or("repository")
-        .to_string();
+    let name = root.rsplit('/').next().unwrap_or("repository").to_string();
 
+    let default_branch = default_branch(&root);
     Ok(RepoInfo {
         root,
         name,
@@ -97,6 +127,7 @@ pub fn info(path: &str) -> Result<RepoInfo, String> {
         detached,
         remotes,
         is_linked_worktree,
+        default_branch,
         state: state.to_string(),
     })
 }
@@ -182,7 +213,12 @@ pub fn scan(roots: &[String], depth: usize) -> Vec<ProjectEntry> {
         }
     }
 
-    out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()).then(a.path.cmp(&b.path)));
+    out.sort_by(|a, b| {
+        a.name
+            .to_lowercase()
+            .cmp(&b.name.to_lowercase())
+            .then(a.path.cmp(&b.path))
+    });
     out
 }
 
@@ -237,10 +273,7 @@ pub fn status(dir: &str) -> Result<StatusData, String> {
         }
         i += 1;
 
-        let is_conflict = matches!(
-            (x, y),
-            ('U', _) | (_, 'U') | ('A', 'A') | ('D', 'D')
-        );
+        let is_conflict = matches!((x, y), ('U', _) | (_, 'U') | ('A', 'A') | ('D', 'D'));
         let untracked = x == '?' && y == '?';
         let entry = FileEntry {
             path: path.clone(),
@@ -325,15 +358,7 @@ pub fn branches(dir: &str) -> Result<Vec<BranchInfo>, String> {
         "--format=%(refname){F}%(refname:short){F}%(objectname){F}%(upstream:short){F}%(upstream:track){F}%(HEAD){F}%(committerdate:unix){F}%(worktreepath){F}%(contents:subject)",
         F = "%1f"
     );
-    let raw = sh::git(
-        dir,
-        &[
-            "for-each-ref",
-            &fmt,
-            "refs/heads",
-            "refs/remotes",
-        ],
-    )?;
+    let raw = sh::git(dir, &["for-each-ref", &fmt, "refs/heads", "refs/remotes"])?;
     let mut out = vec![];
     for line in raw.lines() {
         if line.trim().is_empty() {
@@ -383,7 +408,10 @@ pub struct TagInfo {
 }
 
 pub fn tags(dir: &str) -> Result<Vec<TagInfo>, String> {
-    let fmt = format!("--format=%(refname:short){F}%(objectname){F}%(creatordate:unix)", F = "%1f");
+    let fmt = format!(
+        "--format=%(refname:short){F}%(objectname){F}%(creatordate:unix)",
+        F = "%1f"
+    );
     let raw = sh::git(dir, &["for-each-ref", &fmt, "refs/tags"])?;
     let mut out = vec![];
     for line in raw.lines() {
@@ -414,10 +442,7 @@ pub struct StashInfo {
 }
 
 pub fn stash_list(dir: &str) -> Result<Vec<StashInfo>, String> {
-    let raw = sh::git(
-        dir,
-        &["stash", "list", "--format=%gd%x1f%H%x1f%gs%x1f%at"],
-    )?;
+    let raw = sh::git(dir, &["stash", "list", "--format=%gd%x1f%H%x1f%gs%x1f%at"])?;
     let mut out = vec![];
     for (i, line) in raw.lines().enumerate() {
         if line.trim().is_empty() {
@@ -783,12 +808,28 @@ pub fn diff_text(
 pub fn stash_files(dir: &str, refname: &str) -> Result<Vec<DiffFile>, String> {
     let ns = sh::git(
         dir,
-        &["stash", "show", "--include-untracked", "--name-status", "-z", "-M", refname],
+        &[
+            "stash",
+            "show",
+            "--include-untracked",
+            "--name-status",
+            "-z",
+            "-M",
+            refname,
+        ],
     )
     .unwrap_or_default();
     let num = sh::git(
         dir,
-        &["stash", "show", "--include-untracked", "--numstat", "-z", "-M", refname],
+        &[
+            "stash",
+            "show",
+            "--include-untracked",
+            "--numstat",
+            "-z",
+            "-M",
+            refname,
+        ],
     )
     .unwrap_or_default();
     Ok(parse_files(&ns, &num))
