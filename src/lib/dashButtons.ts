@@ -20,6 +20,7 @@ export const DASH_BUTTONS = {
   stash: { group: "git", label: "スタッシュ", icon: "stash" },
   stashPop: { group: "git", label: "pop", icon: "pull" },
   worktree: { group: "git", label: "worktree", icon: "worktree" },
+  stageToggle: { group: "git", label: "すべてステージ・すべてアンステージ", icon: "plus" },
   // ---- github
   prCreate: { group: "github", label: "PR 作成", icon: "pr" },
   prCurrent: { group: "github", label: "このブランチの PR", icon: "external" },
@@ -86,6 +87,21 @@ export function pushRecent(recent: DashButtonId[], id: DashButtonId): DashButton
 export function normalizeRecent(saved: unknown): DashButtonId[] {
   if (!Array.isArray(saved)) return [];
   return [...new Set(saved.filter(isActionId))].slice(0, DASH_MAX);
+}
+
+/**
+ * 「すべてステージ・すべてアンステージ」ボタンの向き。
+ * 未ステージの変更 (未追跡・コンフリクト含む) が 1 つでもあれば "stage"、
+ * すべてステージ済みなら "unstage"、変更が無ければ null。
+ */
+export function stageToggleMode(counts: {
+  staged: number;
+  unstaged: number;
+  conflicts: number;
+}): "stage" | "unstage" | null {
+  if (counts.unstaged + counts.conflicts > 0) return "stage";
+  if (counts.staged > 0) return "unstage";
+  return null;
 }
 
 // ------------------------------------------------------------------ 永続化

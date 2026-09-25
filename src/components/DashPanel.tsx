@@ -14,6 +14,7 @@ import {
   saveDashPos,
   saveDash,
   saveRecent,
+  stageToggleMode,
   toggleDash,
   type DashPos,
   type DashButtonId,
@@ -75,11 +76,23 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
   const ghUrl = s.gh?.url ?? null;
   const busy = !s.repo || Boolean(s.busy);
   const currentPr = head ? s.prs.find((p) => p.headRefName === head.name) : undefined;
+  const stageMode = stageToggleMode({
+    staged: s.status?.staged.length ?? 0,
+    unstaged: s.status?.unstaged.length ?? 0,
+    conflicts: s.status?.conflicts.length ?? 0,
+  });
 
-  /** 実行内容・無効条件・バッジ。表示名とアイコンは DASH_BUTTONS 側。 */
+  /** 実行内容・無効条件・バッジ。表示名とアイコンは DASH_BUTTONS 側 (label / icon で上書き可)。 */
   const spec = (
     id: DashButtonId,
-  ): { run: () => unknown; disabled?: boolean; badge?: number; title?: string } => {
+  ): {
+    run: () => unknown;
+    disabled?: boolean;
+    badge?: number;
+    title?: string;
+    label?: string;
+    icon?: string;
+  } => {
     const web = (path: string) => ({
       run: () => ghUrl && act.webOpen(`${ghUrl}${path}`),
       disabled: !ghUrl,
@@ -114,6 +127,24 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
         };
       case "worktree":
         return { run: act.worktreeAdd, disabled: busy, title: "git worktree add" };
+      case "stageToggle":
+        return stageMode === "unstage"
+          ? {
+              run: act.unstageAll,
+              disabled: busy,
+              label: "すべてアンステージ",
+              icon: "minus",
+              badge: s.status?.staged.length,
+              title: "ステージ済みの変更をすべてアンステージ",
+            }
+          : {
+              run: act.stageAll,
+              disabled: busy || !stageMode,
+              label: "すべてステージ",
+              icon: "plus",
+              badge: (s.status?.unstaged.length ?? 0) + (s.status?.conflicts.length ?? 0),
+              title: stageMode ? "変更をすべてステージ (git add -A)" : "変更はありません",
+            };
       case "prCreate":
         return { run: act.prCreate, disabled: busy, title: "gh pr create" };
       case "prCurrent":
@@ -264,8 +295,8 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
                 title={sp.title}
                 onClick={() => invoke(id)}
               >
-                <Icon name={a.icon} size={15} />
-                <span>{a.label}</span>
+                <Icon name={sp.icon ?? a.icon} size={15} />
+                <span>{sp.label ?? a.label}</span>
                 {sp.badge ? <em className={BADGE}>{sp.badge}</em> : null}
               </button>
             );

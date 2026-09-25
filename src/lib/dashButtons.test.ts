@@ -10,6 +10,7 @@ import {
   normalizeRecent,
   pushRecent,
   saveDash,
+  stageToggleMode,
   toggleDash,
 } from "./dashButtons";
 
@@ -92,5 +93,19 @@ describe("clampDashPos", () => {
 
   test("はみ出したら余白を残して収める", () => {
     expect(clampDashPos({ x: -50, y: 9999 }, size, view)).toEqual({ x: 8, y: 492 });
+  });
+});
+
+describe("stageToggleMode", () => {
+  test("未ステージの変更があれば stage", () => {
+    expect(stageToggleMode({ staged: 0, unstaged: 2, conflicts: 0 })).toBe("stage");
+    expect(stageToggleMode({ staged: 3, unstaged: 1, conflicts: 0 })).toBe("stage");
+    expect(stageToggleMode({ staged: 1, unstaged: 0, conflicts: 1 })).toBe("stage");
+  });
+  test("すべてステージ済みなら unstage", () => {
+    expect(stageToggleMode({ staged: 2, unstaged: 0, conflicts: 0 })).toBe("unstage");
+  });
+  test("変更が無ければ null", () => {
+    expect(stageToggleMode({ staged: 0, unstaged: 0, conflicts: 0 })).toBeNull();
   });
 });
