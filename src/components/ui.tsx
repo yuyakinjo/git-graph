@@ -625,6 +625,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   const apiValue: DialogApi = {
     form: (spec) => new Promise((resolve) => setFormState({ spec, resolve })),
     confirm: (spec) => new Promise((resolve) => setConfirmState({ spec, resolve })),
+    open: formState !== null || confirmState !== null,
   };
 
   return (

@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { DetailPane } from "./components/DetailPane";
 import { DiffModal } from "./components/DiffModal";
+import { DashPanel } from "./components/DashPanel";
 import { GraphPane } from "./components/GraphPane";
 import { LogModal } from "./components/LogModal";
 import { PrModal } from "./components/PrModal";
@@ -20,6 +21,7 @@ import { useStore } from "./state/store";
 
 const SIDEBAR_KEY = "gitsquid.sidebarW";
 const DETAIL_KEY = "gitsquid.detailW";
+const DASH_OPEN_KEY = "gitsquid.dashPanel";
 
 /**
  * スプリッタの幅。ポインタキャプチャを使うので window 購読は不要で、
@@ -187,6 +189,15 @@ export default function App() {
   const sidebar = usePaneWidth(248, SIDEBAR_KEY, 180, 420);
   const [detailOpen, setDetailOpen] = useState(false);
   const detail = usePaneWidth(520, DETAIL_KEY, 340, 900, true);
+  const [dashOpen, setDashOpen] = useState(() => localStorage.getItem(DASH_OPEN_KEY) !== "off");
+  const toggleDash = useCallback(() => {
+    setDashOpen((v) => {
+      localStorage.setItem(DASH_OPEN_KEY, v ? "off" : "on");
+      return !v;
+    });
+  }, []);
+  /** モーダル (差分・PR・設定・ログ・tidy) を開いている間はダッシュパネルを隠す */
+  const modalOpen = s.diffModal || s.settingsOpen || s.logsOpen || Boolean(s.tidy) || Boolean(pr);
 
   // 一覧の情報ですぐ開き、詳細が届いたら差し替える (取得はクリック起点)
   const openPr = useCallback(
@@ -202,11 +213,7 @@ export default function App() {
     if (
       e.key === "Escape" &&
       !e.defaultPrevented &&
-      !s.diffModal &&
-      !s.settingsOpen &&
-      !s.logsOpen &&
-      !s.tidy &&
-      !pr &&
+      !modalOpen &&
       !(e.target instanceof HTMLInputElement) &&
       !(e.target instanceof HTMLTextAreaElement)
     ) {
@@ -252,7 +259,7 @@ export default function App() {
     <div className="flex h-full flex-col">
       {s.busy ? <ProgressBar /> : null}
       <TitleBar />
-      <Toolbar />
+      <Toolbar dashOpen={dashOpen} onToggleDash={toggleDash} />
       {s.repo ? (
         <div className="relative flex min-h-0 flex-1 bg-bg-1">
           <div style={{ width: sidebar.width, flex: "0 0 auto", minWidth: 0 }}>
@@ -284,6 +291,7 @@ export default function App() {
         <Welcome />
       )}
       <StatusBar />
+      {s.repo && dashOpen && !modalOpen ? <DashPanel onHide={toggleDash} /> : null}
       <Toasts />
       {s.diffModal ? <DiffModal /> : null}
       {pr ? <PrModal pr={pr} onClose={() => setPr(null)} /> : null}

@@ -22,7 +22,13 @@ const TOOL_BADGE_ACCENT =
 /** ステータスバーの各項目 */
 const SB_ITEM = "inline-flex items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap";
 
-export function Toolbar() {
+export function Toolbar({
+  dashOpen,
+  onToggleDash,
+}: {
+  dashOpen: boolean;
+  onToggleDash: () => void;
+}) {
   const s = useStore();
   const act = useActions();
   const openMenu = useMenu();
@@ -163,6 +169,13 @@ export function Toolbar() {
             <Spinner /> {s.busy}
           </span>
         ) : null}
+        <button
+          className={iconBtn({ active: dashOpen })}
+          title={`ダッシュパネル: ${dashOpen ? "表示" : "非表示"}`}
+          onClick={onToggleDash}
+        >
+          <Icon name="dots" size={15} />
+        </button>
         <button
           className={iconBtn({ active: s.autoFetch })}
           title={`自動フェッチ: ${s.autoFetch ? "ON (3分間隔)" : "OFF"}`}

@@ -10,6 +10,8 @@ import type { ConfirmSpec, FormResult, FormSpec, MenuItem } from "./ui";
 export interface DialogApi {
   form: (spec: FormSpec) => Promise<FormResult | null>;
   confirm: (spec: ConfirmSpec) => Promise<boolean>;
+  /** フォーム / 確認ダイアログのどちらかを表示中か */
+  open: boolean;
 }
 
 export const DialogCtx = createContext<DialogApi | null>(null);

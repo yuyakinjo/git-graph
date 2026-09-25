@@ -152,7 +152,7 @@ test.describe("同期", () => {
     await app.refresh();
 
     // ahead の件数がプッシュボタンに出る
-    const push = page.getByRole("button", { name: /^プッシュ/ });
+    const push = page.locator("header").getByRole("button", { name: /^プッシュ/ });
     await expect(push).toHaveText(/プッシュ\s*1/);
     await push.click();
 
@@ -181,7 +181,7 @@ test.describe("同期", () => {
     repo.git("-C", other, "push", "-q", "origin", "main");
 
     await page.getByTitle("git fetch --all --prune").click();
-    const pull = page.getByRole("button", { name: /^プル/ });
+    const pull = page.locator("header").getByRole("button", { name: /^プル/ });
     await expect(pull).toHaveText(/プル\s*1/);
     await pull.click();
 
@@ -238,5 +238,30 @@ test.describe("サイドバー", () => {
 
     await page.reload();
     await expect.poll(ids).toEqual(order);
+  });
+});
+
+test.describe("ダッシュパネル", () => {
+  test("ダッシュボタンを出し、ダイアログの間は隠れる", async ({ app }) => {
+    const { page } = app;
+    const panel = page.getByRole("toolbar", { name: "ダッシュパネル" });
+
+    await expect(panel.getByRole("button", { name: "PR 作成" })).toBeVisible();
+    await expect(panel.getByRole("button", { name: "tidy" })).toBeVisible();
+    await page.screenshot({ path: "test-results/dash-panel.png" });
+
+    // git バーの左端アイコンから候補を選んで足す
+    await panel.getByTitle("git (クリックでボタンを選ぶ)").click();
+    await page.getByRole("button", { name: "ブランチ" }).last().click();
+    const branchBtn = panel.getByRole("button", { name: "ブランチ", exact: true });
+    await expect(branchBtn).toBeVisible();
+
+    // 押すとフォームダイアログが開き、パネルは隠れる。最近使ったにも載る
+    await branchBtn.click();
+    await expect(page.getByRole("dialog", { name: "ブランチを作成" })).toBeVisible();
+    await expect(panel).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(panel.getByTitle("最近使った操作")).toBeVisible();
+    await page.screenshot({ path: "test-results/dash-panel-recent.png" });
   });
 });
