@@ -189,3 +189,13 @@ test.describe("同期", () => {
     expect(repo.git("log", "-1", "--format=%s")).toBe("test: from another clone");
   });
 });
+
+test.describe("設定", () => {
+  test("タイトルバー右端のロゴから設定を開く", async ({ app }) => {
+    const { page } = app;
+
+    await page.getByTitle("設定 (Cmd ,)").click();
+
+    await expect(page.getByRole("dialog", { name: "設定" })).toBeVisible();
+  });
+});

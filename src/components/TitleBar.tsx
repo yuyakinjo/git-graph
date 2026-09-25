@@ -151,6 +151,14 @@ export function TitleBar() {
         </button>
       </div>
       <div className="min-w-6 flex-1 self-stretch" data-tauri-drag-region />
+      {/* 右端のロゴは設定の入口を兼ねる */}
+      <button
+        className="mr-2.5 mb-0.5 flex h-6.5 flex-none cursor-pointer items-center rounded-md border-0 bg-transparent px-1.5 hover:bg-bg-3"
+        title="設定 (Cmd ,)"
+        onClick={s.openSettings}
+      >
+        <img className="block h-5.5 w-auto" src="/logo-long.svg" alt="" draggable={false} />
+      </button>
       {picker ? <RepoPicker x={picker.x} y={picker.y} onClose={() => setPicker(null)} /> : null}
     </header>
   );

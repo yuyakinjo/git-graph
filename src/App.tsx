@@ -67,10 +67,14 @@ function Welcome() {
   return (
     <div className="flex flex-1 items-center justify-center bg-[radial-gradient(circle_at_30%_10%,#1d2735_0%,var(--color-bg-1)_60%)]">
       <div className="w-120 max-w-[88vw] text-center">
-        <h1 className="mx-0 mt-0 mb-1.5 text-[26px] tracking-[-0.01em]">GitSquid</h1>
-        <p className="mx-0 mt-0 mb-5 text-fg-dim">
-          シンプルな操作に絞った git GUI。GitHub 操作は gh CLI を使います。
-        </p>
+        <h1 className="mx-0 mt-0 mb-6">
+          <img
+            className="mx-auto block h-32 w-auto"
+            src="/logo.svg"
+            alt="GitSquid"
+            draggable={false}
+          />
+        </h1>
         <button className={btn("primary", "big")} onClick={() => act.openFolder()}>
           <Icon name="folder" size={16} /> リポジトリを開く
         </button>
