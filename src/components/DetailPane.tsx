@@ -338,22 +338,35 @@ function WipPanel() {
       </div>
 
       <div className="flex-none border-t border-line bg-bg-2 px-2.5 pt-2 pb-2.5">
-        <textarea
-          className="w-full resize-y rounded-md border border-line bg-bg-1 px-2.25 py-1.75 font-[inherit] text-[12.5px] text-fg outline-none focus:border-accent"
-          placeholder={
-            stagedCount === 0 && changedCount > 0
-              ? "コミットメッセージ (ステージ済みが無い場合はすべてステージしてコミットします)"
-              : "コミットメッセージ"
-          }
-          value={message}
-          rows={3}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && canCommit) {
-              act.commit(message, amend).then((ok) => ok && setMessage(""));
+        <div className="relative">
+          <textarea
+            className="block w-full resize-y rounded-md border border-line bg-bg-1 py-1.75 pr-8 pl-2.25 font-[inherit] text-[12.5px] text-fg outline-none focus:border-accent"
+            placeholder={
+              stagedCount === 0 && changedCount > 0
+                ? "コミットメッセージ (ステージ済みが無い場合はすべてステージしてコミットします)"
+                : "コミットメッセージ"
             }
-          }}
-        />
+            value={message}
+            rows={3}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && canCommit) {
+                act.commit(message, amend).then((ok) => ok && setMessage(""));
+              }
+            }}
+          />
+          <button
+            className={`${iconBtn({ tiny: true })} absolute top-1 right-1`}
+            title={
+              generating ? "生成中…" : "AI で生成 (差分から Claude Code でコミットメッセージを生成)"
+            }
+            aria-label="AI で生成"
+            disabled={!canCommit || generating}
+            onClick={() => void generate()}
+          >
+            {generating ? <Spinner /> : <Icon name="sparkle" size={13} />}
+          </button>
+        </div>
         <div className="mt-2 flex items-center justify-between gap-2.5">
           <label className="flex cursor-pointer items-center gap-1.75 text-[11.5px] text-fg-dim">
             <input
@@ -364,29 +377,18 @@ function WipPanel() {
             />
             <span>直前のコミットを修正 (amend)</span>
           </label>
-          <div className="flex items-center gap-1.5">
-            <button
-              className={btn("ghost")}
-              title="差分から Claude Code でコミットメッセージを生成"
-              disabled={!canCommit || generating}
-              onClick={() => void generate()}
-            >
-              {generating ? <Spinner /> : <Icon name="sparkle" size={14} />}
-              {generating ? "生成中…" : "AI で生成"}
-            </button>
-            <button
-              className={btn("primary")}
-              disabled={!canCommit || generating || (!message.trim() && !amend)}
-              onClick={() => act.commit(message, amend).then((ok) => ok && setMessage(""))}
-            >
-              <Icon name="check" size={14} />
-              {amend
-                ? "コミットを修正"
-                : stagedCount === 0
-                  ? "すべてコミット"
-                  : `${stagedCount} 件をコミット`}
-            </button>
-          </div>
+          <button
+            className={btn("primary")}
+            disabled={!canCommit || generating || (!message.trim() && !amend)}
+            onClick={() => act.commit(message, amend).then((ok) => ok && setMessage(""))}
+          >
+            <Icon name="check" size={14} />
+            {amend
+              ? "コミットを修正"
+              : stagedCount === 0
+                ? "すべてコミット"
+                : `${stagedCount} 件をコミット`}
+          </button>
         </div>
       </div>
     </div>

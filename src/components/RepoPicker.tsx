@@ -1,3 +1,4 @@
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useMemo, useState } from "react";
 import type { ProjectEntry } from "../lib/types";
 import { useActions } from "../state/actions";
@@ -87,6 +88,13 @@ export function RepoPicker({ x, y, onClose }: { x: number; y: number; onClose: (
   const choose = (path: string) => {
     onClose();
     void s.openRepo(path);
+  };
+
+  /** Finder でフォルダを選んでプロジェクトの場所に足す。ピッカーは開いたままにして、走査結果をそのまま選べるようにする。 */
+  const addRoots = async () => {
+    const picked = await openDialog({ directory: true, multiple: true });
+    const paths = Array.isArray(picked) ? picked : typeof picked === "string" ? [picked] : [];
+    if (paths.length) s.setProjectRoots([...s.projectRoots, ...paths]);
   };
 
   // ここで処理したキーは stopPropagation して、背後のグラフ (GraphPane の ↑↓)
@@ -196,15 +204,8 @@ export function RepoPicker({ x, y, onClose }: { x: number; y: number; onClose: (
           >
             <Icon name="folder" size={14} /> Finder から開く...
           </button>
-          <button
-            className={PICKER_ACTION}
-            onClick={() => {
-              onClose();
-              s.openSettings();
-            }}
-          >
+          <button className={PICKER_ACTION} onClick={() => void addRoots()}>
             <Icon name="worktree" size={14} /> プロジェクトの場所を設定
-            <span className="ml-auto text-[11px] text-fg-faint">⌘,</span>
           </button>
         </div>
       </div>
