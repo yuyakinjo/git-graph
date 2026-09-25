@@ -130,6 +130,55 @@ function useStagedHeight(initial: number) {
   };
 }
 
+const COMMIT_MSG_KEY = "gitsquid.commitMsgH";
+/** コミットメッセージ欄の最小高さ (1 行強) */
+const COMMIT_MSG_MIN = 36;
+
+/**
+ * コミットメッセージ欄の高さ。コミット欄の上端のスプリッタを掴んで上下にドラッグして変える。
+ * 上へ伸ばせるのはファイル一覧 (listRef) が最小高さを保てる範囲まで。
+ */
+function useCommitMsgHeight(initial: number, listRef: React.RefObject<HTMLDivElement | null>) {
+  const [height, setHeight] = useState(
+    () => Number(localStorage.getItem(COMMIT_MSG_KEY)) || initial,
+  );
+  const drag = useRef<{ y: number; h: number; max: number } | null>(null);
+
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      const room =
+        (listRef.current?.getBoundingClientRect().height ?? 0) - WIP_LIST_MIN - SECTION_MIN;
+      drag.current = { y: e.clientY, h: height, max: height + Math.max(0, room) };
+      document.body.classList.add("dragging-row");
+    },
+    [height, listRef],
+  );
+
+  const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d) return;
+    setHeight(Math.max(COMMIT_MSG_MIN, Math.min(d.max, d.h + d.y - e.clientY)));
+  }, []);
+
+  const onPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!drag.current) return;
+      drag.current = null;
+      document.body.classList.remove("dragging-row");
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      localStorage.setItem(COMMIT_MSG_KEY, String(height));
+    },
+    [height],
+  );
+
+  return {
+    height,
+    handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp },
+  };
+}
+
 function WipPanel() {
   const s = useStore();
   const act = useActions();
@@ -138,6 +187,7 @@ function WipPanel() {
   const [amend, setAmend] = useState(false);
   const sel = s.file;
   const { height: stagedH, containerRef, handlers: splitter } = useStagedHeight(200);
+  const { height: msgH, handlers: msgSplitter } = useCommitMsgHeight(68, containerRef);
 
   /** ファイル行のクリックは差分ダイアログを開く */
   const open = (target: FileTarget) => {
@@ -337,17 +387,18 @@ function WipPanel() {
         </section>
       </div>
 
-      <div className="flex-none border-t border-line bg-bg-2 px-2.5 pt-2 pb-2.5">
+      <div className={ROW_SPLITTER} title="ドラッグで入力欄の高さを変更" {...msgSplitter} />
+      <div className="flex-none bg-bg-2 px-2.5 pt-2 pb-2.5">
         <div className="relative">
           <textarea
-            className="block w-full resize-y rounded-md border border-line bg-bg-1 py-1.75 pr-8 pl-2.25 font-[inherit] text-[12.5px] text-fg outline-none focus:border-accent"
+            className="block w-full resize-none rounded-md border border-line bg-bg-1 py-1.75 pr-8 pl-2.25 font-[inherit] text-[12.5px] text-fg outline-none focus:border-accent"
+            style={{ height: msgH }}
             placeholder={
               stagedCount === 0 && changedCount > 0
                 ? "コミットメッセージ (ステージ済みが無い場合はすべてステージしてコミットします)"
                 : "コミットメッセージ"
             }
             value={message}
-            rows={3}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && canCommit) {

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
-import { generatePrDescription } from "../lib/ai";
+import { generateCommitMessage, generatePrDescription } from "../lib/ai";
 import { api } from "../lib/api";
 import { useDialogs } from "../components/ui-context";
 import { useStore } from "./store";
@@ -33,7 +33,9 @@ export function useActions() {
 
     // ---------------------------------------------------------- 1. checkout
     const checkout = (target: string, label = target) =>
-      s.run(`${label} をチェックアウト`, () => api.checkout(dir, target), { successDetail: false });
+      s.run(`${label} をチェックアウト`, () => api.checkout(dir, target), {
+        successDetail: false,
+      });
 
     const checkoutRemote = (remoteBranch: string) =>
       s.run(`${remoteBranch} をチェックアウト`, () => api.checkoutRemote(dir, remoteBranch), {
@@ -53,7 +55,12 @@ export function useActions() {
             mono: true,
             placeholder: "feature/awesome",
           },
-          { name: "checkout", label: "作成後にチェックアウトする", type: "checkbox", value: true },
+          {
+            name: "checkout",
+            label: "作成後にチェックアウトする",
+            type: "checkbox",
+            value: true,
+          },
         ],
         submitLabel: "作成",
       });
@@ -142,7 +149,12 @@ export function useActions() {
             type: "text",
             placeholder: "作業中の変更",
           },
-          { name: "untracked", label: "未追跡ファイルも含める", type: "checkbox", value: true },
+          {
+            name: "untracked",
+            label: "未追跡ファイルも含める",
+            type: "checkbox",
+            value: true,
+          },
           {
             name: "keepIndex",
             label: "ステージした変更は残す (--keep-index)",
@@ -198,9 +210,13 @@ export function useActions() {
     const stageAll = () =>
       s.run("すべてステージ", () => api.stageAll(dir), { silentSuccess: true });
     const unstage = (paths: string[]) =>
-      s.run("アンステージ", () => api.unstage(dir, paths), { silentSuccess: true });
+      s.run("アンステージ", () => api.unstage(dir, paths), {
+        silentSuccess: true,
+      });
     const unstageAll = () =>
-      s.run("すべてアンステージ", () => api.unstageAll(dir), { silentSuccess: true });
+      s.run("すべてアンステージ", () => api.unstageAll(dir), {
+        silentSuccess: true,
+      });
 
     const discard = async (paths: string[]) => {
       const ok = await dialogs.confirm({
@@ -212,7 +228,10 @@ export function useActions() {
         confirmLabel: "破棄",
         danger: true,
       });
-      if (ok) await s.run("変更を破棄", () => api.discard(dir, paths), { successDetail: false });
+      if (ok)
+        await s.run("変更を破棄", () => api.discard(dir, paths), {
+          successDetail: false,
+        });
     };
 
     const commit = async (message: string, amend: boolean) => {
@@ -225,11 +244,79 @@ export function useActions() {
       });
     };
 
+    /**
+     * メッセージをダイアログで聞いてコミットする (ダッシュボタン用)。
+     * `ai` なら開いた直後に Claude Code でメッセージを生成する。`amend` は --amend の初期値。
+     */
+    const commitPrompt = async (opts: { ai?: boolean; amend?: boolean } = {}) => {
+      const staged = s.status?.staged.length ?? 0;
+      const res = await dialogs.form({
+        title: opts.amend ? "コミットを修正" : "コミット",
+        description: opts.amend
+          ? staged > 0
+            ? `ステージ済みの ${staged} 件を加えて直前のコミットを修正します`
+            : "直前のコミットのメッセージを修正します"
+          : staged > 0
+            ? `ステージ済みの ${staged} 件をコミットします`
+            : "ステージ済みが無いため、すべての変更をステージしてコミットします",
+        width: 560,
+        action: {
+          label: "AI で生成",
+          busyLabel: "生成中…",
+          icon: "sparkle",
+          title: "次のコミットに入る差分から Claude Code でメッセージを生成",
+          autoRun: opts.ai,
+          run: async (values) => {
+            try {
+              const ctx = await api.commitContext(dir, Boolean(values.amend));
+              if (!ctx.diff.trim()) {
+                s.toast({
+                  kind: "info",
+                  title: "コミットする差分がありません",
+                });
+                return;
+              }
+              return {
+                message: await generateCommitMessage(s.aiCliModel, ctx),
+              };
+            } catch (e) {
+              s.toast({
+                kind: "error",
+                title: "コミットメッセージを生成できませんでした",
+                detail: String(e),
+              });
+            }
+          },
+        },
+        fields: [
+          {
+            name: "message",
+            label: "コミットメッセージ",
+            type: "textarea",
+            rows: 5,
+            required: true,
+          },
+          {
+            name: "amend",
+            label: "直前のコミットを修正 (--amend)",
+            type: "checkbox",
+            value: Boolean(opts.amend),
+          },
+        ],
+        submitLabel: "コミット",
+      });
+      if (!res) return;
+      await commit(String(res.message), Boolean(res.amend));
+    };
+
     // ---------------------------------------------------------- 6. push
     const push = async (opts: { force?: boolean } = {}) => {
       const head = s.headBranch;
       if (!head) {
-        s.toast({ kind: "error", title: "detached HEAD のためプッシュできません" });
+        s.toast({
+          kind: "error",
+          title: "detached HEAD のためプッシュできません",
+        });
         return;
       }
       const remote = s.repo?.remotes[0] ?? "origin";
@@ -276,7 +363,11 @@ export function useActions() {
         return;
       }
       await s.run("プッシュ", () =>
-        api.push(dir, { remote, branch: head.name, forceWithLease: opts.force }),
+        api.push(dir, {
+          remote,
+          branch: head.name,
+          forceWithLease: opts.force,
+        }),
       );
     };
 
@@ -334,7 +425,12 @@ export function useActions() {
             value: `${parent}/${s.repo?.name ?? "repo"}-worktree`,
             hint: "存在しないパスを指定してください",
           },
-          { name: "open", label: "作成後にこの worktree を開く", type: "checkbox", value: true },
+          {
+            name: "open",
+            label: "作成後にこの worktree を開く",
+            type: "checkbox",
+            value: true,
+          },
         ],
         submitLabel: "追加",
       });
@@ -522,10 +618,14 @@ export function useActions() {
     };
 
     // ---------------------------------------------------------- 8. pull request
-    const prCreate = async () => {
+    /** `ai` なら作成ダイアログを開いた直後に Claude Code でタイトルと本文を生成する */
+    const prCreate = async (opts: { ai?: boolean } = {}) => {
       const head = s.headBranch;
       if (!head) {
-        s.toast({ kind: "error", title: "detached HEAD では PR を作成できません" });
+        s.toast({
+          kind: "error",
+          title: "detached HEAD では PR を作成できません",
+        });
         return;
       }
       if (!s.gh?.installed) {
@@ -567,7 +667,10 @@ export function useActions() {
         });
         if (ok) {
           const pushed = await s.run("プッシュ", () =>
-            api.push(dir, { remote: s.repo?.remotes[0] ?? "origin", branch: head.name }),
+            api.push(dir, {
+              remote: s.repo?.remotes[0] ?? "origin",
+              branch: head.name,
+            }),
           );
           if (!pushed) return;
         }
@@ -602,6 +705,7 @@ export function useActions() {
           title: template
             ? "PR テンプレートに沿って、差分から Claude Code でタイトルと本文を生成"
             : "差分とコミットから Claude Code でタイトルと本文を生成",
+          autoRun: opts.ai,
           run: async (values) => {
             try {
               const ctx = await api.prContext(dir, {
@@ -610,7 +714,10 @@ export function useActions() {
                 head: head.name,
               });
               if (!ctx.diff.trim()) {
-                s.toast({ kind: "info", title: "マージ先との差分がありません" });
+                s.toast({
+                  kind: "info",
+                  title: "マージ先との差分がありません",
+                });
                 return;
               }
               return await generatePrDescription(s.aiCliModel, ctx);
@@ -624,8 +731,20 @@ export function useActions() {
           },
         },
         fields: [
-          { name: "title", label: "タイトル", type: "text", required: true, value: defaultTitle },
-          { name: "body", label: "本文", type: "textarea", rows: 10, value: defaultBody },
+          {
+            name: "title",
+            label: "タイトル",
+            type: "text",
+            required: true,
+            value: defaultTitle,
+          },
+          {
+            name: "body",
+            label: "本文",
+            type: "textarea",
+            rows: 10,
+            value: defaultBody,
+          },
           {
             name: "base",
             label: "マージ先 (base)",
@@ -633,7 +752,12 @@ export function useActions() {
             value: s.gh.defaultBranch ?? baseOptions[0]?.value ?? "",
             options: baseOptions,
           },
-          { name: "draft", label: "ドラフトとして作成", type: "checkbox", value: false },
+          {
+            name: "draft",
+            label: "ドラフトとして作成",
+            type: "checkbox",
+            value: false,
+          },
         ],
         submitLabel: "作成",
       });
@@ -650,12 +774,20 @@ export function useActions() {
           web: false,
         });
         const url = out.match(/https?:\/\/\S+/)?.[0];
-        s.toast({ kind: "success", title: "PR を作成しました", detail: url ?? out });
+        s.toast({
+          kind: "success",
+          title: "PR を作成しました",
+          detail: url ?? out,
+        });
         await s.refresh({ silent: true });
         await s.refreshPrs();
         if (url) await openUrl(url).catch(() => undefined);
       } catch (e) {
-        s.toast({ kind: "error", title: "PR の作成に失敗しました", detail: String(e) });
+        s.toast({
+          kind: "error",
+          title: "PR の作成に失敗しました",
+          detail: String(e),
+        });
       }
     };
 
@@ -719,6 +851,7 @@ export function useActions() {
       unstageAll,
       discard,
       commit,
+      commitPrompt,
       push,
       forcePush,
       worktreeAdd,

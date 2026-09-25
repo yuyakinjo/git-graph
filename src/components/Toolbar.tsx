@@ -174,7 +174,7 @@ export function Toolbar({
           title={`ダッシュパネル: ${dashOpen ? "表示" : "非表示"}`}
           onClick={onToggleDash}
         >
-          <Icon name="dots" size={15} />
+          <Icon name="bolt" size={15} className={dashOpen ? "text-bolt" : undefined} />
         </button>
         <button
           className={iconBtn({ active: s.autoFetch })}

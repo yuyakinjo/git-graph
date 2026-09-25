@@ -32,6 +32,11 @@
   --color-accent-15: rgba(79, 195, 247, 0.15);
   --color-accent-35: rgba(79, 195, 247, 0.35);
 
+  /* ---- ダッシュパネル (⚡) ---- */
+  --color-bolt: #ffc93c;
+  --color-bolt-line: #ffdc73;
+  --color-on-bolt: #2a1d00;
+
   --color-violet: #a78bfa;
   --color-violet-12: rgba(167, 139, 250, 0.12);
   --color-violet-16: rgba(167, 139, 250, 0.16);

@@ -246,7 +246,8 @@ test.describe("ダッシュパネル", () => {
     const { page } = app;
     const panel = page.getByRole("toolbar", { name: "ダッシュパネル" });
 
-    await expect(panel.getByRole("button", { name: "PR 作成" })).toBeVisible();
+    await expect(panel.getByRole("button", { name: "PR 作成", exact: true })).toBeVisible();
+    await expect(panel.getByRole("button", { name: "AI でコミット" })).toBeVisible();
     await expect(panel.getByRole("button", { name: "tidy" })).toBeVisible();
     await page.screenshot({ path: "test-results/dash-panel.png" });
 
@@ -263,5 +264,54 @@ test.describe("ダッシュパネル", () => {
     await page.keyboard.press("Escape");
     await expect(panel.getByTitle("最近使った操作")).toBeVisible();
     await page.screenshot({ path: "test-results/dash-panel-recent.png" });
+  });
+
+  test("ボタンをドラッグで並べ替え、バーを隠せる", async ({ app }) => {
+    const { page } = app;
+    const panel = page.getByRole("toolbar", { name: "ダッシュパネル" });
+    const labels = () =>
+      panel
+        .locator("[data-dash-button] span")
+        .evaluateAll((els) => els.slice(0, 3).map((el) => el.textContent));
+    await expect.poll(labels).toEqual(["コミット", "プル", "プッシュ"]);
+
+    // プッシュを コミット の前へドラッグする
+    const push = await panel.locator("[data-dash-button]", { hasText: "プッシュ" }).boundingBox();
+    const commit = await panel
+      .locator("[data-dash-button]")
+      .filter({ has: page.locator("span", { hasText: /^コミット$/ }) })
+      .boundingBox();
+    if (!push || !commit) throw new Error("ボタンが見つかりません");
+    await page.mouse.move(push.x + push.width / 2, push.y + push.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(commit.x + 4, commit.y + commit.height / 2, { steps: 8 });
+    await page.mouse.up();
+    await expect.poll(labels).toEqual(["プッシュ", "コミット", "プル"]);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+
+    // GitHub バーを隠す
+    const prBtn = panel.getByRole("button", { name: "PR 作成", exact: true });
+    await expect(prBtn).toBeVisible();
+    await panel.getByTitle("git (クリックでボタンを選ぶ)").click();
+    await page.getByRole("button", { name: "GitHub バー" }).click();
+    await expect(prBtn).toHaveCount(0);
+    await page.screenshot({ path: "test-results/dash-panel-reorder.png" });
+  });
+
+  test("AI でコミットすると、生成したメッセージ入りのダイアログが開く", async ({ app }) => {
+    const { page, repo } = app;
+    app.stub("claude_generate", () => "feat: add ai note");
+    repo.write("ai-note.txt", "hello\n");
+    await app.refresh();
+
+    const panel = page.getByRole("toolbar", { name: "ダッシュパネル" });
+    await panel.getByRole("button", { name: "AI でコミット" }).click();
+    const dialog = page.getByRole("dialog", { name: "コミット" });
+    await expect(dialog.getByLabel("コミットメッセージ")).toHaveValue("feat: add ai note");
+    expect(app.calls.some((c) => c.cmd === "claude_generate")).toBe(true);
+
+    await dialog.getByRole("button", { name: "コミット", exact: true }).click();
+    await expect.poll(() => repo.git("log", "-1", "--format=%s")).toBe("feat: add ai note");
+    expect(repo.git("status", "--porcelain")).toBe("");
   });
 });

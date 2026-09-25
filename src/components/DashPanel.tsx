@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useWindowEvent } from "../lib/effects";
 import {
+  DASH_BARS,
   DASH_BUTTONS,
   DASH_GROUPS,
   DASH_MAX,
@@ -9,13 +10,18 @@ import {
   clampDashPos,
   loadDashPos,
   loadDash,
+  loadHiddenBars,
   loadRecent,
+  moveDash,
   pushRecent,
   saveDashPos,
   saveDash,
+  saveHiddenBars,
   saveRecent,
   stageToggleMode,
   toggleDash,
+  toggleHiddenBar,
+  type DashBar,
   type DashPos,
   type DashButtonId,
   type DashGroup,
@@ -25,24 +31,26 @@ import { useStore } from "../state/store";
 import { Icon } from "./ui";
 import { useDialogs, useMenu } from "./ui-context";
 
-type BarId = DashGroup | "recent";
-
-const BAR_META: Record<BarId, { icon: string; title: string }> = {
+const BAR_META: Record<DashBar, { icon: string; title: string }> = {
   git: { icon: "branch", title: "git" },
   github: { icon: "github", title: "GitHub" },
-  custom: { icon: "sparkle", title: "カスタム" },
+  ai: { icon: "sparkle", title: "AI" },
+  custom: { icon: "user", title: "カスタム" },
   recent: { icon: "clock", title: "最近使った操作" },
 };
 
 const BAR =
-  "flex h-10 items-center gap-1 rounded-full border border-pop-line bg-pop py-1 pr-1.5 pl-1 shadow-[0_12px_30px_rgba(0,0,0,0.45)]";
+  "flex h-10 items-center gap-1 rounded-full border border-bolt-line bg-bolt py-1 pr-1.5 pl-1 text-on-bolt shadow-[0_12px_30px_rgba(0,0,0,0.45)]";
 const GROUP_ICON =
-  "flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-fg-dim hover:bg-bg-3 hover:text-fg";
+  "flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-on-bolt/70 hover:bg-black/10 hover:text-on-bolt";
+/** 無効でもドラッグで並べ替えられるよう、disabled ではなく aria-disabled で表す */
 const ACTION =
-  "flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-line bg-bg-3 px-3 text-[12.5px] whitespace-nowrap text-fg not-disabled:hover:bg-bg-4 disabled:cursor-default disabled:opacity-40";
-const BADGE = "rounded-lg bg-bg-1 px-[5px] py-px text-[10.5px] font-bold text-fg-dim not-italic";
+  "relative flex h-8 cursor-pointer touch-none items-center gap-1.5 rounded-full border border-black/10 bg-black/10 px-3 text-[12.5px] whitespace-nowrap text-on-bolt not-aria-disabled:hover:bg-black/20 aria-disabled:cursor-default aria-disabled:opacity-45";
+const BADGE = "rounded-lg bg-on-bolt px-[5px] py-px text-[10.5px] font-bold text-bolt not-italic";
 const GRIP =
-  "flex h-8 w-5 flex-none cursor-grab touch-none items-center justify-center rounded-md text-fg-faint hover:text-fg-dim active:cursor-grabbing";
+  "flex h-8 w-5 flex-none cursor-grab touch-none items-center justify-center rounded-md text-on-bolt/50 hover:text-on-bolt/80 active:cursor-grabbing";
+/** これ以上動かしたらクリックではなくドラッグとみなす (px) */
+const DRAG_THRESHOLD = 4;
 
 /** ⋮⋮ (6 点) のつまみ */
 function GripDots() {
@@ -58,8 +66,9 @@ function GripDots() {
 
 /**
  * いつでも押せるダッシュボタンを並べたダッシュパネル。
- * git / GitHub / カスタム / 最近使った のバーを縦に積み、⋮⋮ をドラッグして動かす。
+ * git / GitHub / AI / カスタム / 最近使った のバーを縦に積み、⋮⋮ をドラッグして動かす。
  * バーを右クリック (または左端のアイコンをクリック) すると、出すボタンを最大 5 個まで選べる。
+ * ボタンはドラッグで同じバーの中を並べ替えられ、バーごとに表示・非表示を切り替えられる。
  */
 export function DashPanel({ onHide }: { onHide: () => void }) {
   const s = useStore();
@@ -68,6 +77,7 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
   const dialogs = useDialogs();
   const [buttons, setButtons] = useState(loadDash);
   const [recent, setRecent] = useState(loadRecent);
+  const [hidden, setHidden] = useState(loadHiddenBars);
   const [pos, setPos] = useState<DashPos | null>(loadDashPos);
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef<{ dx: number; dy: number } | null>(null);
@@ -100,7 +110,11 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
     });
     switch (id) {
       case "fetch":
-        return { run: act.fetch, disabled: busy, title: "git fetch --all --prune" };
+        return {
+          run: act.fetch,
+          disabled: busy,
+          title: "git fetch --all --prune",
+        };
       case "pull":
         return {
           run: () => act.pull(false),
@@ -109,9 +123,18 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
           title: "git pull",
         };
       case "push":
-        return { run: () => act.push(), disabled: busy, badge: head?.ahead, title: "git push" };
+        return {
+          run: () => act.push(),
+          disabled: busy,
+          badge: head?.ahead,
+          title: "git push",
+        };
       case "branch":
-        return { run: () => act.createBranch(), disabled: busy, title: "ブランチを作成" };
+        return {
+          run: () => act.createBranch(),
+          disabled: busy,
+          title: "ブランチを作成",
+        };
       case "stash":
         return {
           run: act.stashPush,
@@ -126,7 +149,11 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
           title: "git stash pop",
         };
       case "worktree":
-        return { run: act.worktreeAdd, disabled: busy, title: "git worktree add" };
+        return {
+          run: act.worktreeAdd,
+          disabled: busy,
+          title: "git worktree add",
+        };
       case "stageToggle":
         return stageMode === "unstage"
           ? {
@@ -145,8 +172,50 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
               badge: (s.status?.unstaged.length ?? 0) + (s.status?.conflicts.length ?? 0),
               title: stageMode ? "変更をすべてステージ (git add -A)" : "変更はありません",
             };
+      case "commit": {
+        const staged = s.status?.staged.length ?? 0;
+        const changed = (s.status?.unstaged.length ?? 0) + (s.status?.conflicts.length ?? 0);
+        return {
+          run: () => act.commitPrompt(),
+          disabled: busy || staged + changed === 0,
+          badge: staged,
+          title:
+            staged + changed === 0
+              ? "変更はありません"
+              : staged > 0
+                ? `ステージ済みの ${staged} 件をコミット`
+                : "すべての変更をステージしてコミット",
+        };
+      }
+      case "aiCommit": {
+        const staged = s.status?.staged.length ?? 0;
+        const changed = (s.status?.unstaged.length ?? 0) + (s.status?.conflicts.length ?? 0);
+        return {
+          run: () => act.commitPrompt({ ai: true }),
+          disabled: busy || staged + changed === 0,
+          badge: staged,
+          title:
+            staged + changed === 0
+              ? "変更はありません"
+              : `${staged > 0 ? `ステージ済みの ${staged} 件` : "すべての変更"}から Claude Code でメッセージを生成してコミット`,
+        };
+      }
+      case "aiAmend":
+        return {
+          run: () => act.commitPrompt({ ai: true, amend: true }),
+          disabled: busy || !s.repo?.headHash,
+          title: s.repo?.headHash
+            ? "直前のコミット (+ ステージ済み) から Claude Code でメッセージを生成して修正"
+            : "コミットがありません",
+        };
+      case "aiPrCreate":
+        return {
+          run: () => act.prCreate({ ai: true }),
+          disabled: busy,
+          title: "差分とコミットから Claude Code でタイトルと本文を生成して PR 作成",
+        };
       case "prCreate":
-        return { run: act.prCreate, disabled: busy, title: "gh pr create" };
+        return { run: () => act.prCreate(), disabled: busy, title: "gh pr create" };
       case "prCurrent":
         return {
           run: () => currentPr && act.prOpen(currentPr),
@@ -164,13 +233,29 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
       case "ghIssues":
         return web("/issues");
       case "tidy":
-        return { run: act.tidy, disabled: busy, title: "マージ済みのブランチと worktree を整理" };
+        return {
+          run: act.tidy,
+          disabled: busy,
+          title: "マージ済みのブランチと worktree を整理",
+        };
       case "pullRebase":
-        return { run: () => act.pull(true), disabled: busy, title: "git pull --rebase" };
+        return {
+          run: () => act.pull(true),
+          disabled: busy,
+          title: "git pull --rebase",
+        };
       case "forcePush":
-        return { run: act.forcePush, disabled: busy, title: "git push --force-with-lease" };
+        return {
+          run: act.forcePush,
+          disabled: busy,
+          title: "git push --force-with-lease",
+        };
       case "worktreePrune":
-        return { run: act.worktreePrune, disabled: busy, title: "git worktree prune" };
+        return {
+          run: act.worktreePrune,
+          disabled: busy,
+          title: "git worktree prune",
+        };
       case "remoteCreate":
         return {
           run: act.remoteCreate,
@@ -193,9 +278,26 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
     saveDash(next);
   };
 
-  const editMenu = (e: React.MouseEvent, bar: BarId) => {
+  const toggleBar = (bar: DashBar) => {
+    const next = toggleHiddenBar(hidden, bar);
+    setHidden(next);
+    saveHiddenBars(next);
+  };
+
+  const editMenu = (e: React.MouseEvent, bar: DashBar) => {
     e.preventDefault();
-    const tail = [{ separator: true }, { label: "パネルを隠す", icon: "x", onClick: onHide }];
+    const tail = [
+      { separator: true },
+      ...DASH_BARS.map((b) => ({
+        label: `${BAR_META[b].title} バー`,
+        icon: hidden.includes(b) ? undefined : "check",
+        // 最後の 1 本は隠せない
+        disabled: !hidden.includes(b) && hidden.length + 1 >= DASH_BARS.length,
+        onClick: () => toggleBar(b),
+      })),
+      { separator: true },
+      { label: "パネルを隠す", icon: "x", onClick: onHide },
+    ];
     if (bar === "recent") {
       openMenu(e, [
         {
@@ -219,7 +321,11 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
         onClick: () => updateDash(bar, toggleDash(ids, id)),
       })),
       { separator: true },
-      { label: "既定に戻す", icon: "fetch", onClick: () => updateDash(bar, DEFAULT_DASH[bar]) },
+      {
+        label: "既定に戻す",
+        icon: "fetch",
+        onClick: () => updateDash(bar, DEFAULT_DASH[bar]),
+      },
       ...tail,
     ]);
   };
@@ -254,7 +360,86 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
     e.currentTarget.releasePointerCapture(e.pointerId);
     if (pos) saveDashPos(pos);
   };
-  const gripHandlers = { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp };
+  const gripHandlers = {
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel: onPointerUp,
+  };
+
+  // ---------------------------------------------------------- ボタンの並べ替え
+  /** drop は「元の並びで何番目の前に落とすか」 */
+  const [reorder, setReorder] = useState<{
+    group: DashGroup;
+    id: DashButtonId;
+    drop: number;
+  } | null>(null);
+  const pending = useRef<{
+    group: DashGroup;
+    id: DashButtonId;
+    x: number;
+  } | null>(null);
+  /** ドラッグ直後に飛んでくる click でボタンを実行しないための印 */
+  const reordered = useRef(false);
+
+  const dropIndexAt = (barEl: HTMLElement, x: number) => {
+    let i = 0;
+    for (const el of barEl.querySelectorAll<HTMLElement>("[data-dash-button]")) {
+      const r = el.getBoundingClientRect();
+      if (x > r.left + r.width / 2) i++;
+    }
+    return i;
+  };
+
+  const endReorder = () => {
+    pending.current = null;
+    setReorder(null);
+  };
+
+  const buttonDragProps = (group: DashGroup, id: DashButtonId) => ({
+    onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
+      reordered.current = false;
+      if (e.button !== 0) return;
+      pending.current = { group, id, x: e.clientX };
+    },
+    onPointerMove: (e: React.PointerEvent<HTMLButtonElement>) => {
+      const p = pending.current;
+      const barEl = e.currentTarget.parentElement;
+      if (!p || !barEl) return;
+      if (!reordered.current) {
+        if (Math.abs(e.clientX - p.x) < DRAG_THRESHOLD) return;
+        reordered.current = true;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        document.body.classList.add("dragging");
+      }
+      const drop = dropIndexAt(barEl, e.clientX);
+      setReorder((prev) =>
+        prev?.id === p.id && prev.drop === drop ? prev : { group: p.group, id: p.id, drop },
+      );
+    },
+    onPointerUp: () => {
+      if (reorder)
+        updateDash(reorder.group, moveDash(buttons[reorder.group], reorder.id, reorder.drop));
+      document.body.classList.remove("dragging");
+      endReorder();
+    },
+    onPointerCancel: () => {
+      document.body.classList.remove("dragging");
+      endReorder();
+    },
+  });
+
+  /** 自分の前後に落としても並びは変わらないので、そのときは印を出さない */
+  const dropMark = (group: DashGroup, id: DashButtonId): "before" | "after" | null => {
+    if (!reorder || reorder.group !== group) return null;
+    const ids = buttons[group];
+    const from = ids.indexOf(reorder.id);
+    if (reorder.drop === from || reorder.drop === from + 1) return null;
+    const i = ids.indexOf(id);
+    if (reorder.drop === i) return "before";
+    if (reorder.drop === ids.length && i === ids.length - 1) return "after";
+    return null;
+  };
 
   // ウィンドウを縮めても画面外に取り残さない
   useWindowEvent("resize", () => setPos((p) => (p ? place(p) : p)));
@@ -262,10 +447,10 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
   // ダイアログ (フォーム / 確認) を開いている間は隠す
   if (dialogs.open) return null;
 
-  const bars: { id: BarId; ids: DashButtonId[] }[] = [
+  const bars: { id: DashBar; ids: DashButtonId[] }[] = [
     ...DASH_GROUPS.map((g) => ({ id: g, ids: buttons[g] })),
     ...(recent.length ? [{ id: "recent" as const, ids: recent }] : []),
-  ];
+  ].filter((bar) => !hidden.includes(bar.id));
 
   return (
     <div
@@ -287,14 +472,32 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
           {bar.ids.map((id) => {
             const a = DASH_BUTTONS[id];
             const sp = spec(id);
+            // 「最近使った」は使った順に自動で並ぶので並べ替えない
+            const group = bar.id === "recent" ? null : bar.id;
+            const mark = group ? dropMark(group, id) : null;
             return (
               <button
                 key={id}
-                className={ACTION}
-                disabled={sp.disabled}
-                title={sp.title}
-                onClick={() => invoke(id)}
+                data-dash-button
+                className={`${ACTION} ${reorder?.id === id && reorder.group === group ? "opacity-50" : ""}`}
+                aria-disabled={sp.disabled || undefined}
+                title={group ? `${sp.title ?? ""} (ドラッグで並べ替え)` : sp.title}
+                {...(group ? buttonDragProps(group, id) : {})}
+                onClick={() => {
+                  if (reordered.current) {
+                    reordered.current = false;
+                    return;
+                  }
+                  if (!sp.disabled) invoke(id);
+                }}
               >
+                {mark ? (
+                  <span
+                    className={`pointer-events-none absolute top-0.5 bottom-0.5 w-0.5 rounded-full bg-on-bolt ${
+                      mark === "before" ? "-left-[3px]" : "-right-[3px]"
+                    }`}
+                  />
+                ) : null}
                 <Icon name={sp.icon ?? a.icon} size={15} />
                 <span>{sp.label ?? a.label}</span>
                 {sp.badge ? <em className={BADGE}>{sp.badge}</em> : null}
@@ -302,7 +505,7 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
             );
           })}
           {bar.ids.length === 0 ? (
-            <span className="px-1.5 text-[11.5px] text-fg-faint">右クリックでボタンを追加</span>
+            <span className="px-1.5 text-[11.5px] text-on-bolt/60">右クリックでボタンを追加</span>
           ) : null}
           <div className={GRIP} title="ドラッグで移動" {...gripHandlers}>
             <GripDots />

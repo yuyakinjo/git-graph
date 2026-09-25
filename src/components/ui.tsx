@@ -143,6 +143,7 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M6 14.5l6-6 6 6" />
     </>
   ),
+  bolt: <path d="M13 2.5 4.5 13.5h6.5l-1 8 8.5-11h-6.5l1-8z" />,
   dots: (
     <>
       <circle cx="6" cy="12" r="1.5" />
@@ -240,6 +241,12 @@ const PATHS: Record<string, ReactNode> = {
     <>
       <circle cx="12" cy="12" r="8.5" />
       <path d="M12 7.5V12l3.2 2" />
+    </>
+  ),
+  user: (
+    <>
+      <circle cx="12" cy="8" r="3.8" />
+      <path d="M4.5 20c.8-3.8 3.8-6 7.5-6s6.7 2.2 7.5 6" />
     </>
   ),
   columns: (
@@ -403,6 +410,8 @@ export interface FormAction {
   busyLabel?: string;
   icon?: string;
   title?: string;
+  /** ダイアログを開くと同時に 1 度実行する (AI で生成してから確認させるときなど) */
+  autoRun?: boolean;
   run: (values: FormResult) => Promise<Partial<FormResult> | void>;
 }
 
@@ -425,31 +434,46 @@ export interface ConfirmSpec {
 
 export type FormResult = Record<string, string | boolean>;
 
+const initialValues = (spec: FormSpec): FormResult => {
+  const init: FormResult = {};
+  for (const f of spec.fields) init[f.name] = f.value ?? (f.type === "checkbox" ? false : "");
+  return init;
+};
+
 function FormDialog({
   spec,
   resolve,
+  autoBusy = false,
+  autoPatch,
 }: {
   spec: FormSpec;
   resolve: (v: FormResult | null) => void;
+  /** autoRun の実行中か。autoRun は開く側 (DialogProvider) が始める */
+  autoBusy?: boolean;
+  /** autoRun の結果。届いたら入力欄を上書きする */
+  autoPatch?: Partial<FormResult>;
 }) {
-  const [values, setValues] = useState<FormResult>(() => {
-    const init: FormResult = {};
-    for (const f of spec.fields) init[f.name] = f.value ?? (f.type === "checkbox" ? false : "");
-    return init;
-  });
+  const [values, setValues] = useState<FormResult>(() => initialValues(spec));
+  // autoRun の結果が届いたら 1 度だけ反映する (描画中の state 調整。effect は使わない)
+  const [appliedPatch, setAppliedPatch] = useState(autoPatch);
+  if (autoPatch !== appliedPatch) {
+    setAppliedPatch(autoPatch);
+    if (autoPatch) setValues((v) => ({ ...v, ...(autoPatch as FormResult) }));
+  }
   const missing = spec.fields.some(
     (f) => f.required && f.type !== "checkbox" && !String(values[f.name] ?? "").trim(),
   );
   const action = spec.action;
   const [actionBusy, setActionBusy] = useState(false);
+  const busy = actionBusy || autoBusy;
 
   const submit = () => {
-    if (missing || actionBusy) return;
+    if (missing || busy) return;
     resolve(values);
   };
 
   const runAction = async (action: FormAction) => {
-    if (actionBusy) return;
+    if (busy) return;
     setActionBusy(true);
     try {
       const patch = await action.run(values);
@@ -476,15 +500,11 @@ function FormDialog({
               <button
                 className={btn("ghost")}
                 title={action.title}
-                disabled={actionBusy}
+                disabled={busy}
                 onClick={() => void runAction(action)}
               >
-                {actionBusy ? (
-                  <Spinner />
-                ) : action.icon ? (
-                  <Icon name={action.icon} size={14} />
-                ) : null}
-                {actionBusy ? (action.busyLabel ?? action.label) : action.label}
+                {busy ? <Spinner /> : action.icon ? <Icon name={action.icon} size={14} /> : null}
+                {busy ? (action.busyLabel ?? action.label) : action.label}
               </button>
               <span className="flex-1" />
             </>
@@ -494,7 +514,7 @@ function FormDialog({
           </button>
           <button
             className={btn(spec.danger ? "danger" : "primary")}
-            disabled={missing || actionBusy}
+            disabled={missing || busy}
             onClick={submit}
           >
             {spec.submitLabel ?? "OK"}
@@ -616,6 +636,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   const [formState, setFormState] = useState<{
     spec: FormSpec;
     resolve: (v: FormResult | null) => void;
+    autoBusy?: boolean;
+    autoPatch?: Partial<FormResult>;
   } | null>(null);
   const [confirmState, setConfirmState] = useState<{
     spec: ConfirmSpec;
@@ -623,7 +645,18 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   } | null>(null);
 
   const apiValue: DialogApi = {
-    form: (spec) => new Promise((resolve) => setFormState({ spec, resolve })),
+    form: (spec) =>
+      new Promise((resolve) => {
+        const auto = spec.action?.autoRun ? spec.action : null;
+        setFormState({ spec, resolve, autoBusy: Boolean(auto) });
+        if (!auto) return;
+        // 閉じた・別のフォームに替わったあとに届いた結果は捨てる
+        const settle = (patch?: Partial<FormResult> | void) =>
+          setFormState((st) =>
+            st?.spec === spec ? { ...st, autoBusy: false, autoPatch: patch || undefined } : st,
+          );
+        auto.run(initialValues(spec)).then(settle, () => settle());
+      }),
     confirm: (spec) => new Promise((resolve) => setConfirmState({ spec, resolve })),
     open: formState !== null || confirmState !== null,
   };
@@ -634,6 +667,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       {formState ? (
         <FormDialog
           spec={formState.spec}
+          autoBusy={formState.autoBusy}
+          autoPatch={formState.autoPatch}
           resolve={(v) => {
             formState.resolve(v);
             setFormState(null);

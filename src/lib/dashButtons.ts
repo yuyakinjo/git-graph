@@ -1,15 +1,19 @@
 /**
  * ダッシュパネルに並べるダッシュボタンの候補と、その並び・履歴。
  *
- * グループごとに最大 DASH_MAX 個のボタンを選べる。選択と「最近使った」履歴、
- * パネルの位置は localStorage に保存し、再起動後も復元する。
+ * グループごとに最大 DASH_MAX 個のボタンを選べる。選択 (並び順込み) と「最近使った」履歴、
+ * 隠したバー、パネルの位置は localStorage に保存し、再起動後も復元する。
  */
 
 export const DASH_MAX = 5;
 
 /** ボタンを自分で選べるグループ。「最近使った」は履歴から自動で並ぶ。 */
-export const DASH_GROUPS = ["git", "github", "custom"] as const;
+export const DASH_GROUPS = ["git", "github", "ai", "custom"] as const;
 export type DashGroup = (typeof DASH_GROUPS)[number];
+
+/** パネルに積むバー。上から この順に並ぶ。 */
+export const DASH_BARS = [...DASH_GROUPS, "recent"] as const;
+export type DashBar = (typeof DASH_BARS)[number];
 
 export const DASH_BUTTONS = {
   // ---- git
@@ -20,7 +24,12 @@ export const DASH_BUTTONS = {
   stash: { group: "git", label: "スタッシュ", icon: "stash" },
   stashPop: { group: "git", label: "pop", icon: "pull" },
   worktree: { group: "git", label: "worktree", icon: "worktree" },
-  stageToggle: { group: "git", label: "すべてステージ・すべてアンステージ", icon: "plus" },
+  stageToggle: {
+    group: "git",
+    label: "すべてステージ・すべてアンステージ",
+    icon: "plus",
+  },
+  commit: { group: "git", label: "コミット", icon: "commit" },
   // ---- github
   prCreate: { group: "github", label: "PR 作成", icon: "pr" },
   prCurrent: { group: "github", label: "このブランチの PR", icon: "external" },
@@ -28,6 +37,10 @@ export const DASH_BUTTONS = {
   ghRepo: { group: "github", label: "リポジトリ", icon: "github" },
   ghActions: { group: "github", label: "Actions", icon: "clock" },
   ghIssues: { group: "github", label: "Issues", icon: "external" },
+  // ---- ai (Claude Code で生成してから確認ダイアログを開く)
+  aiCommit: { group: "ai", label: "AI でコミット", icon: "commit" },
+  aiAmend: { group: "ai", label: "AI で amend", icon: "amend" },
+  aiPrCreate: { group: "ai", label: "AI で PR 作成", icon: "pr" },
   // ---- custom (複合・派生操作)
   tidy: { group: "custom", label: "tidy", icon: "sweep" },
   pullRebase: { group: "custom", label: "プル (rebase)", icon: "pull" },
@@ -42,8 +55,9 @@ const isActionId = (v: unknown): v is DashButtonId =>
   typeof v === "string" && Object.hasOwn(DASH_BUTTONS, v);
 
 export const DEFAULT_DASH: Record<DashGroup, DashButtonId[]> = {
-  git: ["pull", "push"],
+  git: ["commit", "pull", "push"],
   github: ["prCreate"],
+  ai: ["aiCommit", "aiPrCreate"],
   custom: ["tidy"],
 };
 
@@ -70,13 +84,24 @@ export function normalizeDash(saved: unknown): Record<DashGroup, DashButtonId[]>
 
 /**
  * id をグループに出す / 外す。上限に達していて追加できないときは同じ配列を返す。
- * 追加するときは候補の定義順の位置に差し込む。
+ * 追加するときは末尾に足す (並べ替えた順を崩さない)。
  */
 export function toggleDash(ids: DashButtonId[], id: DashButtonId): DashButtonId[] {
   if (ids.includes(id)) return ids.filter((x) => x !== id);
   if (ids.length >= DASH_MAX) return ids;
-  const order = actionsOf(DASH_BUTTONS[id].group);
-  return order.filter((x) => x === id || ids.includes(x));
+  return [...ids, id];
+}
+
+/**
+ * `id` を「元の並びで `index` 番目の前」へ動かす (`index === ids.length` なら末尾)。
+ * 動かなければ同じ配列をそのまま返す。
+ */
+export function moveDash(ids: DashButtonId[], id: DashButtonId, index: number): DashButtonId[] {
+  const from = ids.indexOf(id);
+  if (from < 0 || index === from || index === from + 1) return ids;
+  const next = ids.filter((x) => x !== id);
+  next.splice(from < index ? index - 1 : index, 0, id);
+  return next;
 }
 
 /** 使った id を履歴の先頭に置く (重複は除き、最大 DASH_MAX 件)。 */
@@ -109,6 +134,7 @@ export function stageToggleMode(counts: {
 const DASH_KEY = "gitsquid.dashButtons";
 const RECENT_KEY = "gitsquid.dashRecent";
 const POS_KEY = "gitsquid.dashPos";
+const HIDDEN_KEY = "gitsquid.dashHiddenBars";
 
 const readJson = (key: string): unknown => {
   try {
@@ -125,6 +151,23 @@ export const saveDash = (v: Record<DashGroup, DashButtonId[]>) =>
 export const loadRecent = () => normalizeRecent(readJson(RECENT_KEY));
 export const saveRecent = (v: DashButtonId[]) =>
   localStorage.setItem(RECENT_KEY, JSON.stringify(v));
+
+/** 隠したバー。既知の id だけを残し、すべて隠れる値は捨てる (パネルが空にならないように)。 */
+export function normalizeHiddenBars(saved: unknown): DashBar[] {
+  if (!Array.isArray(saved)) return [];
+  const hidden = DASH_BARS.filter((b) => saved.includes(b));
+  return hidden.length < DASH_BARS.length ? hidden : [];
+}
+
+/** バーを出す / 隠す。最後の 1 本は隠さない (同じ配列を返す)。 */
+export function toggleHiddenBar(hidden: DashBar[], bar: DashBar): DashBar[] {
+  if (hidden.includes(bar)) return hidden.filter((b) => b !== bar);
+  if (hidden.length + 1 >= DASH_BARS.length) return hidden;
+  return DASH_BARS.filter((b) => b === bar || hidden.includes(b));
+}
+
+export const loadHiddenBars = () => normalizeHiddenBars(readJson(HIDDEN_KEY));
+export const saveHiddenBars = (v: DashBar[]) => localStorage.setItem(HIDDEN_KEY, JSON.stringify(v));
 
 export interface DashPos {
   x: number;
