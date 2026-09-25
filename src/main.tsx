@@ -2,10 +2,28 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import { DialogProvider, MenuProvider } from "./components/ui";
+import { appLog } from "./lib/log";
 import { bootApp } from "./lib/repo-data";
 import { applyZoom } from "./lib/zoom";
 import { StoreProvider } from "./state/StoreProvider";
 import "./styles.css";
+
+// 握りつぶされた例外もログ画面 (LogModal) から追えるようにする
+window.addEventListener("error", (e) => {
+  appLog(
+    "error",
+    `未処理の例外: ${e.message}`,
+    e.error instanceof Error ? e.error.stack : undefined,
+  );
+});
+window.addEventListener("unhandledrejection", (e) => {
+  const r: unknown = e.reason;
+  appLog(
+    "error",
+    "未処理の Promise の失敗",
+    r instanceof Error ? (r.stack ?? r.message) : String(r),
+  );
+});
 
 // 前回の表示倍率を最初の描画前に戻す (拡大した状態で起動してもチラつかせない)
 applyZoom();

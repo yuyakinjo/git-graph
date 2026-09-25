@@ -98,6 +98,35 @@ export function useActions() {
       }
     };
 
+    const deleteTag = async (name: string) => {
+      const remote = s.repo?.remotes[0];
+      const res = await dialogs.form({
+        title: "タグを削除",
+        description: `タグ ${name} を削除します。`,
+        fields: remote
+          ? [
+              {
+                name: "remote",
+                label: `リモート (${remote}) からも削除する`,
+                type: "checkbox",
+                value: false,
+              },
+            ]
+          : [],
+        submitLabel: "削除",
+        danger: true,
+      });
+      if (!res) return;
+      const done = await s.run(`タグ ${name} を削除`, () => api.deleteTag(dir, name), {
+        successDetail: false,
+      });
+      if (done && remote && res.remote) {
+        await s.run(`タグ ${name} を ${remote} から削除`, () =>
+          api.deleteRemoteTag(dir, remote, name),
+        );
+      }
+    };
+
     // ---------------------------------------------------------- 2. stash
     const stashPush = async () => {
       if (!s.dirty) {
@@ -677,6 +706,7 @@ export function useActions() {
       checkoutRemote,
       createBranch,
       deleteBranch,
+      deleteTag,
       stashPush,
       stashApply,
       stashDrop,

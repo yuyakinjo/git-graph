@@ -222,3 +222,17 @@ export interface PrContext {
   /** リポジトリの PR テンプレート */
   template: string | null;
 }
+
+/** Rust 側で実行した外部コマンド (git / gh など) の記録 */
+export interface CmdLog {
+  /** 開始時刻 (エポックミリ秒) */
+  time: number;
+  cwd: string;
+  program: string;
+  args: string[];
+  /** 終了コード。起動できなかったときは -1 */
+  code: number;
+  durationMs: number;
+  stdout: string;
+  stderr: string;
+}

@@ -151,6 +151,13 @@ export function TitleBar() {
         </button>
       </div>
       <div className="min-w-6 flex-1 self-stretch" data-tauri-drag-region />
+      <button
+        className="mr-1 mb-0.5 flex h-6.5 w-6.5 flex-none cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-fg-dim hover:bg-bg-3 hover:text-fg"
+        title="ログ (Cmd Shift L)"
+        onClick={s.openLogs}
+      >
+        <Icon name="log" size={14} />
+      </button>
       {/* 右端のロゴは設定の入口を兼ねる */}
       <button
         className="mr-2.5 mb-0.5 flex h-6.5 flex-none cursor-pointer items-center rounded-md border-0 bg-transparent px-1.5 hover:bg-bg-3"

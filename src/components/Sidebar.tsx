@@ -615,6 +615,12 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
                   icon: "copy",
                   onClick: () => navigator.clipboard.writeText(t.name).catch(() => undefined),
                 },
+                {
+                  label: "タグを削除",
+                  icon: "trash",
+                  danger: true,
+                  onClick: () => act.deleteTag(t.name),
+                },
               ]);
             }}
           >

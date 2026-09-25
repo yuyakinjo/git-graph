@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { DetailPane } from "./components/DetailPane";
 import { DiffModal } from "./components/DiffModal";
 import { GraphPane } from "./components/GraphPane";
+import { LogModal } from "./components/LogModal";
 import { PrModal } from "./components/PrModal";
 import { TidyModal } from "./components/TidyModal";
 import { Settings } from "./components/Settings";
@@ -9,7 +10,7 @@ import { Sidebar } from "./components/Sidebar";
 import { TitleBar } from "./components/TitleBar";
 import { StatusBar, Toolbar } from "./components/Toolbar";
 import { btn, iconBtn } from "./components/classes";
-import { Icon, ProgressBar, Spinner } from "./components/ui";
+import { CopyButton, Icon, ProgressBar, Spinner } from "./components/ui";
 import { api } from "./lib/api";
 import { useWindowEvent } from "./lib/effects";
 import type { PullRequest } from "./lib/types";
@@ -153,7 +154,7 @@ function Toasts() {
             size={18}
             className={`mt-px flex-none ${TOAST_ICON[t.kind] ?? TOAST_ICON.info}`}
           />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <strong className="text-[14px] font-[650]">{t.title}</strong>
             {t.detail ? (
               <pre className="mx-0 mt-1.5 mb-0 max-h-60 overflow-auto font-mono text-[12.5px] wrap-break-word whitespace-pre-wrap text-fg-dim">
@@ -161,6 +162,11 @@ function Toasts() {
               </pre>
             ) : null}
           </div>
+          <CopyButton
+            text={t.detail ? `${t.title}\n${t.detail}` : t.title}
+            title="メッセージをコピー"
+            className={`${iconBtn({ tiny: true })} -mt-1 -mr-1.5 flex-none`}
+          />
         </div>
       ))}
     </div>
@@ -198,6 +204,7 @@ export default function App() {
       !e.defaultPrevented &&
       !s.diffModal &&
       !s.settingsOpen &&
+      !s.logsOpen &&
       !s.tidy &&
       !pr &&
       !(e.target instanceof HTMLInputElement) &&
@@ -216,6 +223,9 @@ export default function App() {
     if (e.key === "o") {
       e.preventDefault();
       act.openFolder();
+    } else if (e.key.toLowerCase() === "l" && e.shiftKey) {
+      e.preventDefault();
+      s.openLogs();
     } else if (e.key === ",") {
       e.preventDefault();
       s.openSettings();
@@ -278,6 +288,7 @@ export default function App() {
       {s.diffModal ? <DiffModal /> : null}
       {pr ? <PrModal pr={pr} onClose={() => setPr(null)} /> : null}
       {s.settingsOpen ? <Settings /> : null}
+      {s.logsOpen ? <LogModal /> : null}
       {s.tidy ? (
         <TidyModal dir={s.tidy.dir} plan={s.tidy.plan} onClose={() => s.setTidy(null)} />
       ) : null}

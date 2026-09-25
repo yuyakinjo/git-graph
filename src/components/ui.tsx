@@ -185,6 +185,14 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M5.5 15V3.5H16" />
     </>
   ),
+  /** ターミナル (ログ) */
+  log: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <path d="M7.5 9.5l2.5 2.5-2.5 2.5" />
+      <path d="M12.5 15h4" />
+    </>
+  ),
   remote: (
     <>
       <circle cx="12" cy="12" r="8.5" />
@@ -273,6 +281,49 @@ export function Icon({
     >
       {PATHS[name] ?? null}
     </svg>
+  );
+}
+
+// ------------------------------------------------------------------ コピーボタン
+
+/**
+ * 押すとクリップボードへコピーし、少しの間チェックマークに変わるアイコンボタン。
+ * text は押した時点で評価したいもの (ログ全体など) のために関数でも渡せる。
+ */
+export function CopyButton({
+  text,
+  title = "クリップボードにコピー",
+  size = 13,
+  className,
+  label,
+}: {
+  text: string | (() => string);
+  title?: string;
+  size?: number;
+  className?: string;
+  /** アイコンの横に出す文言 (ボタン型で使うとき) */
+  label?: ReactNode;
+}) {
+  const [copied, setCopied] = useState(false);
+  const copy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard
+      .writeText(typeof text === "function" ? text() : text)
+      .then(() => {
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1200);
+      })
+      .catch(() => undefined);
+  };
+  return (
+    <button
+      className={className ?? iconBtn({ tiny: true })}
+      title={copied ? "コピーしました" : title}
+      onClick={copy}
+    >
+      <Icon name={copied ? "check" : "copy"} size={size} className={copied ? "text-green" : ""} />
+      {label}
+    </button>
   );
 }
 

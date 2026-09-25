@@ -56,6 +56,11 @@ fn dispatch(cmd: &str, a: &Value) -> Result<Value, String> {
         "scan_repos" => reply(Ok(c::scan_repos(arg(a, "roots")?, arg(a, "depth")?))),
         "home_dir" => reply(Ok(c::home_dir())),
         "initial_repo" => reply(Ok(c::initial_repo())),
+        "app_logs" => reply(Ok(c::app_logs())),
+        "app_logs_clear" => {
+            c::app_logs_clear();
+            reply(Ok(()))
+        }
 
         // add / commit
         "git_stage" => call!(a, c::git_stage, "dir", "paths"),
@@ -96,6 +101,8 @@ fn dispatch(cmd: &str, a: &Value) -> Result<Value, String> {
         "git_delete_remote_branch" => {
             call!(a, c::git_delete_remote_branch, "dir", "remoteBranch")
         }
+        "git_delete_tag" => call!(a, c::git_delete_tag, "dir", "name"),
+        "git_delete_remote_tag" => call!(a, c::git_delete_remote_tag, "dir", "remote", "name"),
 
         // stash
         "git_stash_push" => call!(

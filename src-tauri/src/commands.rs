@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use serde_json::Value;
 use tauri::Manager;
 
+use crate::applog;
 use crate::avatar;
 use crate::github;
 use crate::graph;
@@ -285,6 +286,17 @@ pub fn git_delete_remote_branch(dir: String, remote_branch: String) -> Result<St
         .split_once('/')
         .ok_or("リモートブランチ名が不正です")?;
     sh::git_log(&dir, &["push", remote, "--delete", branch])
+}
+
+#[tauri::command]
+pub fn git_delete_tag(dir: String, name: String) -> Result<String, String> {
+    sh::git_log(&dir, &["tag", "-d", &name])
+}
+
+#[tauri::command]
+pub fn git_delete_remote_tag(dir: String, remote: String, name: String) -> Result<String, String> {
+    let refname = format!("refs/tags/{name}");
+    sh::git_log(&dir, &["push", &remote, "--delete", &refname])
 }
 
 // ------------------------------------------------------------------ stash
@@ -724,4 +736,17 @@ pub fn initial_repo() -> Option<String> {
         .ok()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
+}
+
+// ------------------------------------------------------------------ デバッグ用ログ
+
+/// 実行した外部コマンドの履歴 (古い順)
+#[tauri::command]
+pub fn app_logs() -> Vec<applog::CmdLog> {
+    applog::snapshot()
+}
+
+#[tauri::command]
+pub fn app_logs_clear() {
+    applog::clear()
 }

@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   BranchInfo,
+  CmdLog,
   CommitContext,
   PrContext,
   CommitDetail,
@@ -44,6 +45,10 @@ export const api = {
   homeDir: () => invoke<string>("home_dir"),
   initialRepo: () => invoke<string | null>("initial_repo"),
 
+  // デバッグ用ログ
+  appLogs: () => invoke<CmdLog[]>("app_logs"),
+  clearAppLogs: () => invoke<void>("app_logs_clear"),
+
   // add / commit
   stage: (dir: string, paths: string[]) => invoke<string>("git_stage", { dir, paths }),
   stageAll: (dir: string) => invoke<string>("git_stage_all", { dir }),
@@ -86,6 +91,9 @@ export const api = {
     invoke<string>("git_delete_branch", { dir, name, force }),
   deleteRemoteBranch: (dir: string, remoteBranch: string) =>
     invoke<string>("git_delete_remote_branch", { dir, remoteBranch }),
+  deleteTag: (dir: string, name: string) => invoke<string>("git_delete_tag", { dir, name }),
+  deleteRemoteTag: (dir: string, remote: string, name: string) =>
+    invoke<string>("git_delete_remote_tag", { dir, remote, name }),
 
   // stash
   stashPush: (dir: string, message: string, includeUntracked: boolean, keepIndex = false) =>

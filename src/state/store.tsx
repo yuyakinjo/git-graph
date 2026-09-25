@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { parseDiff, tokenizeDiff, type DiffLine } from "../lib/diff";
 import { DEFAULT_DIFF_THEME, isDiffTheme, type DiffTheme } from "../lib/highlight";
 import { useInterval } from "../lib/effects";
+import { appLog, clearAppLogs } from "../lib/log";
 import {
   GRAPH_LIMIT,
   GRAPH_PAGE,
@@ -20,6 +21,7 @@ import { snapshotHash, type CachedRepo } from "../lib/snapshot-cache";
 import { applyZoom, clampZoom, loadZoom, saveZoom } from "../lib/zoom";
 import type {
   BranchInfo,
+  CmdLog,
   CommitDetail,
   DiffFile,
   GhStatus,
@@ -248,6 +250,8 @@ export function useStoreValue(boot: BootData | null) {
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [scanning, setScanning] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [cmdLogs, setCmdLogs] = useState<CmdLog[]>([]);
   /** マージ済みブランチ / worktree の整理ダイアログ。判定したリポジトリと結果を持つ */
   const [tidy, setTidy] = useState<{ dir: string; plan: TidyPlan } | null>(null);
 
@@ -338,6 +342,7 @@ export function useStoreValue(boot: BootData | null) {
   const shownRef = useRef<string>(boot?.snapshot.repo.root ?? "");
 
   const toast = useCallback((t: Omit<Toast, "id">) => {
+    appLog(t.kind === "error" ? "error" : "info", t.title, t.detail);
     const id = ++toastSeq.current;
     setToasts((prev) => [...prev, { ...t, id }]);
     const ttl = t.kind === "error" ? 9000 : 3800;
@@ -693,9 +698,11 @@ export function useStoreValue(boot: BootData | null) {
       opts: { successDetail?: boolean; silentSuccess?: boolean } = {},
     ): Promise<boolean> => {
       setBusy(label);
+      appLog("info", `${label} を開始`);
       try {
         const out = await fn();
-        if (!opts.silentSuccess) {
+        if (opts.silentSuccess) appLog("info", `${label} 完了`);
+        else {
           toast({
             kind: "success",
             title: `${label} 完了`,
@@ -838,6 +845,20 @@ export function useStoreValue(boot: BootData | null) {
 
   const openSettings = useCallback(() => setSettingsOpen(true), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  /** Rust 側のコマンド履歴を取り直す (ログ画面を開いている間は定期的に呼ぶ) */
+  const reloadLogs = useCallback(async () => {
+    setCmdLogs(await api.appLogs().catch(() => []));
+  }, []);
+  const clearLogs = useCallback(async () => {
+    clearAppLogs();
+    await api.clearAppLogs().catch(() => undefined);
+    await reloadLogs();
+  }, [reloadLogs]);
+  const openLogs = useCallback(() => {
+    setLogsOpen(true);
+    void reloadLogs();
+  }, [reloadLogs]);
+  const closeLogs = useCallback(() => setLogsOpen(false), []);
 
   const headBranch = useMemo(() => branches.find((b) => b.isHead) ?? null, [branches]);
 
@@ -914,6 +935,12 @@ export function useStoreValue(boot: BootData | null) {
     settingsOpen,
     openSettings,
     closeSettings,
+    logsOpen,
+    cmdLogs,
+    reloadLogs,
+    clearLogs,
+    openLogs,
+    closeLogs,
   };
 }
 

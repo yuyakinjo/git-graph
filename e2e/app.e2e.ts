@@ -199,3 +199,18 @@ test.describe("設定", () => {
     await expect(page.getByRole("dialog", { name: "設定" })).toBeVisible();
   });
 });
+
+test.describe("ログ", () => {
+  test("タイトルバーからログを開き、実行した git コマンドをコピーできる", async ({ app }) => {
+    const { page } = app;
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+
+    await page.getByTitle("ログ (Cmd Shift L)").click();
+
+    const dialog = page.getByRole("dialog", { name: "ログ" });
+    await expect(dialog.getByText(/^\$ git /).first()).toBeVisible();
+    await dialog.getByRole("button", { name: "すべてコピー" }).click();
+    await expect(dialog.getByTitle("コピーしました")).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("$ git ");
+  });
+});

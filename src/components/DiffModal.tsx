@@ -91,12 +91,21 @@ export function DiffModal() {
 
   // WIP のファイルだけはダイアログから直接ステージ / アンステージできる。
   // 実行後は refresh がこのパスを新しい source で選び直すので、選択はそのまま残る。
+  // ステージしたときは、まだ未ステージのファイルが残っていればそちらへ移る
+  // (いまの位置より後ろを優先し、なければ先頭側へ回り込む)。
   const staged = cur?.source === "staged";
   const canStage =
     cur?.source === "staged" || cur?.source === "unstaged" || cur?.source === "untracked";
-  const toggleStage = () => {
+  const toggleStage = async () => {
     if (!cur) return;
-    void (staged ? act.unstage([cur.path]) : act.stage([cur.path]));
+    if (staged) {
+      void act.unstage([cur.path]);
+      return;
+    }
+    const rest = entries.filter((e) => e.group === "unstaged" && e.target.path !== cur.path);
+    const next = rest.find((e) => entries.indexOf(e) > index) ?? rest.at(0);
+    const ok = await act.stage([cur.path]);
+    if (ok && next) await s.openFile(next.target);
   };
 
   const go = (delta: number) => {
@@ -135,59 +144,65 @@ export function DiffModal() {
         role="dialog"
         aria-label={cur ? cur.path : "差分"}
       >
-        <header className="flex flex-none items-center gap-2.5 border-b border-line px-3.5 py-2.5">
-          <span
-            className={`w-3.5 flex-none text-center font-mono text-[11px] font-bold ${
-              FSTATUS_COLOR[entries[index]?.status ?? ""] ?? "text-fg-faint"
-            }`}
-          >
-            {entries[index]?.status ?? ""}
-          </span>
-          <h2 className="m-0 min-w-0 text-[13.5px] font-[650] text-ellipsis whitespace-nowrap">
-            {cur ? basename(cur.path) : "差分"}
-          </h2>
-          <span className="min-w-0 flex-1 overflow-hidden font-mono text-[11.5px] text-ellipsis whitespace-nowrap text-fg-faint">
-            {cur ? dirname(cur.path) : ""}
-          </span>
-          {entries[index]?.stats ? (
-            <span className={fstats}>
-              <em className={fstatAdd}>+{entries[index].stats.additions}</em>
-              <em className={fstatDel}>-{entries[index].stats.deletions}</em>
-            </span>
-          ) : null}
-          {canStage ? (
-            <button
-              className={btn(staged ? "default" : "primary", "tiny")}
-              title={staged ? "このファイルをアンステージ" : "このファイルを git add"}
-              disabled={!!s.busy}
-              onClick={toggleStage}
+        <header className="grid flex-none grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-2.5 border-b border-line px-3.5 py-2.5">
+          <div className="flex min-w-0 items-center">
+            {canStage ? (
+              <button
+                className={btn(staged ? "default" : "primary", "tiny")}
+                title={staged ? "このファイルをアンステージ" : "このファイルを git add"}
+                disabled={!!s.busy}
+                onClick={() => void toggleStage()}
+              >
+                <Icon name={staged ? "minus" : "plus"} size={12} />
+                {staged ? "アンステージ" : "ステージ"}
+              </button>
+            ) : null}
+          </div>
+          <div className="flex min-w-0 items-center justify-center gap-2.5">
+            <span
+              className={`w-3.5 flex-none text-center font-mono text-[11px] font-bold ${
+                FSTATUS_COLOR[entries[index]?.status ?? ""] ?? "text-fg-faint"
+              }`}
             >
-              <Icon name={staged ? "minus" : "plus"} size={12} />
-              {staged ? "アンステージ" : "ステージ"}
+              {entries[index]?.status ?? ""}
+            </span>
+            <h2 className="m-0 min-w-0 overflow-hidden text-[13.5px] font-[650] text-ellipsis whitespace-nowrap">
+              {cur ? basename(cur.path) : "差分"}
+            </h2>
+            <span className="min-w-0 overflow-hidden font-mono text-[11.5px] text-ellipsis whitespace-nowrap text-fg-faint">
+              {cur ? dirname(cur.path) : ""}
+            </span>
+          </div>
+          <div className="flex min-w-0 items-center justify-end gap-2.5">
+            {entries[index]?.stats ? (
+              <span className={fstats}>
+                <em className={fstatAdd}>+{entries[index].stats.additions}</em>
+                <em className={fstatDel}>-{entries[index].stats.deletions}</em>
+              </span>
+            ) : null}
+            <span className="flex-none font-mono text-[11.5px] text-fg-dim">
+              {index < 0 ? "-" : index + 1} / {entries.length}
+            </span>
+            <button
+              className={iconBtn({ tiny: true })}
+              title="前のファイル (↑)"
+              disabled={index <= 0}
+              onClick={() => go(-1)}
+            >
+              <Icon name="chevronUp" size={13} />
             </button>
-          ) : null}
-          <span className="flex-none font-mono text-[11.5px] text-fg-dim">
-            {index < 0 ? "-" : index + 1} / {entries.length}
-          </span>
-          <button
-            className={iconBtn({ tiny: true })}
-            title="前のファイル (↑)"
-            disabled={index <= 0}
-            onClick={() => go(-1)}
-          >
-            <Icon name="chevronUp" size={13} />
-          </button>
-          <button
-            className={iconBtn({ tiny: true })}
-            title="次のファイル (↓)"
-            disabled={index >= entries.length - 1}
-            onClick={() => go(1)}
-          >
-            <Icon name="chevronDown" size={13} />
-          </button>
-          <button className={iconBtn()} title="閉じる (Esc)" onClick={close}>
-            <Icon name="x" />
-          </button>
+            <button
+              className={iconBtn({ tiny: true })}
+              title="次のファイル (↓)"
+              disabled={index >= entries.length - 1}
+              onClick={() => go(1)}
+            >
+              <Icon name="chevronDown" size={13} />
+            </button>
+            <button className={iconBtn()} title="閉じる (Esc)" onClick={close}>
+              <Icon name="x" />
+            </button>
+          </div>
         </header>
 
         <div className="flex min-h-0 flex-1">

@@ -1,6 +1,9 @@
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::time::Instant;
+
+use crate::applog;
 
 /// GUI プロセスは PATH が最小限になりがちなので、よくあるインストール先を足しておく。
 /// (gh / git を Homebrew や asdf 経由で入れているケースを救う)
@@ -61,8 +64,35 @@ pub fn exec<S: AsRef<str>>(cwd: &str, program: &str, args: &[S]) -> Result<Out, 
     exec_with_stdin(cwd, program, args, None)
 }
 
-/// stdin に文字列を流し込んで実行する (引数に載せきれない大きな入力用)
+/// stdin に文字列を流し込んで実行する (引数に載せきれない大きな入力用)。
+/// 実行結果はデバッグ用のログ (applog) にも残す。
 pub fn exec_with_stdin<S: AsRef<str>>(
+    cwd: &str,
+    program: &str,
+    args: &[S],
+    stdin: Option<&str>,
+) -> Result<Out, String> {
+    let time = applog::now_ms();
+    let started = Instant::now();
+    let res = spawn(cwd, program, args, stdin);
+    let (code, stdout, stderr) = match &res {
+        Ok(out) => (out.code, out.stdout.clone(), out.stderr.clone()),
+        Err(e) => (-1, String::new(), e.clone()),
+    };
+    applog::record(applog::CmdLog {
+        time,
+        cwd: cwd.to_string(),
+        program: program.to_string(),
+        args: args.iter().map(|a| a.as_ref().to_string()).collect(),
+        code,
+        duration_ms: started.elapsed().as_millis() as u64,
+        stdout,
+        stderr,
+    });
+    res
+}
+
+fn spawn<S: AsRef<str>>(
     cwd: &str,
     program: &str,
     args: &[S],
@@ -88,6 +118,17 @@ pub fn exec_with_stdin<S: AsRef<str>>(
     cmd.env("GH_PAGER", "cat");
     cmd.env("GH_PROMPT_DISABLED", "1");
     cmd.env("NO_COLOR", "1");
+    // VSCode のデバッグ用ターミナルから起動するとデバッガ接続用の変数が付き、
+    // Bun 製の claude などが同じソケットで inspector を開こうとして落ちるので渡さない
+    for var in [
+        "BUN_INSPECT",
+        "BUN_INSPECT_CONNECT_TO",
+        "BUN_INSPECT_NOTIFY",
+        "NODE_OPTIONS",
+        "VSCODE_INSPECTOR_OPTIONS",
+    ] {
+        cmd.env_remove(var);
+    }
 
     let spawn_err = |e: std::io::Error| match e.kind() {
         std::io::ErrorKind::NotFound => {

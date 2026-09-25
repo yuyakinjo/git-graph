@@ -1,3 +1,4 @@
+mod applog;
 mod avatar;
 // E2E ブリッジ (src/bin/e2e-bridge.rs) から直接呼ぶので公開している
 pub mod commands;
@@ -70,6 +71,8 @@ pub fn run() {
             commands::git_create_branch,
             commands::git_delete_branch,
             commands::git_delete_remote_branch,
+            commands::git_delete_tag,
+            commands::git_delete_remote_tag,
             commands::git_stash_push,
             commands::git_stash_apply,
             commands::git_stash_drop,
@@ -97,6 +100,8 @@ pub fn run() {
             commands::pr_context,
             commands::claude_generate,
             commands::initial_repo,
+            commands::app_logs,
+            commands::app_logs_clear,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
