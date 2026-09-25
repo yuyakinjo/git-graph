@@ -133,6 +133,10 @@ fn dispatch(cmd: &str, a: &Value) -> Result<Value, String> {
         "git_tidy_plan" => call!(a, c::git_tidy_plan, "dir", "fetch"),
         "git_tidy_apply" => call!(a, c::git_tidy_apply, "dir", "ops"),
 
+        // recompose
+        "recompose_context" => call!(a, c::recompose_context, "dir", "branch"),
+        "recompose_apply" => call!(a, c::recompose_apply, "dir", "op"),
+
         // GitHub (gh CLI)
         "gh_status" => call!(a, c::gh_status, "dir"),
         "gh_owners" => call!(a, c::gh_owners, "dir"),
