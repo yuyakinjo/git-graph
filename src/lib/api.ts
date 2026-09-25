@@ -10,6 +10,8 @@ import type {
   GraphData,
   ProjectEntry,
   PullRequest,
+  RecomposeContext,
+  RecomposeOp,
   RepoInfo,
   StashInfo,
   StatusData,
@@ -114,6 +116,12 @@ export const api = {
   tidyPlan: (dir: string, fetch = true) => invoke<TidyPlan>("git_tidy_plan", { dir, fetch }),
   tidyApply: (dir: string, ops: Pick<TidyItem, "kind" | "target" | "sha">[]) =>
     invoke<TidyResult[]>("git_tidy_apply", { dir, ops }),
+
+  // recompose (ブランチのコミットを組み直す)
+  /** 分岐点から最終状態 (HEAD なら作業中の変更込み) までの変更を集める */
+  recomposeContext: (dir: string, branch: string) =>
+    invoke<RecomposeContext>("recompose_context", { dir, branch }),
+  recomposeApply: (dir: string, op: RecomposeOp) => invoke<string>("recompose_apply", { dir, op }),
 
   // GitHub (gh CLI)
   ghStatus: (dir: string) => invoke<GhStatus>("gh_status", { dir }),

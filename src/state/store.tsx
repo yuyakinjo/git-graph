@@ -63,8 +63,20 @@ export interface DiffState {
 
 const RECENT_KEY = "gitsquid.recent";
 const TABS_KEY = "gitsquid.tabs";
-const AUTOFETCH_KEY = "gitsquid.autofetch";
-const AUTOFETCH_MS = 180_000;
+// 自動フェッチの間隔 (分)。0 は OFF。旧キー (on/off) は OFF だけ引き継ぐ。
+const AUTOFETCH_KEY = "gitsquid.autofetchMinutes";
+const LEGACY_AUTOFETCH_KEY = "gitsquid.autofetch";
+const DEFAULT_AUTOFETCH_MIN = 1;
+export const AUTOFETCH_MINUTES = [0, 1, 3, 5, 10, 30] as const;
+
+function loadAutoFetchMinutes(): number {
+  const saved = localStorage.getItem(AUTOFETCH_KEY);
+  if (saved !== null) {
+    const n = Number(saved);
+    return (AUTOFETCH_MINUTES as readonly number[]).includes(n) ? n : DEFAULT_AUTOFETCH_MIN;
+  }
+  return localStorage.getItem(LEGACY_AUTOFETCH_KEY) === "off" ? 0 : DEFAULT_AUTOFETCH_MIN;
+}
 // 設定 (Cmd+,) で決めるプロジェクト置き場と、その探索の深さ
 const ROOTS_KEY = "gitsquid.projectRoots";
 const DEPTH_KEY = "gitsquid.scanDepth";
@@ -233,7 +245,7 @@ export function useStoreValue(boot: BootData | null) {
   });
   // タブごとの「未コミット変更あり」。現在のタブ以外は最後に読んだ時点の情報。
   const [tabDirty, setTabDirty] = useState<Record<string, boolean>>({});
-  const [autoFetch, setAutoFetch] = useState(() => localStorage.getItem(AUTOFETCH_KEY) !== "off");
+  const [autoFetchMinutes, setAutoFetchMinutesState] = useState<number>(loadAutoFetchMinutes);
   const [columns, setColumns] = useState<GraphColumns>(loadColumns);
   const [columnWidths, setColumnWidths] = useState<GraphColumnWidths>(loadColumnWidths);
   const [graphStyle, setGraphStyleState] = useState<GraphStyle>(() =>
@@ -254,6 +266,8 @@ export function useStoreValue(boot: BootData | null) {
   const [cmdLogs, setCmdLogs] = useState<CmdLog[]>([]);
   /** マージ済みブランチ / worktree の整理ダイアログ。判定したリポジトリと結果を持つ */
   const [tidy, setTidy] = useState<{ dir: string; plan: TidyPlan } | null>(null);
+  /** recompose ダイアログ。開いたリポジトリと、最初に選んでおくブランチを持つ */
+  const [recompose, setRecompose] = useState<{ dir: string; branch: string } | null>(null);
 
   // ---- 選択 (どこを見ているか) と、その中身 ----
   const [selection, setSelection] = useState<Selection>({ kind: "wip" });
@@ -721,14 +735,12 @@ export function useStoreValue(boot: BootData | null) {
     [refresh, toast],
   );
 
-  const toggleAutoFetch = useCallback(() => {
-    setAutoFetch((v) => {
-      localStorage.setItem(AUTOFETCH_KEY, v ? "off" : "on");
-      return !v;
-    });
+  const setAutoFetchMinutes = useCallback((minutes: number) => {
+    setAutoFetchMinutesState(minutes);
+    localStorage.setItem(AUTOFETCH_KEY, String(minutes));
   }, []);
 
-  // 自動フェッチ (3分間隔・サイレント)。外部タイマーの購読なので効果として扱う。
+  // 自動フェッチ (設定した間隔・サイレント)。外部タイマーの購読なので効果として扱う。
   useInterval(
     () => {
       api
@@ -736,7 +748,7 @@ export function useStoreValue(boot: BootData | null) {
         .then(() => refresh({ silent: true, ifChanged: true }))
         .catch(() => undefined); // オフライン時などは黙って無視
     },
-    dir && autoFetch ? AUTOFETCH_MS : null,
+    dir && autoFetchMinutes > 0 ? autoFetchMinutes * 60_000 : null,
   );
 
   /** 登録したプロジェクト置き場を走査する。古い結果は連番で破棄する。 */
@@ -908,8 +920,8 @@ export function useStoreValue(boot: BootData | null) {
     run,
     headBranch,
     dirty,
-    autoFetch,
-    toggleAutoFetch,
+    autoFetchMinutes,
+    setAutoFetchMinutes,
     columns,
     toggleColumn,
     resetColumns,
@@ -932,6 +944,8 @@ export function useStoreValue(boot: BootData | null) {
     scanProjects,
     tidy,
     setTidy,
+    recompose,
+    setRecompose,
     settingsOpen,
     openSettings,
     closeSettings,

@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { buildBranchTree, type BranchNode } from "../lib/branchTree";
 import { relativeTime } from "../lib/format";
+import { recomposeMode } from "../lib/recompose";
 import {
   loadSectionOrder,
   moveSection,
@@ -246,6 +247,26 @@ function BranchItem({ b, label, depth = 0 }: { b: BranchInfo; label?: string; de
         { separator: true },
       ];
 
+  // 既定ブランチはチェックアウト中のときだけ (compose)。差分が無ければ無効
+  const isDefault = b.name === s.repo?.defaultBranch;
+  const dirty =
+    (s.status?.staged.length ?? 0) +
+      (s.status?.unstaged.length ?? 0) +
+      (s.status?.conflicts.length ?? 0) >
+    0;
+  const composeMode = isDefault && b.isHead ? recomposeMode(s.repo, b, dirty) : null;
+  const recomposeItems =
+    b.kind === "local" && (!isDefault || b.isHead)
+      ? [
+          {
+            label: isDefault ? "compose…" : "recompose…",
+            icon: "layers",
+            disabled: isDefault && !composeMode,
+            onClick: () => act.recompose(b.name),
+          },
+        ]
+      : [];
+
   const menu = (e: React.MouseEvent) => {
     e.preventDefault();
     openMenu(e, [
@@ -271,6 +292,7 @@ function BranchItem({ b, label, depth = 0 }: { b: BranchInfo; label?: string; de
         icon: "worktree",
         onClick: () => act.worktreeAdd(),
       },
+      ...recomposeItems,
       { separator: true },
       {
         label: "名前をコピー",

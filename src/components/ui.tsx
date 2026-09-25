@@ -180,6 +180,14 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M7 17.5l2-2" />
     </>
   ),
+  /** 積み直し (recompose) */
+  layers: (
+    <>
+      <path d="M12 3.5 20.5 8 12 12.5 3.5 8z" />
+      <path d="M3.5 12 12 16.5 20.5 12" />
+      <path d="M3.5 16 12 20.5 20.5 16" />
+    </>
+  ),
   copy: (
     <>
       <path d="M9 9h10.5v11.5H9z" />

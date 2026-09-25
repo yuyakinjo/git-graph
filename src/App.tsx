@@ -5,6 +5,7 @@ import { DashPanel } from "./components/DashPanel";
 import { GraphPane } from "./components/GraphPane";
 import { LogModal } from "./components/LogModal";
 import { PrModal } from "./components/PrModal";
+import { RecomposeModal } from "./components/RecomposeModal";
 import { TidyModal } from "./components/TidyModal";
 import { Settings } from "./components/Settings";
 import { Sidebar } from "./components/Sidebar";
@@ -196,8 +197,14 @@ export default function App() {
       return !v;
     });
   }, []);
-  /** モーダル (差分・PR・設定・ログ・tidy) を開いている間はダッシュパネルを隠す */
-  const modalOpen = s.diffModal || s.settingsOpen || s.logsOpen || Boolean(s.tidy) || Boolean(pr);
+  /** モーダル (差分・PR・設定・ログ・tidy・recompose) を開いている間はダッシュパネルを隠す */
+  const modalOpen =
+    s.diffModal ||
+    s.settingsOpen ||
+    s.logsOpen ||
+    Boolean(s.tidy) ||
+    Boolean(s.recompose) ||
+    Boolean(pr);
 
   // 一覧の情報ですぐ開き、詳細が届いたら差し替える (取得はクリック起点)
   const openPr = useCallback(
@@ -299,6 +306,14 @@ export default function App() {
       {s.logsOpen ? <LogModal /> : null}
       {s.tidy ? (
         <TidyModal dir={s.tidy.dir} plan={s.tidy.plan} onClose={() => s.setTidy(null)} />
+      ) : null}
+      {s.recompose ? (
+        <RecomposeModal
+          key={`${s.recompose.dir}\0${s.recompose.branch}`}
+          dir={s.recompose.dir}
+          initialBranch={s.recompose.branch}
+          onClose={() => s.setRecompose(null)}
+        />
       ) : null}
     </div>
   );

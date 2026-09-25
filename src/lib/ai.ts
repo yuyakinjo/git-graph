@@ -1,5 +1,6 @@
 import { api } from "./api";
-import type { CommitContext, PrContext } from "./types";
+import { parsePlan, validatePlan } from "./recompose";
+import type { CommitContext, PrContext, RecomposeContext, RecomposePlan } from "./types";
 
 /**
  * コミットメッセージや PR の説明はインストール済みの Claude Code (`claude -p`) に作らせる。
@@ -102,4 +103,104 @@ export async function generatePrDescription(
   const res = parsePrDescription(text);
   if (!res.title) throw new Error("Claude Code から空の応答が返りました。");
   return res;
+}
+
+const recomposeSystem = (
+  compose: boolean,
+) => `You reorganize the changes on a git branch into a clean series of commits.
+
+You are given every file changed between the branch's fork point and its final state, with the diff. Group the files into commits so that each commit is one coherent, self-contained change (a feature, a fix, a refactor, tests, docs, config, ...). Order the commits so that each builds on the previous ones: shared types, utilities and refactors come before the code that depends on them.
+
+Rules:
+- Every listed file must appear in exactly one commit. A file cannot be split across commits.
+- Use the file paths exactly as listed. For a rename, use the new path; the old path moves with it.
+- Prefer a few meaningful commits over many tiny ones, but do not lump unrelated changes together.
+- The developer's existing commit messages on the branch hint at the intent; use them, but do not copy their grouping.
+- Commit messages: match the language, tone and format (e.g. Conventional Commits prefixes or not) of the repository's recent commit subjects when provided. If there are none, write in Japanese. A concise subject line; add a blank line and a short body only when the why genuinely needs explaining.
+${
+  compose
+    ? "- Also propose a short git branch name for the whole change: lowercase ASCII, kebab-case, with a type prefix such as feature/, fix/, refactor/, docs/ or chore/.\n"
+    : ""
+}
+Output only a JSON object, with no code fences and no explanation:
+${compose ? '{"branch": "<branch name>", "commits": [{"message": "<commit message>", "files": ["<path>", ...]}, ...]}' : '{"commits": [{"message": "<commit message>", "files": ["<path>", ...]}, ...]}'}`;
+
+/** ユーザーとのやり取り (再プランのたびに積む) */
+export interface RecomposeRound {
+  plan: RecomposePlan;
+  /** そのプランに対するユーザーのコメント */
+  comment: string;
+}
+
+function buildRecomposePrompt(
+  ctx: RecomposeContext,
+  rounds: RecomposeRound[],
+  invalid?: { plan: RecomposePlan; errors: string[] },
+): string {
+  const parts: string[] = [];
+  if (ctx.recentSubjects.length) {
+    parts.push(
+      `<recent_commit_subjects>\n${ctx.recentSubjects.join("\n")}\n</recent_commit_subjects>`,
+    );
+  }
+  if (ctx.commits.length) {
+    parts.push(`<existing_commits>\n${ctx.commits.join("\n\n---\n\n")}\n</existing_commits>`);
+  }
+  const files = ctx.files.map((f) =>
+    f.origPath ? `${f.status}\t${f.origPath} -> ${f.path}` : `${f.status}\t${f.path}`,
+  );
+  parts.push(`<changed_files>\n${files.join("\n")}\n</changed_files>`);
+  parts.push(`<diff>\n${ctx.diff}\n</diff>`);
+  if (ctx.truncated) {
+    parts.push(
+      "The diff above was cut off because it is very large; infer the rest from the file list and what is shown.",
+    );
+  }
+  if (rounds.length) {
+    const history = rounds
+      .map(
+        (r, i) =>
+          `<round index="${i + 1}">\n<plan>\n${JSON.stringify(r.plan)}\n</plan>\n<feedback>\n${r.comment}\n</feedback>\n</round>`,
+      )
+      .join("\n");
+    parts.push(
+      `The developer reviewed earlier plans and left feedback (latest last):\n${history}\n\nRevise the latest plan to address all of the feedback, keeping what they did not ask to change.`,
+    );
+  }
+  if (invalid) {
+    parts.push(
+      `Your previous answer was invalid:\n<plan>\n${JSON.stringify(invalid.plan)}\n</plan>\n<errors>\n${invalid.errors.join("\n")}\n</errors>\nFix these problems.`,
+    );
+  }
+  parts.push(rounds.length ? "Write the revised plan." : "Write the plan.");
+  return parts.join("\n\n");
+}
+
+/**
+ * ブランチの変更からコミットプランを作る。すべての変更をちょうど 1 回ずつ含まない
+ * プランが返ったら、理由を添えて 1 回だけ作り直させる。
+ */
+export async function generateRecomposePlan(
+  model: ClaudeCodeModel,
+  ctx: RecomposeContext,
+  rounds: RecomposeRound[] = [],
+): Promise<RecomposePlan> {
+  // 変更のまとまりと順序を考えさせるので、コミットメッセージより少し深く考えさせる
+  const effort = model === "haiku" ? undefined : "medium";
+  const system = recomposeSystem(ctx.compose);
+  let invalid: { plan: RecomposePlan; errors: string[] } | undefined;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const text = await api.claudeGenerate(
+      system,
+      buildRecomposePrompt(ctx, rounds, invalid),
+      model,
+      effort,
+    );
+    const plan = parsePlan(text);
+    const errors = validatePlan(plan, ctx.files);
+    if (ctx.compose && !plan.branch) errors.push("branch (ブランチ名) がありません");
+    if (!errors.length) return plan;
+    invalid = { plan, errors };
+  }
+  throw new Error(`AI のプランが不完全です:\n${invalid!.errors.join("\n")}`);
 }

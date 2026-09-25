@@ -26,6 +26,7 @@ import {
   type DashButtonId,
   type DashGroup,
 } from "../lib/dashButtons";
+import { recomposeMode } from "../lib/recompose";
 import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
 import { Icon } from "./ui";
@@ -86,6 +87,11 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
   const ghUrl = s.gh?.url ?? null;
   const busy = !s.repo || Boolean(s.busy);
   const currentPr = head ? s.prs.find((p) => p.headRefName === head.name) : undefined;
+  const dirty =
+    (s.status?.staged.length ?? 0) +
+      (s.status?.unstaged.length ?? 0) +
+      (s.status?.conflicts.length ?? 0) >
+    0;
   const stageMode = stageToggleMode({
     staged: s.status?.staged.length ?? 0,
     unstaged: s.status?.unstaged.length ?? 0,
@@ -214,6 +220,21 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
           disabled: busy,
           title: "差分とコミットから Claude Code でタイトルと本文を生成して PR 作成",
         };
+      case "recompose": {
+        const mode = recomposeMode(s.repo, head, dirty);
+        return {
+          run: () => act.recompose(),
+          disabled: busy || !mode,
+          label: mode ?? undefined,
+          title: !mode
+            ? s.repo?.headBranch === s.repo?.defaultBranch
+              ? "既定ブランチに未プッシュのコミットも作業中の変更もありません"
+              : "チェックアウト中のブランチがありません (または操作の途中です)"
+            : mode === "compose"
+              ? "未プッシュのコミットと作業中の変更を、Claude Code が立てたプランで新しいブランチに切り出す"
+              : "ブランチの変更を Claude Code が立てたプランでコミットし直し、新しいブランチに積む",
+        };
+      }
       case "prCreate":
         return { run: () => act.prCreate(), disabled: busy, title: "gh pr create" };
       case "prCurrent":

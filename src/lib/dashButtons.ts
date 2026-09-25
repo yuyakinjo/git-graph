@@ -41,6 +41,8 @@ export const DASH_BUTTONS = {
   aiCommit: { group: "ai", label: "AI でコミット", icon: "commit" },
   aiAmend: { group: "ai", label: "AI で amend", icon: "amend" },
   aiPrCreate: { group: "ai", label: "AI で PR 作成", icon: "pr" },
+  /** 既定ブランチでは compose に表示が変わる */
+  recompose: { group: "ai", label: "recompose", icon: "layers" },
   // ---- custom (複合・派生操作)
   tidy: { group: "custom", label: "tidy", icon: "sweep" },
   pullRebase: { group: "custom", label: "プル (rebase)", icon: "pull" },
@@ -57,7 +59,7 @@ const isActionId = (v: unknown): v is DashButtonId =>
 export const DEFAULT_DASH: Record<DashGroup, DashButtonId[]> = {
   git: ["commit", "pull", "push"],
   github: ["prCreate"],
-  ai: ["aiCommit", "aiPrCreate"],
+  ai: ["aiCommit", "aiPrCreate", "recompose"],
   custom: ["tidy"],
 };
 

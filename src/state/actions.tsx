@@ -4,11 +4,13 @@ import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { generateCommitMessage, generatePrDescription } from "../lib/ai";
 import { api } from "../lib/api";
 import { useDialogs } from "../components/ui-context";
+import type { RecomposeMode } from "../lib/recompose";
 import { useStore } from "./store";
 import type { FormField } from "../components/ui";
 import type {
   BranchInfo,
   PullRequest,
+  RecomposeOp,
   StashInfo,
   TidyItem,
   TidyPlan,
@@ -514,6 +516,18 @@ export function useActions() {
       });
     };
 
+    // ---------------------------------------------------------- 6.6. recompose
+    /** recompose / compose のダイアログを開く。ブランチの既定はチェックアウト中のもの */
+    const recompose = (branch?: string) => {
+      const target = branch ?? s.repo?.headBranch;
+      if (target) s.setRecompose({ dir, branch: target });
+    };
+
+    const recomposeApply = async (target: string, mode: RecomposeMode, op: RecomposeOp) => {
+      s.setRecompose(null);
+      await s.run(`${mode}: ${op.newBranch}`, () => api.recomposeApply(target, op));
+    };
+
     // ---------------------------------------------------------- 7.5. remote
     /**
      * リモート未設定のリポジトリに GitHub の新規リポジトリを作って origin に登録する。
@@ -859,6 +873,8 @@ export function useActions() {
       worktreePrune,
       tidy,
       tidyApply,
+      recompose,
+      recomposeApply,
       remoteCreate,
       prCreate,
       prCheckout,
