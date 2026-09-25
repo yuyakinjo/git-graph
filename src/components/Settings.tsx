@@ -106,7 +106,7 @@ export function Settings() {
           {s.projectRoots.map((p) => (
             <div
               key={p}
-              className="flex items-center gap-2 rounded-md border border-line-soft bg-bg-1 px-2 py-[5px] text-[12px]"
+              className="flex items-center gap-2 rounded-md border border-line-soft bg-bg-1 px-2 py-1.25 text-[12px]"
             >
               <Icon name="folder" size={14} />
               <span className="min-w-0 flex-1 overflow-hidden font-mono text-[12px] text-ellipsis whitespace-nowrap">
