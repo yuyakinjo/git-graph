@@ -1,7 +1,7 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { CLAUDE_CODE_MODELS, isClaudeCodeModel } from "../lib/ai";
 import { DIFF_THEMES, isDiffTheme } from "../lib/highlight";
-import { useStore } from "../state/store";
+import { AUTOFETCH_MINUTES, useStore } from "../state/store";
 import { btn, dialogDesc, field, fieldInput, fieldLabel, hint, iconBtn } from "./classes";
 import { Icon, Modal, Spinner } from "./ui";
 
@@ -12,7 +12,7 @@ const shortPath = (p: string) => p.replace(/^\/Users\/[^/]+/, "~");
 const DEPTHS = [1, 2, 3, 4, 5, 6];
 
 /**
- * 設定 (Cmd+,)。グラフの見た目、プロジェクトの場所、AI、作者アイコンを扱う。
+ * 設定 (Cmd+,)。グラフの見た目、自動フェッチ、プロジェクトの場所、AI、作者アイコンを扱う。
  */
 export function Settings() {
   const s = useStore();
@@ -91,6 +91,30 @@ export function Settings() {
           </select>
           <em className={hint}>
             ファイルの拡張子から言語を判定して色を付けます。テーマは選んだものだけを読み込みます。
+          </em>
+        </div>
+      </section>
+
+      <section>
+        <h3 className={SECTION_H3}>自動フェッチ</h3>
+        <div className={field}>
+          <label className={fieldLabel} htmlFor="auto-fetch">
+            間隔
+          </label>
+          <select
+            className={`${fieldInput} font-sans text-[12.5px]`}
+            id="auto-fetch"
+            value={String(s.autoFetchMinutes)}
+            onChange={(e) => s.setAutoFetchMinutes(Number(e.target.value))}
+          >
+            {AUTOFETCH_MINUTES.map((m) => (
+              <option key={m} value={m}>
+                {m === 0 ? "OFF" : `${m} 分ごと`}
+              </option>
+            ))}
+          </select>
+          <em className={hint}>
+            開いているリポジトリを裏で git fetch し、変化があれば表示を更新します。
           </em>
         </div>
       </section>
