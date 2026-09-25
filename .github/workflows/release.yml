@@ -1,0 +1,119 @@
+name: Release
+
+# Actions の画面から手動実行すると、実行時刻 (JST) から YYYY.M.DHHMM 形式の CalVer を決めて
+# macOS (arm64) 向けにビルドし、v<version> のタグ付きで GitHub Release を作り、
+# yuyakinjo/homebrew-tap の Casks/git-squid.rb を新しいバージョンに書き換える。
+# Tauri / Cargo のバージョンは SemVer (3 要素・先頭ゼロ不可) 必須なので、日と時刻を 3 つ目にまとめている。
+# 例: 2026-09-25 09:30 JST → 2026.9.250930
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::リリースは main からのみ実行できます ($GITHUB_REF)"
+            exit 1
+          fi
+          version="$(TZ=Asia/Tokyo date +%Y.%-m.%-d%H%M)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "zip=GitSquid_${version}_aarch64.zip" >> "$GITHUB_OUTPUT"
+
+      # リポジトリ上の version は固定のまま、ビルド時だけ CalVer を書き込む
+      - name: Set app version
+        run: |
+          jq --arg v "${{ steps.ver.outputs.version }}" '.version = $v' src-tauri/tauri.conf.json > tauri.conf.json.tmp
+          mv tauri.conf.json.tmp src-tauri/tauri.conf.json
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: release
+
+      - name: Build app
+        run: bunx tauri build --bundles app
+
+      # ditto で固めないと .app 内のシンボリックリンクや拡張属性が壊れる
+      - name: Package
+        run: |
+          ditto -c -k --keepParent \
+            src-tauri/target/release/bundle/macos/GitSquid.app \
+            "${{ steps.ver.outputs.zip }}"
+          echo "SHA256=$(shasum -a 256 "${{ steps.ver.outputs.zip }}" | awk '{print $1}')" >> "$GITHUB_ENV"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.ver.outputs.tag }}" "${{ steps.ver.outputs.zip }}" \
+            --target "$GITHUB_SHA" --title "GitSquid ${{ steps.ver.outputs.tag }}" --generate-notes
+
+      - uses: actions/checkout@v5
+        with:
+          repository: yuyakinjo/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update cask
+        working-directory: homebrew-tap
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          mkdir -p Casks
+          cat > Casks/git-squid.rb <<EOF
+          cask "git-squid" do
+            version "${VERSION}"
+            sha256 "${SHA256}"
+
+            url "https://github.com/yuyakinjo/git-squid/releases/download/v#{version}/GitSquid_#{version}_aarch64.zip"
+            name "GitSquid"
+            desc "Simple Git GUI with a GitKraken-style commit graph"
+            homepage "https://github.com/yuyakinjo/git-squid"
+
+            depends_on macos: :big_sur
+            depends_on arch: :arm64
+
+            app "GitSquid.app"
+
+            postflight do
+              system_command "/usr/bin/xattr",
+                             args:         ["-dr", "com.apple.quarantine", "#{appdir}/GitSquid.app"],
+                             print_stderr: false
+            end
+
+            zap trash: [
+              "~/Library/Application Support/dev.gitsquid.app",
+              "~/Library/Caches/dev.gitsquid.app",
+              "~/Library/Logs/dev.gitsquid.app",
+              "~/Library/Preferences/dev.gitsquid.app.plist",
+              "~/Library/Saved Application State/dev.gitsquid.app.savedState",
+              "~/Library/WebKit/dev.gitsquid.app",
+            ]
+          end
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/git-squid.rb
+          git commit -m "git-squid ${VERSION}"
+          git push
