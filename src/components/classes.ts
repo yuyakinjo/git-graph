@@ -134,6 +134,7 @@ export const fieldInput =
 /** ファイル状態 (A/M/D/R...) の文字色。ファイル一覧はどこでも同じ色で出す。 */
 export const FSTATUS_COLOR: Record<string, string> = {
   A: "text-green",
+  "?": "text-green",
   M: "text-accent",
   T: "text-accent",
   D: "text-red",
