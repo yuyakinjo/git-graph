@@ -77,7 +77,9 @@ pub fn status(dir: &str) -> GhStatus {
     ) {
         if let Ok(v) = serde_json::from_str::<Value>(&json) {
             st.repo = v["nameWithOwner"].as_str().map(|s| s.to_string());
-            st.default_branch = v["defaultBranchRef"]["name"].as_str().map(|s| s.to_string());
+            st.default_branch = v["defaultBranchRef"]["name"]
+                .as_str()
+                .map(|s| s.to_string());
             st.url = v["url"].as_str().map(|s| s.to_string());
         }
     }
@@ -220,7 +222,10 @@ pub fn owners(dir: &str) -> Vec<String> {
             list.push(login.to_string());
         }
     }
-    if let Ok(orgs) = sh::gh(dir, &["api", "user/orgs", "--paginate", "--jq", ".[].login"]) {
+    if let Ok(orgs) = sh::gh(
+        dir,
+        &["api", "user/orgs", "--paginate", "--jq", ".[].login"],
+    ) {
         for line in orgs.lines() {
             let name = line.trim();
             if !name.is_empty() && !list.iter().any(|o| o == name) {

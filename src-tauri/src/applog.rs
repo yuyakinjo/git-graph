@@ -74,7 +74,9 @@ pub fn record(mut entry: CmdLog) {
 }
 
 pub fn snapshot() -> Vec<CmdLog> {
-    LOGS.lock().map(|l| l.iter().cloned().collect()).unwrap_or_default()
+    LOGS.lock()
+        .map(|l| l.iter().cloned().collect())
+        .unwrap_or_default()
 }
 
 pub fn clear() {
