@@ -214,3 +214,29 @@ test.describe("ログ", () => {
     expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("$ git ");
   });
 });
+
+test.describe("サイドバー", () => {
+  test("セクションをドラッグで並べ替え、再読み込み後も並びを保つ", async ({ app }) => {
+    const { page } = app;
+    const sections = page.locator("aside [data-section]");
+    const header = (id: string) => page.locator(`aside [data-section="${id}"] > header`);
+    await expect(sections.first()).toHaveAttribute("data-section", "local");
+
+    // タグの見出しをローカルの見出しの上半分へ落とす
+    const from = (await header("tag").boundingBox())!;
+    const to = (await header("local").boundingBox())!;
+    await page.mouse.move(from.x + 40, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(to.x + 40, to.y + 2, { steps: 10 });
+    await page.mouse.up();
+
+    const order = ["tag", "local", "remote", "pr", "stash", "worktree"];
+    const ids = () => sections.evaluateAll((els) => els.map((el) => el.dataset.section));
+    await expect.poll(ids).toEqual(order);
+    // ドラッグ後の click で開閉が切り替わっていない (タグは既定で閉じている)
+    await expect(page.locator('aside [data-section="tag"] > div')).toHaveCount(0);
+
+    await page.reload();
+    await expect.poll(ids).toEqual(order);
+  });
+});

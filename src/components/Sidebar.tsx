@@ -1,6 +1,12 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { buildBranchTree, type BranchNode } from "../lib/branchTree";
 import { relativeTime } from "../lib/format";
+import {
+  loadSectionOrder,
+  moveSection,
+  saveSectionOrder,
+  type SectionId,
+} from "../lib/sectionOrder";
 import type { BranchInfo, PullRequest } from "../lib/types";
 import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
@@ -56,6 +62,90 @@ function useSections() {
   return { isOpen, toggle };
 }
 
+/** これ以上動かしたらクリックではなくドラッグとみなす (px) */
+const DRAG_THRESHOLD = 4;
+
+type SectionDrag = ReturnType<typeof useSectionDrag>;
+
+/** セクション見出しのドラッグで並びを入れ替え、結果を保存する */
+function useSectionDrag(containerRef: RefObject<HTMLElement | null>) {
+  const [order, setOrder] = useState(loadSectionOrder);
+  /** drop は「元の並びで何番目の前に落とすか」 */
+  const [drag, setDrag] = useState<{ id: SectionId; drop: number } | null>(null);
+  const pending = useRef<{ id: SectionId; y: number } | null>(null);
+  /** ドラッグ直後に飛んでくる click で開閉しないための印 */
+  const dragged = useRef(false);
+
+  const dropIndexAt = (y: number) => {
+    const els = containerRef.current?.querySelectorAll<HTMLElement>("[data-section]") ?? [];
+    let i = 0;
+    for (const el of els) {
+      const r = el.getBoundingClientRect();
+      if (y > r.top + r.height / 2) i++;
+    }
+    return i;
+  };
+
+  const end = () => {
+    pending.current = null;
+    setDrag(null);
+  };
+
+  const headerProps = (id: SectionId) => ({
+    onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
+      dragged.current = false;
+      // 見出し内のボタン (作成・フェッチなど) はドラッグの起点にしない
+      if (e.button !== 0 || (e.target as HTMLElement).closest("button")) return;
+      pending.current = { id, y: e.clientY };
+    },
+    onPointerMove: (e: React.PointerEvent<HTMLElement>) => {
+      const p = pending.current;
+      if (!p) return;
+      if (!dragged.current) {
+        if (Math.abs(e.clientY - p.y) < DRAG_THRESHOLD) return;
+        dragged.current = true;
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }
+      const drop = dropIndexAt(e.clientY);
+      setDrag((prev) => (prev?.id === p.id && prev.drop === drop ? prev : { id: p.id, drop }));
+    },
+    onPointerUp: () => {
+      if (drag) {
+        setOrder((prev) => {
+          const next = moveSection(prev, drag.id, drag.drop);
+          if (next !== prev) saveSectionOrder(next);
+          return next;
+        });
+      }
+      end();
+    },
+    onPointerCancel: end,
+  });
+
+  /** 自分の前後に落としても並びは変わらないので、そのときは印を出さない */
+  const from = drag ? order.indexOf(drag.id) : -1;
+  const drop = drag && drag.drop !== from && drag.drop !== from + 1 ? drag.drop : null;
+  const indicator = (id: SectionId) => {
+    const i = order.indexOf(id);
+    if (drop === i) return "before";
+    if (drop === order.length && i === order.length - 1) return "after";
+    return null;
+  };
+
+  return {
+    order,
+    dragging: drag?.id ?? null,
+    headerProps,
+    indicator,
+    /** ドラッグ直後の click なら true を返し、印を消す */
+    consumeClick: () => {
+      const was = dragged.current;
+      dragged.current = false;
+      return was;
+    },
+  };
+}
+
 function Section({
   id,
   title,
@@ -65,8 +155,9 @@ function Section({
   action,
   isOpen,
   toggle,
+  drag,
 }: {
-  id: string;
+  id: SectionId;
   title: string;
   icon: string;
   count?: number;
@@ -74,15 +165,32 @@ function Section({
   action?: ReactNode;
   isOpen: (k: string) => boolean;
   toggle: (k: string) => void;
+  drag: SectionDrag;
 }) {
   const open = isOpen(id);
+  const indicator = drag.indicator(id);
   return (
     <section
-      className={`flex flex-col border-line-soft border-t first:mt-auto first:border-t-0 ${
+      data-section={id}
+      className={`relative flex flex-col border-line-soft border-t first:mt-auto first:border-t-0 ${
         open ? "min-h-7 flex-1" : "shrink-0"
-      }`}
+      } ${drag.dragging === id ? "opacity-50" : ""}`}
     >
-      <header className={SIDE_HEADER} onClick={() => toggle(id)}>
+      {indicator ? (
+        <div
+          className={`pointer-events-none absolute inset-x-0 z-10 h-0.5 bg-accent ${
+            indicator === "before" ? "-top-px" : "-bottom-px"
+          }`}
+        />
+      ) : null}
+      <header
+        className={SIDE_HEADER}
+        title="ドラッグで並べ替え"
+        {...drag.headerProps(id)}
+        onClick={() => {
+          if (!drag.consumeClick()) toggle(id);
+        }}
+      >
         <Icon name={open ? "chevronDown" : "chevronRight"} size={12} />
         <Icon name={icon} size={13} />
         <span className="flex-1 overflow-hidden text-ellipsis">{title}</span>
@@ -348,6 +456,8 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
   const act = useActions();
   const openMenu = useMenu();
   const { isOpen, toggle } = useSections();
+  const asideRef = useRef<HTMLElement>(null);
+  const drag = useSectionDrag(asideRef);
   /** ローカル / リモートで状態を共有したいので、ここで 1 つだけ持つ */
   const folders = useFolders();
 
@@ -358,8 +468,8 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
   /** リモート未設定なら、フェッチではなく GitHub リポジトリ作成を出す */
   const noRemote = (s.repo?.remotes.length ?? 0) === 0;
 
-  return (
-    <aside className="flex h-full flex-col overflow-y-auto bg-bg-2 pt-1.5 pb-5">
+  const sections: Record<SectionId, ReactNode> = {
+    local: (
       <Section
         id="local"
         title="ローカル"
@@ -367,6 +477,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         count={locals.length}
         isOpen={isOpen}
         toggle={toggle}
+        drag={drag}
         action={
           <>
             <button
@@ -388,7 +499,8 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
       >
         <BranchNodes nodes={localTree} depth={0} {...folders} />
       </Section>
-
+    ),
+    remote: (
       <Section
         id="remote"
         title="リモート"
@@ -396,6 +508,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         count={remotes.length}
         isOpen={isOpen}
         toggle={toggle}
+        drag={drag}
         action={
           noRemote ? (
             <button
@@ -430,7 +543,8 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
           <BranchNodes nodes={remoteTree} depth={0} {...folders} />
         )}
       </Section>
-
+    ),
+    pr: (
       <Section
         id="pr"
         title="プルリクエスト"
@@ -438,6 +552,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         count={s.prs.length}
         isOpen={isOpen}
         toggle={toggle}
+        drag={drag}
         action={
           <button
             className={iconBtn({ tiny: true })}
@@ -460,7 +575,8 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
           s.prs.map((pr) => <PrItem key={pr.number} pr={pr} onOpen={onOpenPr} />)
         )}
       </Section>
-
+    ),
+    stash: (
       <Section
         id="stash"
         title="スタッシュ"
@@ -468,6 +584,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         count={s.stashes.length}
         isOpen={isOpen}
         toggle={toggle}
+        drag={drag}
         action={
           <button className={iconBtn({ tiny: true })} title="stash" onClick={() => act.stashPush()}>
             <Icon name="plus" size={13} />
@@ -521,7 +638,8 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
           })
         )}
       </Section>
-
+    ),
+    worktree: (
       <Section
         id="worktree"
         title="worktree"
@@ -529,6 +647,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         count={s.worktrees.length}
         isOpen={isOpen}
         toggle={toggle}
+        drag={drag}
         action={
           <button
             className={iconBtn({ tiny: true })}
@@ -589,7 +708,8 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
           </button>
         ) : null}
       </Section>
-
+    ),
+    tag: (
       <Section
         id="tag"
         title="タグ"
@@ -597,6 +717,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         count={s.tags.length}
         isOpen={isOpen}
         toggle={toggle}
+        drag={drag}
       >
         {s.tags.slice(0, 50).map((t) => (
           <div
@@ -632,6 +753,19 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         ))}
         {s.tags.length === 0 ? <div className={SIDE_NOTE}>タグはありません</div> : null}
       </Section>
+    ),
+  };
+
+  return (
+    <aside
+      ref={asideRef}
+      className={`flex h-full flex-col overflow-y-auto bg-bg-2 pt-1.5 pb-5 ${
+        drag.dragging ? "cursor-grabbing" : ""
+      }`}
+    >
+      {drag.order.map((id) => (
+        <Fragment key={id}>{sections[id]}</Fragment>
+      ))}
     </aside>
   );
 }
