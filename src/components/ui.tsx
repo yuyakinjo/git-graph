@@ -369,7 +369,7 @@ export function Modal({
       }}
     >
       <div
-        className="flex max-h-[82vh] flex-col overflow-hidden rounded-xl border border-line bg-bg-2 shadow-[0_24px_60px_rgba(0,0,0,0.5)]"
+        className="flex max-h-[82vh] flex-col overflow-hidden rounded-xl border border-line bg-bg-2 shadow-[0_24px_60px_rgba(0,0,0,0.5)] outline-none"
         style={{ width }}
         tabIndex={-1}
         ref={focusIfEmpty}
@@ -862,7 +862,7 @@ export function MenuProvider({ children }: { children: ReactNode }) {
 export function Spinner({ size = 14 }: { size?: number }) {
   return (
     <span
-      className="inline-block animate-spinner rounded-full border-2 border-[rgba(255,255,255,0.18)] border-t-accent"
+      className="inline-block animate-spinner rounded-full border-2 border-bg-4 border-t-accent"
       style={{ width: size, height: size }}
     />
   );

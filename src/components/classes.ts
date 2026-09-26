@@ -25,7 +25,8 @@ const BTN_VARIANT = {
   danger: "bg-danger border-danger text-white not-disabled:hover:bg-danger-hover",
   ghost: "bg-transparent border-line text-fg not-disabled:hover:bg-bg-3",
   /** .btn.tiny.danger: 枠線だけの控えめな破壊操作 */
-  outlineDanger: "bg-transparent border-red-45 text-red not-disabled:hover:bg-danger-hover",
+  outlineDanger:
+    "bg-transparent border-red-45 text-red not-disabled:hover:bg-danger-hover not-disabled:hover:text-white",
 } as const;
 
 export function btn(

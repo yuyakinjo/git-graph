@@ -26,7 +26,7 @@ const SIDE_ITEM_PLAIN = `${SIDE_ITEM} hover:bg-bg-hover`;
 const sideIcon = (current = false) => `flex flex-none ${current ? "text-accent" : "text-fg-faint"}`;
 const sideLabel = (current = false) =>
   `flex-1 overflow-hidden text-[12.5px] text-ellipsis whitespace-nowrap ${
-    current ? "font-bold text-white" : ""
+    current ? "font-bold text-fg" : ""
   }`;
 
 const SIDE_NOTE = "pt-1 pr-3.5 pb-2 pl-3.5 text-[11.5px] text-fg-faint";

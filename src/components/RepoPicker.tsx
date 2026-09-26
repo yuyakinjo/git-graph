@@ -134,7 +134,7 @@ export function RepoPicker({ x, y, onClose }: { x: number; y: number; onClose: (
   return (
     <div className={ctxBackdrop} onMouseDown={onClose}>
       <div
-        className="fixed z-81 flex max-h-105 w-90 flex-col overflow-hidden rounded-[10px] border border-line bg-bg-2 shadow-[0_18px_44px_rgba(0,0,0,0.5)]"
+        className="fixed z-81 flex max-h-105 w-90 flex-col overflow-hidden rounded-[10px] border border-line bg-bg-2 shadow-[0_18px_44px_rgba(0,0,0,0.5)] outline-none"
         style={{ left: Math.max(8, left), top: Math.max(8, top) }}
         tabIndex={-1}
         onMouseDown={keepFocus}
