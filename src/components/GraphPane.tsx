@@ -72,13 +72,15 @@ const REF_BADGE_IS_HEAD = "bg-accent border-accent text-on-accent";
 const ROW_H = 30;
 const LANE_W = 16;
 // アバターを出すときはノードが太るぶんレーンも広げる
-const LANE_W_AVATAR = 26;
+const LANE_W_AVATAR = 32;
 const PAD_X = 14;
 const OVERSCAN = 12;
 /** 下端からこの行数まで近づいたら次のページを読む */
 const LOAD_MORE_ROWS = 24;
-/** アバターノードの半径 */
-const AVATAR_R = 9;
+/** 通常ノードの半径 */
+const NODE_R = 5.5;
+/** アバターノードの半径。行の高さ (30px) に上下 3px の余白を残す */
+const AVATAR_R = 11;
 // 路線図では線幅 (8px) と駅の外径 (10px) を近づける。
 const RAILWAY_LINE_W = 8;
 const RAILWAY_NODE_R = 4;
@@ -1057,7 +1059,7 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
                 <circle
                   cx={cx(headRow >= 0 ? commits[headRow].column : 0)}
                   cy={cy(0)}
-                  r={showNodeAvatar ? AVATAR_R : isRailway ? RAILWAY_NODE_R : 4.5}
+                  r={showNodeAvatar ? AVATAR_R : isRailway ? RAILWAY_NODE_R : NODE_R}
                   fill="var(--color-bg-1)"
                   stroke={laneColor(headRow >= 0 ? commits[headRow].column : 0)}
                   strokeWidth="1.8"
@@ -1086,7 +1088,7 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
                         <circle
                           cx={x}
                           cy={y}
-                          r={showNodeAvatar ? AVATAR_R + 3.5 : 8}
+                          r={showNodeAvatar ? AVATAR_R + 3 : NODE_R + 3}
                           fill="none"
                           stroke={color}
                           strokeWidth="1.2"
@@ -1130,7 +1132,13 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
                           <circle
                             cx={x}
                             cy={y}
-                            r={showNodeAvatar ? AVATAR_R : isRailway ? RAILWAY_NODE_R + 1.5 : 5.5}
+                            r={
+                              showNodeAvatar
+                                ? AVATAR_R
+                                : isRailway
+                                  ? RAILWAY_NODE_R + 1.5
+                                  : NODE_R + 1
+                            }
                             fill="var(--color-bg-1)"
                             stroke={color}
                             strokeWidth={isHead ? 2.5 : 1.8}
@@ -1138,7 +1146,7 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
                           <circle
                             cx={x}
                             cy={y}
-                            r={showNodeAvatar ? AVATAR_R * 0.45 : 2.2}
+                            r={showNodeAvatar ? AVATAR_R * 0.45 : 2.6}
                             fill={color}
                           />
                         </>
@@ -1152,7 +1160,7 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
                             fill={avatarColor(c.authorEmail || c.authorName)}
                           />
                           <text
-                            className="svg-initials fill-white text-[8px] font-bold select-none"
+                            className="svg-initials fill-white text-[10px] font-bold select-none"
                             x={x}
                             y={y}
                           >
@@ -1183,7 +1191,7 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
                         <circle
                           cx={x}
                           cy={y}
-                          r={isRailway ? RAILWAY_NODE_R : 4.5}
+                          r={isRailway ? RAILWAY_NODE_R : NODE_R}
                           fill={isHead ? color : "var(--color-bg-1)"}
                           stroke={color}
                           strokeWidth={isRailway ? 2 : isHead ? 3 : 2}

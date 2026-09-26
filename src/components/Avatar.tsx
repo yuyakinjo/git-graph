@@ -20,7 +20,7 @@ export function Avatar({
   return (
     <span
       className={`relative inline-flex flex-none items-center justify-center overflow-hidden rounded-full font-bold text-avatar-fg ${
-        big ? "h-7.5 w-7.5 text-[12px]" : "h-4.5 w-4.5 text-[10px]"
+        big ? "h-7.5 w-7.5 text-[12px]" : "h-5.5 w-5.5 text-[11px]"
       }`}
       style={{ background: avatarColor(email || name) }}
     >
