@@ -176,3 +176,223 @@
   text-anchor: middle;
   dominant-baseline: central;
 }
+
+/*
+ * GitHub 互換 Markdown の表示 (components/Markdown.tsx)。
+ * 余白・見出し・表などの寸法は GitHub の markdown-body に合わせ、色はアプリのトークンを使う。
+ */
+@layer components {
+  .markdown-body {
+    font-size: 13px;
+    line-height: 1.6;
+    word-wrap: break-word;
+    color: var(--color-fg);
+
+    & > :first-child {
+      margin-top: 0 !important;
+    }
+    & > :last-child {
+      margin-bottom: 0 !important;
+    }
+
+    & p,
+    & blockquote,
+    & ul,
+    & ol,
+    & dl,
+    & table,
+    & pre,
+    & details,
+    & .markdown-alert {
+      margin-top: 0;
+      margin-bottom: 12px;
+    }
+
+    & h1,
+    & h2,
+    & h3,
+    & h4,
+    & h5,
+    & h6 {
+      margin-top: 18px;
+      margin-bottom: 12px;
+      font-weight: 600;
+      line-height: 1.25;
+    }
+    & h1 {
+      font-size: 1.85em;
+      padding-bottom: 0.3em;
+      border-bottom: 1px solid var(--color-line);
+    }
+    & h2 {
+      font-size: 1.45em;
+      padding-bottom: 0.3em;
+      border-bottom: 1px solid var(--color-line);
+    }
+    & h3 {
+      font-size: 1.2em;
+    }
+    & h4 {
+      font-size: 1em;
+    }
+    & h5 {
+      font-size: 0.875em;
+    }
+    & h6 {
+      font-size: 0.85em;
+      color: var(--color-fg-dim);
+    }
+
+    & a {
+      color: var(--color-accent);
+      text-decoration: none;
+      cursor: pointer;
+    }
+    & a:hover {
+      text-decoration: underline;
+    }
+
+    & strong {
+      font-weight: 600;
+    }
+
+    & ul,
+    & ol {
+      padding-left: 2em;
+    }
+    & ul {
+      list-style: disc;
+    }
+    & ol {
+      list-style: decimal;
+    }
+    & ul ul,
+    & ol ul {
+      list-style: circle;
+    }
+    & li + li {
+      margin-top: 0.25em;
+    }
+    & li > ul,
+    & li > ol {
+      margin-top: 0.25em;
+      margin-bottom: 0;
+    }
+    /* タスクリスト: チェックボックスの行は点を消す */
+    & li:has(> input[type="checkbox"]),
+    & li:has(> p > input[type="checkbox"]) {
+      list-style: none;
+    }
+    & li:has(> input[type="checkbox"]) {
+      margin-left: -1.4em;
+    }
+    & input[type="checkbox"] {
+      margin: 0 0.35em 0.2em 0;
+      vertical-align: middle;
+      accent-color: var(--color-accent);
+    }
+
+    & blockquote {
+      padding: 0 1em;
+      color: var(--color-fg-dim);
+      border-left: 0.25em solid var(--color-line);
+      margin-left: 0;
+      margin-right: 0;
+    }
+
+    & code {
+      font-family: var(--font-mono);
+      font-size: 85%;
+      padding: 0.2em 0.4em;
+      border-radius: 6px;
+      background: var(--color-bg-3);
+    }
+    & pre {
+      font-family: var(--font-mono);
+      font-size: 85%;
+      line-height: 1.45;
+      padding: 12px 14px;
+      overflow: auto;
+      border-radius: 6px;
+      background: var(--color-bg-2);
+    }
+    & pre code {
+      font-size: 100%;
+      padding: 0;
+      background: transparent;
+      white-space: pre;
+    }
+
+    & table {
+      display: block;
+      width: max-content;
+      max-width: 100%;
+      overflow: auto;
+      border-collapse: collapse;
+      border-spacing: 0;
+    }
+    & th,
+    & td {
+      padding: 5px 12px;
+      border: 1px solid var(--color-line);
+    }
+    & th {
+      font-weight: 600;
+    }
+    & tr:nth-child(2n) {
+      background: var(--color-row-hover);
+    }
+
+    & hr {
+      height: 0.25em;
+      margin: 18px 0;
+      padding: 0;
+      border: 0;
+      background: var(--color-line);
+    }
+
+    & img {
+      max-width: 100%;
+    }
+
+    & details summary {
+      cursor: pointer;
+    }
+
+    & kbd {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 2px 5px;
+      border: 1px solid var(--color-line);
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      background: var(--color-bg-2);
+    }
+
+    /* GitHub アラート (> [!NOTE] など) */
+    & .markdown-alert {
+      padding: 0.5em 1em;
+      border-left: 0.25em solid var(--alert);
+    }
+    & .markdown-alert-title {
+      font-weight: 600;
+      color: var(--alert);
+      margin-bottom: 4px;
+    }
+    & .markdown-alert-note {
+      --alert: var(--color-accent);
+    }
+    & .markdown-alert-tip {
+      --alert: var(--color-green);
+    }
+    & .markdown-alert-important {
+      --alert: var(--color-violet);
+    }
+    & .markdown-alert-warning {
+      --alert: var(--color-amber);
+    }
+    & .markdown-alert-caution {
+      --alert: var(--color-red);
+    }
+  }
+}
