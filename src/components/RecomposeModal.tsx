@@ -5,16 +5,7 @@ import { recomposeBranchName } from "../lib/recompose";
 import type { RecomposeContext, RecomposePlan } from "../lib/types";
 import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
-import {
-  FSTATUS_COLOR,
-  btn,
-  dialogDesc,
-  field,
-  fieldInput,
-  fieldLabel,
-  hint,
-  miniPill,
-} from "./classes";
+import { FSTATUS_COLOR, btn, dialogDesc, field, fieldInput, fieldLabel, hint } from "./classes";
 import { Icon, Modal, Spinner } from "./ui";
 
 const SECTION_H3 = "mx-0 mt-4 mb-1.5 text-[12px] font-semibold text-fg-dim";
@@ -161,27 +152,24 @@ export function RecomposeModal({
       </p>
 
       {/* 1. ブランチ */}
-      <div className="flex items-end gap-2">
-        <label className={`${field} min-w-0 flex-1`}>
-          <span className={fieldLabel}>ブランチ</span>
-          <select
-            className={`${fieldInput} font-mono text-[12.5px]`}
-            value={branch}
-            disabled={Boolean(busy)}
-            onChange={(e) => {
-              setBranch(e.target.value);
-              reset();
-            }}
-          >
-            {options.map((b) => (
-              <option key={b.name} value={b.name}>
-                {b.name}
-                {b.isHead ? " (チェックアウト中)" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-        <span className={`${miniPill(compose ? "ahead" : "behind")} mb-2`}>{mode}</span>
+      <div className="flex items-center gap-2">
+        <select
+          className="h-[30px] min-w-0 flex-1 rounded-md border border-line bg-bg-1 px-[9px] font-mono text-[12.5px] text-fg outline-none focus:border-accent"
+          aria-label="ブランチ"
+          value={branch}
+          disabled={Boolean(busy)}
+          onChange={(e) => {
+            setBranch(e.target.value);
+            reset();
+          }}
+        >
+          {options.map((b) => (
+            <option key={b.name} value={b.name}>
+              {b.name}
+              {b.isHead ? " (チェックアウト中)" : ""}
+            </option>
+          ))}
+        </select>
         <button
           className={btn(plan ? "default" : "primary")}
           disabled={Boolean(busy) || !selected}
