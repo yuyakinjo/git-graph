@@ -2,6 +2,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::path::PathBuf;
 
+use crate::i18n::Msg;
 use crate::sh;
 
 #[derive(Serialize, Clone, Debug)]
@@ -96,7 +97,7 @@ pub fn pr_list(dir: &str, state: &str, limit: u32) -> Result<Value, String> {
             "pr", "list", "--json", PR_FIELDS, "--state", state, "--limit", &limit,
         ],
     )?;
-    serde_json::from_str(&raw).map_err(|e| format!("gh の出力を解析できません: {e}"))
+    serde_json::from_str(&raw).map_err(|e| Msg::GhParseFailed { err: e.to_string() }.text())
 }
 
 pub fn pr_for_branch(dir: &str, branch: &str) -> Result<Value, String> {
@@ -106,14 +107,14 @@ pub fn pr_for_branch(dir: &str, branch: &str) -> Result<Value, String> {
             "pr", "list", "--head", branch, "--state", "all", "--json", PR_FIELDS, "--limit", "5",
         ],
     )?;
-    serde_json::from_str(&raw).map_err(|e| format!("gh の出力を解析できません: {e}"))
+    serde_json::from_str(&raw).map_err(|e| Msg::GhParseFailed { err: e.to_string() }.text())
 }
 
 pub fn pr_view(dir: &str, number: u32) -> Result<Value, String> {
     let n = number.to_string();
     let fields = format!("{PR_FIELDS},body,commits,files,labels,assignees,reviews");
     let raw = sh::gh(dir, &["pr", "view", &n, "--json", &fields])?;
-    serde_json::from_str(&raw).map_err(|e| format!("gh の出力を解析できません: {e}"))
+    serde_json::from_str(&raw).map_err(|e| Msg::GhParseFailed { err: e.to_string() }.text())
 }
 
 #[allow(clippy::too_many_arguments)]

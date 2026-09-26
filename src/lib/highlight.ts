@@ -7,6 +7,7 @@ import type { BundledLanguage, Highlighter, ThemedToken, ThemeInput } from "shik
  * ここに並べたものだけを動的 import する (= ビルド成果物に載るのもこの分だけ)。
  * 選ぶのは暗い配色で、システムがライト外観の間は light の配色に差し替えて塗る
  * (対になるライト版が無いテーマは GitHub Light で代用)。増やすならこの配列に足す。
+ * 表示名に添える説明 (「控えめ」など) は i18n の highlight.themeLabel で付ける。
  */
 export const DIFF_THEMES = [
   {
@@ -53,7 +54,7 @@ export const DIFF_THEMES = [
   },
   {
     id: "min-dark",
-    label: "Min Dark (控えめ)",
+    label: "Min Dark",
     light: "min-light",
     load: () => import("@shikijs/themes/min-dark"),
   },

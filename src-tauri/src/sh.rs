@@ -4,6 +4,7 @@ use std::process::{Command, Stdio};
 use std::time::Instant;
 
 use crate::applog;
+use crate::i18n::Msg;
 
 /// GUI プロセスは PATH が最小限になりがちなので、よくあるインストール先を足しておく。
 /// (gh / git を Homebrew や asdf 経由で入れているケースを救う)
@@ -54,7 +55,7 @@ impl Out {
             s.push_str(self.stdout.trim());
         }
         if s.is_empty() {
-            s = format!("command exited with status {}", self.code);
+            s = Msg::CommandExited { code: self.code }.text();
         }
         s
     }
@@ -111,7 +112,10 @@ fn spawn<S: AsRef<str>>(
     env: &[(&str, &str)],
 ) -> Result<Out, String> {
     if !cwd.is_empty() && !Path::new(cwd).exists() {
-        return Err(format!("ディレクトリが存在しません: {cwd}"));
+        return Err(Msg::DirNotFound {
+            dir: cwd.to_string(),
+        }
+        .into());
     }
     let mut cmd = Command::new(program);
     for a in args {
@@ -146,10 +150,15 @@ fn spawn<S: AsRef<str>>(
     }
 
     let spawn_err = |e: std::io::Error| match e.kind() {
-        std::io::ErrorKind::NotFound => {
-            format!("`{program}` が見つかりません。インストールと PATH を確認してください。")
+        std::io::ErrorKind::NotFound => Msg::ProgramNotFound {
+            program: program.to_string(),
         }
-        _ => format!("`{program}` の実行に失敗しました: {e}"),
+        .text(),
+        _ => Msg::ProgramFailed {
+            program: program.to_string(),
+            err: e.to_string(),
+        }
+        .text(),
     };
     let output = match stdin {
         None => cmd.output().map_err(spawn_err)?,

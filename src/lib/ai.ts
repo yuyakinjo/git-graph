@@ -1,3 +1,4 @@
+import { getLocale, type Locale, t } from "../i18n";
 import { api } from "./api";
 import { parsePlan, validatePlan } from "./recompose";
 import type {
@@ -13,21 +14,30 @@ import type {
  * Claude のサブスクリプションでログインしていれば、キーの登録は要らない。
  */
 
-/** Claude Code に渡すモデル。エイリアスなので常にその系統の最新が使われる。先頭が既定。 */
+/**
+ * Claude Code に渡すモデル。エイリアスなので常にその系統の最新が使われる。先頭が既定。
+ * 設定画面の表示名は i18n の settings.models から引く。
+ */
 export const CLAUDE_CODE_MODELS = [
-  { id: "sonnet", label: "Sonnet（最新・バランス）" },
-  { id: "opus", label: "Opus（最新・高品質）" },
-  { id: "haiku", label: "Haiku（最新・高速）" },
+  { id: "sonnet", label: "Sonnet" },
+  { id: "opus", label: "Opus" },
+  { id: "haiku", label: "Haiku" },
 ] as const;
 export type ClaudeCodeModel = (typeof CLAUDE_CODE_MODELS)[number]["id"];
 export const DEFAULT_CLAUDE_CODE_MODEL: ClaudeCodeModel = CLAUDE_CODE_MODELS[0].id;
 export const isClaudeCodeModel = (v: unknown): v is ClaudeCodeModel =>
   CLAUDE_CODE_MODELS.some((m) => m.id === v);
 
-const SYSTEM = `You write git commit messages for the staged changes a developer is about to commit.
+/** 手掛かりが無いときに AI に書かせる言語 (表示言語に合わせる) */
+const LANGUAGE_NAME: Record<Locale, string> = { ja: "Japanese", en: "English" };
+const outputLanguage = () => LANGUAGE_NAME[getLocale()];
+
+/** コミットメッセージ用のシステムプロンプト (呼んだ時点の表示言語を反映する) */
+export const commitSystem =
+  () => `You write git commit messages for the staged changes a developer is about to commit.
 
 Output only the commit message itself: no preamble, no explanation, no code fences, no quotes.
-Match the language, tone, casing and format (e.g. Conventional Commits prefixes or not, subject length) of the repository's recent commit subjects when they are provided. If there are none, write in Japanese.
+Match the language, tone, casing and format (e.g. Conventional Commits prefixes or not, subject length) of the repository's recent commit subjects when they are provided. If there are none, write in ${outputLanguage()}.
 Start with a concise subject line. Add a blank line and a short body only when the change genuinely needs explaining (the why, not a file-by-file list).`;
 
 function buildPrompt(ctx: CommitContext): string {
@@ -59,17 +69,18 @@ export async function generateCommitMessage(
 ): Promise<string> {
   // Haiku は effort に対応していない
   const effort = model === "haiku" ? undefined : "low";
-  const text = (await api.claudeGenerate(SYSTEM, buildPrompt(ctx), model, effort)).trim();
-  if (!text) throw new Error("Claude Code から空の応答が返りました。");
+  const text = (await api.claudeGenerate(commitSystem(), buildPrompt(ctx), model, effort)).trim();
+  if (!text) throw new Error(t().ai.emptyResponse);
   return text;
 }
 
-const PR_SYSTEM = `You write GitHub pull request titles and descriptions for a branch a developer is about to open a PR for.
+const prSystem =
+  () => `You write GitHub pull request titles and descriptions for a branch a developer is about to open a PR for.
 
 Output format: the first line is the PR title, then one blank line, then the PR body in GitHub-flavored Markdown. Output nothing else: no preamble, no explanation, no code fences around the whole output, no quotes, no "Title:" label.
 If a pull request template is provided, the body must follow it: keep its headings and structure, fill in each section from the changes, keep checklists (tick items only when the changes clearly satisfy them), and drop HTML comments that are only instructions to the author. Leave a section short rather than inventing facts you cannot see.
 If there is no template, write a concise body that explains what changed and why, with a short list of the notable changes.
-Match the language of the commit messages and the template when they are provided. If there are none, write in Japanese.`;
+Match the language of the commit messages and the template when they are provided. If there are none, write in ${outputLanguage()}.`;
 
 function buildPrPrompt(ctx: PrContext): string {
   const parts: string[] = [];
@@ -105,17 +116,18 @@ export async function generatePrDescription(
   ctx: PrContext,
 ): Promise<{ title: string; body: string }> {
   const effort = model === "haiku" ? undefined : "low";
-  const text = (await api.claudeGenerate(PR_SYSTEM, buildPrPrompt(ctx), model, effort)).trim();
+  const text = (await api.claudeGenerate(prSystem(), buildPrPrompt(ctx), model, effort)).trim();
   const res = parsePrDescription(text);
-  if (!res.title) throw new Error("Claude Code から空の応答が返りました。");
+  if (!res.title) throw new Error(t().ai.emptyResponse);
   return res;
 }
 
-const STASH_SYSTEM = `You name a git stash so the developer can recognize it later in a list of stashes.
+const stashSystem =
+  () => `You name a git stash so the developer can recognize it later in a list of stashes.
 
 Output only the name itself on one line: no preamble, no explanation, no quotes, no trailing period, and no "On <branch>:" prefix.
 Keep it short (about 40 characters at most) and describe what the work in progress is about, not the list of files.
-Match the language of the current name when it is written in natural language. Otherwise write in Japanese.`;
+Match the language of the current name when it is written in natural language. Otherwise write in ${outputLanguage()}.`;
 
 function buildStashPrompt(ctx: StashContext, currentName: string): string {
   const parts = [`<current_name>\n${currentName}\n</current_name>`, `<diff>\n${ctx.diff}\n</diff>`];
@@ -136,13 +148,13 @@ export async function generateStashName(
 ): Promise<string> {
   const effort = model === "haiku" ? undefined : "low";
   const text = await api.claudeGenerate(
-    STASH_SYSTEM,
+    stashSystem(),
     buildStashPrompt(ctx, currentName),
     model,
     effort,
   );
   const name = text.trim().split("\n")[0].trim();
-  if (!name) throw new Error("Claude Code から空の応答が返りました。");
+  if (!name) throw new Error(t().ai.emptyResponse);
   return name;
 }
 
@@ -157,7 +169,7 @@ Rules:
 - Use the file paths exactly as listed. For a rename, use the new path; the old path moves with it.
 - Prefer a few meaningful commits over many tiny ones, but do not lump unrelated changes together.
 - The developer's existing commit messages on the branch hint at the intent; use them, but do not copy their grouping.
-- Commit messages: match the language, tone and format (e.g. Conventional Commits prefixes or not) of the repository's recent commit subjects when provided. If there are none, write in Japanese. A concise subject line; add a blank line and a short body only when the why genuinely needs explaining.
+- Commit messages: match the language, tone and format (e.g. Conventional Commits prefixes or not) of the repository's recent commit subjects when provided. If there are none, write in ${outputLanguage()}. A concise subject line; add a blank line and a short body only when the why genuinely needs explaining.
 ${
   compose
     ? "- Also propose a short git branch name for the whole change: lowercase ASCII, kebab-case, with a type prefix such as feature/, fix/, refactor/, docs/ or chore/.\n"
@@ -239,9 +251,9 @@ export async function generateRecomposePlan(
     );
     const plan = parsePlan(text);
     const errors = validatePlan(plan, ctx.files);
-    if (ctx.compose && !plan.branch) errors.push("branch (ブランチ名) がありません");
+    if (ctx.compose && !plan.branch) errors.push(t().ai.missingBranch);
     if (!errors.length) return plan;
     invalid = { plan, errors };
   }
-  throw new Error(`AI のプランが不完全です:\n${invalid!.errors.join("\n")}`);
+  throw new Error(t().ai.incompletePlan(invalid!.errors.join("\n")));
 }

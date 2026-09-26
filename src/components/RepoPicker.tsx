@@ -1,5 +1,6 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useMemo, useState } from "react";
+import { useT } from "../i18n";
 import type { ProjectEntry } from "../lib/types";
 import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
@@ -78,6 +79,7 @@ function filterCandidates(all: Candidate[], query: string): Candidate[] {
 export function RepoPicker({ x, y, onClose }: { x: number; y: number; onClose: () => void }) {
   const s = useStore();
   const act = useActions();
+  const m = useT().repoPicker;
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
 
@@ -140,7 +142,7 @@ export function RepoPicker({ x, y, onClose }: { x: number; y: number; onClose: (
         onMouseDown={keepFocus}
         onKeyDown={onKeyDown}
         role="dialog"
-        aria-label="リポジトリを選択"
+        aria-label={m.ariaLabel}
       >
         <div className="flex items-center gap-1.75 border-b border-line-soft px-2.5 py-2 text-fg-dim">
           <Icon name="search" size={14} />
@@ -148,7 +150,7 @@ export function RepoPicker({ x, y, onClose }: { x: number; y: number; onClose: (
             className="min-w-0 flex-1 border-none bg-transparent text-[13px] text-fg outline-none"
             ref={focusInput}
             value={query}
-            placeholder="プロジェクトを検索"
+            placeholder={m.searchPlaceholder}
             onChange={(e) => {
               setQuery(e.target.value);
               setActive(0);
@@ -178,18 +180,14 @@ export function RepoPicker({ x, y, onClose }: { x: number; y: number; onClose: (
                 <span className="min-w-0 flex-1 overflow-hidden font-mono text-[11px] text-ellipsis whitespace-nowrap text-fg-faint">
                   {c.detail}
                 </span>
-                {open ? <span className={PICKER_TAG}>開いています</span> : null}
-                {!c.known ? <span className={PICKER_TAG}>最近</span> : null}
+                {open ? <span className={PICKER_TAG}>{m.tagOpen}</span> : null}
+                {!c.known ? <span className={PICKER_TAG}>{m.tagRecent}</span> : null}
               </button>
             );
           })}
           {!items.length ? (
             <div className="px-3 py-3.5 text-[12px] leading-[1.6] text-fg-dim">
-              {s.projectRoots.length
-                ? s.scanning
-                  ? "検索中..."
-                  : "該当するリポジトリがありません"
-                : "プロジェクトの場所が未設定です。下の「プロジェクトの場所を設定」から追加してください。"}
+              {s.projectRoots.length ? (s.scanning ? m.searching : m.noMatch) : m.noRoots}
             </div>
           ) : null}
         </div>
@@ -202,10 +200,10 @@ export function RepoPicker({ x, y, onClose }: { x: number; y: number; onClose: (
               void act.openFolder();
             }}
           >
-            <Icon name="folder" size={14} /> Finder から開く...
+            <Icon name="folder" size={14} /> {m.openFromFinder}
           </button>
           <button className={PICKER_ACTION} onClick={() => void addRoots()}>
-            <Icon name="worktree" size={14} /> プロジェクトの場所を設定
+            <Icon name="worktree" size={14} /> {m.setRoots}
           </button>
         </div>
       </div>

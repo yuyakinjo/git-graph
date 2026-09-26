@@ -10,6 +10,7 @@ import { Avatar } from "./Avatar";
 import { FSTATUS_COLOR, btn, fstatAdd, fstatDel, fstats, iconBtn } from "./classes";
 import { Icon, Spinner } from "./ui";
 import { useMenu } from "./ui-context";
+import { useT } from "../i18n";
 
 const DETAIL = "flex h-full min-w-0 flex-col";
 const DETAIL_HEAD = "flex-none border-b border-line px-3 py-2.5";
@@ -181,6 +182,7 @@ function useCommitMsgHeight(initial: number, listRef: React.RefObject<HTMLDivEle
 
 function WipPanel() {
   const s = useStore();
+  const m = useT();
   const act = useActions();
   const openMenu = useMenu();
   const [message, setMessage] = useState("");
@@ -211,12 +213,17 @@ function WipPanel() {
     e.preventDefault();
     openMenu(e, [
       staged
-        ? { label: "アンステージ", icon: "minus", onClick: () => act.unstage([f.path]) }
-        : { label: "ステージ", icon: "plus", onClick: () => act.stage([f.path]) },
+        ? { label: m.detailPane.unstage, icon: "minus", onClick: () => act.unstage([f.path]) }
+        : { label: m.detailPane.stage, icon: "plus", onClick: () => act.stage([f.path]) },
       { separator: true },
-      { label: "変更を破棄", icon: "trash", danger: true, onClick: () => act.discard([f.path]) },
       {
-        label: "パスをコピー",
+        label: m.detailPane.discard,
+        icon: "trash",
+        danger: true,
+        onClick: () => act.discard([f.path]),
+      },
+      {
+        label: m.detailPane.copyPath,
         icon: "copy",
         onClick: () => navigator.clipboard.writeText(f.path).catch(() => undefined),
       },
@@ -232,14 +239,14 @@ function WipPanel() {
     try {
       const ctx = await api.commitContext(s.dir, amend);
       if (!ctx.diff.trim()) {
-        s.toast({ kind: "info", title: "コミットする差分がありません" });
+        s.toast({ kind: "info", title: m.detailPane.noDiffToCommit });
         return;
       }
       setMessage(await generateCommitMessage(s.aiCliModel, ctx));
     } catch (e) {
       s.toast({
         kind: "error",
-        title: "コミットメッセージを生成できませんでした",
+        title: m.detailPane.generateFailed,
         detail: String(e),
       });
     } finally {
@@ -252,7 +259,7 @@ function WipPanel() {
       <header className={DETAIL_HEAD}>
         <div className={DETAIL_TITLE}>
           <Icon name="commit" size={15} />
-          <h3 className={DETAIL_H3}>未コミットの変更</h3>
+          <h3 className={DETAIL_H3}>{m.detailPane.uncommitted}</h3>
         </div>
         <div className={DETAIL_SUB}>
           {s.repo?.state !== "clean" ? (
@@ -260,20 +267,20 @@ function WipPanel() {
               {s.repo?.state}
             </span>
           ) : null}
-          <span>{changedCount + stagedCount} ファイル</span>
+          <span>{m.detailPane.fileCount(changedCount + stagedCount)}</span>
         </div>
       </header>
 
       <div ref={containerRef} className="flex min-h-0 flex-auto flex-col">
         <section className="flex min-h-0 flex-auto flex-col">
           <div className={SECTION_HEAD}>
-            <span>変更 ({changedCount})</span>
+            <span>{m.detailPane.changes(changedCount)}</span>
             <button
               className={btn("default", "tiny")}
               disabled={changedCount === 0}
               onClick={() => act.stageAll()}
             >
-              <Icon name="plus" size={12} /> すべてステージ
+              <Icon name="plus" size={12} /> {m.detailPane.stageAll}
             </button>
           </div>
           <div className="min-h-0 flex-auto overflow-y-auto">
@@ -288,7 +295,7 @@ function WipPanel() {
                 right={
                   <button
                     className={iconBtn({ tiny: true })}
-                    title="解決済みとしてステージ"
+                    title={m.detailPane.markResolved}
                     onClick={(e) => {
                       e.stopPropagation();
                       act.stage([f.path]);
@@ -314,7 +321,7 @@ function WipPanel() {
                   <>
                     <button
                       className={iconBtn({ tiny: true })}
-                      title="変更を破棄"
+                      title={m.detailPane.discard}
                       onClick={(e) => {
                         e.stopPropagation();
                         act.discard([f.path]);
@@ -324,7 +331,7 @@ function WipPanel() {
                     </button>
                     <button
                       className={iconBtn({ tiny: true })}
-                      title="ステージ"
+                      title={m.detailPane.stage}
                       onClick={(e) => {
                         e.stopPropagation();
                         act.stage([f.path]);
@@ -336,7 +343,7 @@ function WipPanel() {
                 }
               />
             ))}
-            {changedCount === 0 ? <div className={LIST_EMPTY}>変更はありません</div> : null}
+            {changedCount === 0 ? <div className={LIST_EMPTY}>{m.detailPane.noChanges}</div> : null}
           </div>
         </section>
 
@@ -347,13 +354,13 @@ function WipPanel() {
           style={{ height: stagedH, maxHeight: `calc(100% - ${WIP_LIST_MIN}px)` }}
         >
           <div className={SECTION_HEAD}>
-            <span>ステージ済み ({stagedCount})</span>
+            <span>{m.detailPane.staged(stagedCount)}</span>
             <button
               className={btn("default", "tiny")}
               disabled={stagedCount === 0}
               onClick={() => act.unstageAll()}
             >
-              <Icon name="minus" size={12} /> すべて解除
+              <Icon name="minus" size={12} /> {m.detailPane.unstageAll}
             </button>
           </div>
           <div className="min-h-0 flex-auto overflow-y-auto">
@@ -369,7 +376,7 @@ function WipPanel() {
                 right={
                   <button
                     className={iconBtn({ tiny: true })}
-                    title="アンステージ"
+                    title={m.detailPane.unstage}
                     onClick={(e) => {
                       e.stopPropagation();
                       act.unstage([f.path]);
@@ -380,14 +387,12 @@ function WipPanel() {
                 }
               />
             ))}
-            {stagedCount === 0 ? (
-              <div className={LIST_EMPTY}>ステージ済みのファイルはありません</div>
-            ) : null}
+            {stagedCount === 0 ? <div className={LIST_EMPTY}>{m.detailPane.noStaged}</div> : null}
           </div>
         </section>
       </div>
 
-      <div className={ROW_SPLITTER} title="ドラッグで入力欄の高さを変更" {...msgSplitter} />
+      <div className={ROW_SPLITTER} title={m.detailPane.resizeMessage} {...msgSplitter} />
       <div className="flex-none bg-bg-2 px-2.5 pt-2 pb-2.5">
         <div className="relative">
           <textarea
@@ -395,8 +400,8 @@ function WipPanel() {
             style={{ height: msgH }}
             placeholder={
               stagedCount === 0 && changedCount > 0
-                ? "コミットメッセージ (ステージ済みが無い場合はすべてステージしてコミットします)"
-                : "コミットメッセージ"
+                ? m.detailPane.messagePlaceholderStageAll
+                : m.detailPane.messagePlaceholder
             }
             value={message}
             onChange={(e) => setMessage(e.target.value)}
@@ -408,10 +413,8 @@ function WipPanel() {
           />
           <button
             className={`${iconBtn({ tiny: true })} absolute top-1 right-1`}
-            title={
-              generating ? "生成中…" : "AI で生成 (差分から Claude Code でコミットメッセージを生成)"
-            }
-            aria-label="AI で生成"
+            title={generating ? m.detailPane.generating : m.detailPane.generateTitle}
+            aria-label={m.detailPane.generateLabel}
             disabled={!canCommit || generating}
             onClick={() => void generate()}
           >
@@ -426,7 +429,7 @@ function WipPanel() {
               checked={amend}
               onChange={(e) => toggleAmend(e.target.checked)}
             />
-            <span>直前のコミットを修正 (amend)</span>
+            <span>{m.detailPane.amend}</span>
           </label>
           <button
             className={btn("primary")}
@@ -435,10 +438,10 @@ function WipPanel() {
           >
             <Icon name="check" size={14} />
             {amend
-              ? "コミットを修正"
+              ? m.detailPane.commitAmend
               : stagedCount === 0
-                ? "すべてコミット"
-                : `${stagedCount} 件をコミット`}
+                ? m.detailPane.commitAll
+                : m.detailPane.commitStaged(stagedCount)}
           </button>
         </div>
       </div>
@@ -450,6 +453,7 @@ function WipPanel() {
 
 function CommitPanel({ sha }: { sha: string }) {
   const s = useStore();
+  const m = useT();
   const act = useActions();
   const openMenu = useMenu();
   // 中身は選択時に store がまとめて読み込む。ここは受け取って描くだけ。
@@ -464,13 +468,13 @@ function CommitPanel({ sha }: { sha: string }) {
     });
   }, [detail]);
 
-  if (!detail) return <div className={`${DETAIL} p-4 text-fg-dim`}>読み込み中...</div>;
+  if (!detail) return <div className={`${DETAIL} p-4 text-fg-dim`}>{m.detailPane.loading}</div>;
 
   const fileMenu = (f: DiffFile) => (e: React.MouseEvent) => {
     e.preventDefault();
     openMenu(e, [
       {
-        label: "パスをコピー",
+        label: m.detailPane.copyPath,
         icon: "copy",
         onClick: () => navigator.clipboard.writeText(f.path).catch(() => undefined),
       },
@@ -489,7 +493,7 @@ function CommitPanel({ sha }: { sha: string }) {
               <span title={absoluteTime(detail.authorAt)}>{relativeTime(detail.authorAt)}</span>
               <button
                 className="inline-flex cursor-pointer items-center gap-1 rounded-[5px] border-0 bg-bg-3 px-1.5 py-px font-mono text-[12px] text-fg-dim hover:text-fg"
-                title="SHA をコピー"
+                title={m.detailPane.copySha}
                 onClick={() => navigator.clipboard.writeText(detail.hash).catch(() => undefined)}
               >
                 {detail.short} <Icon name="copy" size={11} />
@@ -502,10 +506,10 @@ function CommitPanel({ sha }: { sha: string }) {
             className={btn("default", "tiny")}
             onClick={() => act.checkout(detail.hash, detail.short)}
           >
-            <Icon name="commit" size={12} /> チェックアウト
+            <Icon name="commit" size={12} /> {m.detailPane.checkout}
           </button>
           <button className={btn("default", "tiny")} onClick={() => act.createBranch(detail.hash)}>
-            <Icon name="branch" size={12} /> ブランチ作成
+            <Icon name="branch" size={12} /> {m.detailPane.createBranch}
           </button>
         </div>
       </header>
@@ -518,8 +522,9 @@ function CommitPanel({ sha }: { sha: string }) {
 
       <div className={SECTION_HEAD}>
         <span>
-          {detail.files.length} ファイル変更
-          {detail.parents.length > 1 ? " (第一親との差分)" : ""}
+          {detail.parents.length > 1
+            ? m.detailPane.filesChangedVsFirstParent(detail.files.length)
+            : m.detailPane.filesChanged(detail.files.length)}
         </span>
         <span className={fstats}>
           <em className={fstatAdd}>+{totals.a}</em>
@@ -542,7 +547,7 @@ function CommitPanel({ sha }: { sha: string }) {
             stats={{ additions: f.additions, deletions: f.deletions }}
           />
         ))}
-        {detail.files.length === 0 ? <div className={LIST_EMPTY}>差分はありません</div> : null}
+        {detail.files.length === 0 ? <div className={LIST_EMPTY}>{m.detailPane.noDiff}</div> : null}
       </div>
     </div>
   );
@@ -552,6 +557,7 @@ function CommitPanel({ sha }: { sha: string }) {
 
 function StashPanel({ refname, message }: { refname: string; message: string }) {
   const s = useStore();
+  const m = useT();
   const act = useActions();
   const files = s.stashFiles;
   const sel = s.file?.source === "stash" ? s.file.path : null;
@@ -574,28 +580,28 @@ function StashPanel({ refname, message }: { refname: string; message: string }) 
             disabled={!stash}
             onClick={() => stash && act.stashApply(stash, false)}
           >
-            適用
+            {m.detailPane.stash.apply}
           </button>
           <button
             className={btn("default", "tiny")}
             disabled={!stash}
             onClick={() => stash && act.stashApply(stash, true)}
           >
-            ポップ
+            {m.detailPane.stash.pop}
           </button>
           <button
             className={btn("default", "tiny")}
             disabled={!stash}
             onClick={() => stash && act.stashRename(stash)}
           >
-            名前を変更
+            {m.detailPane.stash.rename}
           </button>
           <button
             className={btn("outlineDanger", "tiny")}
             disabled={!stash}
             onClick={() => stash && act.stashDrop(stash)}
           >
-            破棄
+            {m.detailPane.stash.drop}
           </button>
         </div>
       </header>

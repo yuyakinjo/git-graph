@@ -133,7 +133,8 @@ test.describe("変更", () => {
     await app.refresh();
 
     // ダイアログを挟まず、日時から付けた名前ですぐスタッシュする
-    await page.getByRole("button", { name: "スタッシュ", exact: true }).click();
+    // サイドバーの見出しにも同名のボタンがあるので、ツールバーの方をコマンド表記で選ぶ
+    await page.getByTitle("git stash push").click();
 
     await expect(page.getByText("スタッシュ 1", { exact: true })).toBeVisible();
     expect(repo.git("stash", "list", "--format=%s")).toMatch(/: WIP \d{4}-\d{2}-\d{2} /);
@@ -231,6 +232,20 @@ test.describe("設定", () => {
     await dialog.getByRole("tab", { name: "AI" }).click();
     await expect(dialog.getByText("AI コミットメッセージ")).toBeVisible();
   });
+
+  test("表示言語を English にすると画面の文言が切り替わり、再起動後も残る", async ({ app }) => {
+    const { page } = app;
+
+    await page.getByTitle("設定 (Cmd ,)").click();
+    await page.getByLabel("表示言語").selectOption("en");
+
+    const dialog = page.getByRole("dialog", { name: "Settings" });
+    await expect(dialog.getByRole("tab", { name: "General" })).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+
+    await page.reload();
+    await expect(page.getByTitle("Settings (Cmd ,)")).toBeVisible();
+  });
 });
 
 test.describe("ログ", () => {
@@ -281,7 +296,7 @@ test.describe("ダッシュパネル", () => {
 
     await expect(panel.getByRole("button", { name: "PR 作成", exact: true })).toBeVisible();
     await expect(panel.getByRole("button", { name: "AI でコミット" })).toBeVisible();
-    await expect(panel.getByRole("button", { name: "tidy" })).toBeVisible();
+    await expect(panel.getByRole("button", { name: "整理" })).toBeVisible();
     await page.screenshot({ path: "test-results/dash-panel.png" });
 
     // git バーの左端アイコンから候補を選んで足す

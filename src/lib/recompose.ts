@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { ChangedFile, RecomposePlan, RepoInfo } from "./types";
 
 /**
@@ -30,15 +31,15 @@ export const recomposeBranchName = (branch: string) => `${RECOMPOSE_PREFIX}${bra
 export function parsePlan(text: string): RecomposePlan {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
-  if (start < 0 || end <= start) throw new Error("AI の応答に JSON のプランがありません");
+  if (start < 0 || end <= start) throw new Error(t().recompose.noJsonPlan);
   let raw: unknown;
   try {
     raw = JSON.parse(text.slice(start, end + 1));
   } catch (e) {
-    throw new Error(`AI の応答を JSON として読めません: ${String(e)}`);
+    throw new Error(t().recompose.invalidJson(String(e)));
   }
   const obj = (raw ?? {}) as { branch?: unknown; commits?: unknown };
-  if (!Array.isArray(obj.commits)) throw new Error("AI の応答に commits がありません");
+  if (!Array.isArray(obj.commits)) throw new Error(t().recompose.noCommitsField);
   const commits = obj.commits.map((c) => {
     const item = (c ?? {}) as { message?: unknown; files?: unknown };
     return {
@@ -60,19 +61,19 @@ export function validatePlan(plan: RecomposePlan, files: ChangedFile[]): string[
   const known = new Set(files.map((f) => f.path));
   const seen = new Set<string>();
   const errors: string[] = [];
-  if (plan.commits.length === 0) errors.push("コミットが 1 つもありません");
+  const m = t().recompose;
+  if (plan.commits.length === 0) errors.push(m.noCommits);
   plan.commits.forEach((c, i) => {
     const n = i + 1;
-    if (!c.message) errors.push(`${n} 番目のコミットにメッセージがありません`);
-    if (c.files.length === 0) errors.push(`${n} 番目のコミットにファイルがありません`);
+    if (!c.message) errors.push(m.commitNoMessage(n));
+    if (c.files.length === 0) errors.push(m.commitNoFiles(n));
     for (const f of c.files) {
-      if (!known.has(f)) errors.push(`変更の一覧に無いファイルがあります: ${f}`);
-      else if (seen.has(f)) errors.push(`${f} が複数のコミットに含まれています`);
+      if (!known.has(f)) errors.push(m.unknownFile(f));
+      else if (seen.has(f)) errors.push(m.duplicateFile(f));
       seen.add(f);
     }
   });
   const missing = files.filter((f) => !seen.has(f.path)).map((f) => f.path);
-  if (missing.length)
-    errors.push(`どのコミットにも入っていないファイルがあります: ${missing.join(", ")}`);
+  if (missing.length) errors.push(m.missingFiles(missing.join(", ")));
   return errors;
 }

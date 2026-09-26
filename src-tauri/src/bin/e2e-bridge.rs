@@ -22,7 +22,7 @@ use app_lib::commands as c;
 /// 引数を 1 つ取り出す。無いキーは null として読むので Option の引数は省略できる。
 fn arg<T: DeserializeOwned>(args: &Value, key: &str) -> Result<T, String> {
     let v = args.get(key).cloned().unwrap_or(Value::Null);
-    serde_json::from_value(v).map_err(|e| format!("引数 {key} が不正です: {e}"))
+    serde_json::from_value(v).map_err(|e| format!("invalid argument {key}: {e}"))
 }
 
 fn reply<T: Serialize>(r: Result<T, String>) -> Result<Value, String> {
@@ -147,7 +147,13 @@ fn dispatch(cmd: &str, a: &Value) -> Result<Value, String> {
         "gh_pr_view" => call!(a, c::gh_pr_view, "dir", "number"),
         "gh_pr_template" => call!(a, c::gh_pr_template, "dir"),
 
-        _ => Err(format!("e2e-bridge: 未対応のコマンドです: {cmd}")),
+        // 表示言語
+        "set_locale" => {
+            c::set_locale(arg(a, "locale")?);
+            Ok(Value::Null)
+        }
+
+        _ => Err(format!("e2e-bridge: unsupported command: {cmd}")),
     }
 }
 
@@ -162,7 +168,7 @@ fn main() {
         let req: Value = match serde_json::from_str(&line) {
             Ok(v) => v,
             Err(e) => {
-                eprintln!("e2e-bridge: 不正なリクエスト: {e}");
+                eprintln!("e2e-bridge: invalid request: {e}");
                 continue;
             }
         };

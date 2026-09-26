@@ -1,5 +1,6 @@
 use serde::Serialize;
 
+use crate::i18n::Msg;
 use crate::sh;
 
 const FS: &str = "\u{1f}";
@@ -57,7 +58,7 @@ pub fn info(path: &str) -> Result<RepoInfo, String> {
         .trim()
         .to_string();
     if root.is_empty() {
-        return Err("git リポジトリが見つかりません".into());
+        return Err(Msg::NotAGitRepo.into());
     }
     let head_ref = sh::git(&root, &["rev-parse", "--abbrev-ref", "HEAD"])
         .unwrap_or_default()
@@ -641,7 +642,10 @@ pub fn commit_detail(dir: &str, sha: &str) -> Result<CommitDetail, String> {
     let meta = sh::git(dir, &["show", "--no-patch", fmt, sha])?;
     let f: Vec<&str> = meta.trim_end_matches('\n').split(FS).collect();
     if f.len() < 10 {
-        return Err(format!("コミット情報を解析できません: {sha}"));
+        return Err(Msg::CommitParseFailed {
+            sha: sha.to_string(),
+        }
+        .into());
     }
     let name_status = sh::git(
         dir,
@@ -715,7 +719,7 @@ pub fn diff_text(
     let ctx = format!("-U{}", context);
     let out = match kind {
         "commit" => {
-            let sha = sha.ok_or("コミットハッシュが必要です")?;
+            let sha = sha.ok_or_else(|| Msg::CommitShaRequired.text())?;
             sh::exec(
                 dir,
                 "git",
@@ -769,7 +773,7 @@ pub fn diff_text(
         "stash" => {
             // `git stash show` はパス指定を受け付けないので、元のコミット (^1) との差分を取る。
             // 追跡中のファイルは stash 本体、未追跡のファイルは第三親 (^3) に入っている。
-            let sha = sha.ok_or("stash の参照が必要です")?;
+            let sha = sha.ok_or_else(|| Msg::StashRefRequired.text())?;
             let diff = |to: String| {
                 sh::exec(
                     dir,
@@ -795,7 +799,12 @@ pub fn diff_text(
                 tracked
             }
         }
-        _ => return Err(format!("未知の diff 種別: {kind}")),
+        _ => {
+            return Err(Msg::UnknownDiffKind {
+                kind: kind.to_string(),
+            }
+            .into())
+        }
     };
     // --no-index は差分があると exit code 1 を返すので許容する
     if out.ok() || out.code == 1 {

@@ -1,6 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { getLocale, loadLocalePref, resolveLocale, setLocale, subscribeLocale, t } from "./i18n";
+import { api } from "./lib/api";
 import { DialogProvider, MenuProvider } from "./components/ui";
 import { appLog } from "./lib/log";
 import { bootApp } from "./lib/repo-data";
@@ -12,7 +14,7 @@ import "./styles.css";
 window.addEventListener("error", (e) => {
   appLog(
     "error",
-    `未処理の例外: ${e.message}`,
+    t().main.uncaughtError(e.message),
     e.error instanceof Error ? e.error.stack : undefined,
   );
 });
@@ -20,9 +22,20 @@ window.addEventListener("unhandledrejection", (e) => {
   const r: unknown = e.reason;
   appLog(
     "error",
-    "未処理の Promise の失敗",
+    t().main.unhandledRejection,
     r instanceof Error ? (r.stack ?? r.message) : String(r),
   );
+});
+
+// 表示言語も最初の描画前に決め、Rust 側のメッセージの言語も合わせる
+setLocale(resolveLocale(loadLocalePref()));
+const syncRustLocale = () => void api.setLocale(getLocale()).catch(() => {});
+syncRustLocale();
+subscribeLocale(syncRustLocale);
+// 「システムに合わせる」のときは OS の言語の変更にも追従する
+window.addEventListener("languagechange", () => {
+  const pref = loadLocalePref();
+  if (pref === "system") setLocale(resolveLocale(pref));
 });
 
 // 前回の表示倍率を最初の描画前に戻す (拡大した状態で起動してもチラつかせない)

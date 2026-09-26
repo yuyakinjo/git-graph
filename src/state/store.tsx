@@ -19,6 +19,14 @@ import {
 } from "../lib/repo-data";
 import { snapshotHash, type CachedRepo } from "../lib/snapshot-cache";
 import { applyZoom, clampZoom, loadZoom, saveZoom } from "../lib/zoom";
+import {
+  loadLocalePref,
+  resolveLocale,
+  saveLocalePref,
+  setLocale,
+  t,
+  type LocalePref,
+} from "../i18n";
 import type {
   BranchInfo,
   CmdLog,
@@ -92,16 +100,16 @@ const AI_CLI_MODEL_KEY = "gitsquid.aiClaudeCodeModel";
 export type GraphStyle = "default" | "japanese-railway";
 
 export const GRAPH_COLUMNS = [
-  { key: "graph", label: "グラフ" },
+  { key: "graph" },
   // 列ではなくグラフ内の見た目の切り替えだが、同じメニューで扱うためここに置く
-  { key: "nodeAvatar", label: "ノード" },
-  { key: "refs", label: "ブランチ" },
+  { key: "nodeAvatar" },
+  { key: "refs" },
   // 独立した列ではなく、ブランチ列にタグを並べるかどうか
-  { key: "tags", label: "タグ" },
-  { key: "subject", label: "メッセージ" },
-  { key: "author", label: "作者" },
-  { key: "sha", label: "SHA" },
-  { key: "date", label: "日時" },
+  { key: "tags" },
+  { key: "subject" },
+  { key: "author" },
+  { key: "sha" },
+  { key: "date" },
 ] as const;
 
 export type GraphColumnKey = (typeof GRAPH_COLUMNS)[number]["key"];
@@ -292,6 +300,9 @@ export function useStoreValue(boot: BootData | null) {
     return isClaudeCodeModel(saved) ? saved : DEFAULT_CLAUDE_CODE_MODEL;
   });
 
+  /** 表示言語の設定値 (system は OS に合わせる)。実際の切り替えは i18n の setLocale。 */
+  const [localePref, setLocalePrefState] = useState<LocalePref>(loadLocalePref);
+
   const toastSeq = useRef(0);
   const detailSeq = useRef(0);
   const diffSeq = useRef(0);
@@ -355,11 +366,11 @@ export function useStoreValue(boot: BootData | null) {
   /** いま state に載っているリポジトリ。ハッシュ比較はこれと合わせて見る。 */
   const shownRef = useRef<string>(boot?.snapshot.repo.root ?? "");
 
-  const toast = useCallback((t: Omit<Toast, "id">) => {
-    appLog(t.kind === "error" ? "error" : "info", t.title, t.detail);
+  const toast = useCallback((next: Omit<Toast, "id">) => {
+    appLog(next.kind === "error" ? "error" : "info", next.title, next.detail);
     const id = ++toastSeq.current;
-    setToasts((prev) => [...prev, { ...t, id }]);
-    const ttl = t.kind === "error" ? 9000 : 3800;
+    setToasts((prev) => [...prev, { ...next, id }]);
+    const ttl = next.kind === "error" ? 9000 : 3800;
     window.setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), ttl);
   }, []);
 
@@ -415,7 +426,7 @@ export function useStoreValue(boot: BootData | null) {
           );
         } catch (e) {
           if (detailSeq.current === id) {
-            toast({ kind: "error", title: "コミットを読み込めません", detail: String(e) });
+            toast({ kind: "error", title: t().store.commitLoadFailed, detail: String(e) });
           }
         }
         return;
@@ -498,9 +509,9 @@ export function useStoreValue(boot: BootData | null) {
       await api.ghAvatarsClear();
       setAvatars({});
       refreshAvatars(dirRef.current, graphRef.current);
-      toast({ kind: "success", title: "作者アイコンのキャッシュを消しました" });
+      toast({ kind: "success", title: t().store.avatarCacheCleared });
     } catch (e) {
-      toast({ kind: "error", title: "キャッシュを消せませんでした", detail: String(e) });
+      toast({ kind: "error", title: t().store.avatarCacheClearFailed, detail: String(e) });
     }
   }, [refreshAvatars, toast]);
 
@@ -541,7 +552,7 @@ export function useStoreValue(boot: BootData | null) {
       }
       refreshAvatars(root, g);
     } catch (e) {
-      toast({ kind: "error", title: "コミットを追加で読めませんでした", detail: String(e) });
+      toast({ kind: "error", title: t().store.loadMoreFailed, detail: String(e) });
     } finally {
       moreRef.current = false;
       setLoadingMore(false);
@@ -572,7 +583,7 @@ export function useStoreValue(boot: BootData | null) {
         }
         await refreshPrs();
       } catch (e) {
-        toast({ kind: "error", title: "リポジトリの読み込みに失敗しました", detail: String(e) });
+        toast({ kind: "error", title: t().store.refreshFailed, detail: String(e) });
       } finally {
         if (!opts.silent) setLoading(false);
       }
@@ -629,7 +640,7 @@ export function useStoreValue(boot: BootData | null) {
           })
           .catch(() => undefined);
       } catch (e) {
-        toast({ kind: "error", title: "リポジトリを開けませんでした", detail: String(e) });
+        toast({ kind: "error", title: t().store.openRepoFailed, detail: String(e) });
       } finally {
         if (openSeq.current === id) {
           setLoading(false);
@@ -712,20 +723,20 @@ export function useStoreValue(boot: BootData | null) {
       opts: { successDetail?: boolean; silentSuccess?: boolean } = {},
     ): Promise<boolean> => {
       setBusy(label);
-      appLog("info", `${label} を開始`);
+      appLog("info", t().store.runStart(label));
       try {
         const out = await fn();
-        if (opts.silentSuccess) appLog("info", `${label} 完了`);
+        if (opts.silentSuccess) appLog("info", t().store.runDone(label));
         else {
           toast({
             kind: "success",
-            title: `${label} 完了`,
+            title: t().store.runDone(label),
             detail: opts.successDetail === false ? undefined : out?.trim() || undefined,
           });
         }
         return true;
       } catch (e) {
-        toast({ kind: "error", title: `${label} に失敗しました`, detail: String(e) });
+        toast({ kind: "error", title: t().store.runFailed(label), detail: String(e) });
         return false;
       } finally {
         setBusy(null);
@@ -766,7 +777,7 @@ export function useStoreValue(boot: BootData | null) {
       if (scanSeq.current === id) setProjects(found);
     } catch (e) {
       if (scanSeq.current === id) {
-        toast({ kind: "error", title: "プロジェクトの検索に失敗しました", detail: String(e) });
+        toast({ kind: "error", title: t().store.scanFailed, detail: String(e) });
       }
     } finally {
       if (scanSeq.current === id) setScanning(false);
@@ -865,6 +876,12 @@ export function useStoreValue(boot: BootData | null) {
     localStorage.setItem(AI_CLI_MODEL_KEY, model);
   }, []);
 
+  const setLocalePref = useCallback((pref: LocalePref) => {
+    setLocalePrefState(pref);
+    saveLocalePref(pref);
+    setLocale(resolveLocale(pref));
+  }, []);
+
   const openSettings = useCallback(() => setSettingsOpen(true), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
   /** Rust 側のコマンド履歴を取り直す (ログ画面を開いている間は定期的に呼ぶ) */
@@ -943,6 +960,8 @@ export function useStoreValue(boot: BootData | null) {
     setDiffTheme,
     aiCliModel,
     setAiCliModel,
+    localePref,
+    setLocalePref,
     zoom,
     setZoom,
     projectRoots,

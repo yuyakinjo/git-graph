@@ -3,8 +3,10 @@
  *
  * Bun には localStorage が無いので、メモリ上の簡易実装を差し込む。
  * 日時の整形がマシンのタイムゾーンに左右されないよう TZ も固定する。
+ * 表示言語は各テストの前に日本語へ戻す。
  */
 import { beforeEach } from "bun:test";
+import { setLocale } from "../src/i18n";
 
 process.env.TZ = "Asia/Tokyo";
 
@@ -32,4 +34,7 @@ class MemoryStorage implements Storage {
 
 globalThis.localStorage = new MemoryStorage();
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  setLocale("ja");
+});

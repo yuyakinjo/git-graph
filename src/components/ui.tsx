@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { useT } from "../i18n";
 import { useWindowEvent } from "../lib/effects";
 import { DialogCtx, MenuCtx, type DialogApi } from "./ui-context";
 import { Markdown } from "./Markdown";
@@ -314,7 +315,7 @@ export function Icon({
  */
 export function CopyButton({
   text,
-  title = "クリップボードにコピー",
+  title,
   size = 13,
   className,
   label,
@@ -326,6 +327,7 @@ export function CopyButton({
   /** アイコンの横に出す文言 (ボタン型で使うとき) */
   label?: ReactNode;
 }) {
+  const m = useT();
   const [copied, setCopied] = useState(false);
   const copy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -340,7 +342,7 @@ export function CopyButton({
   return (
     <button
       className={className ?? iconBtn({ tiny: true })}
-      title={copied ? "コピーしました" : title}
+      title={copied ? m.ui.copied : (title ?? m.ui.copyToClipboard)}
       onClick={copy}
     >
       <Icon name={copied ? "check" : "copy"} size={size} className={copied ? "text-green" : ""} />
@@ -364,6 +366,7 @@ export function Modal({
   footer?: ReactNode;
   width?: number;
 }) {
+  const m = useT();
   return (
     <div
       className="fixed inset-0 z-60 flex items-start justify-center bg-scrim pt-[8vh] backdrop-blur-[2px]"
@@ -387,7 +390,7 @@ export function Modal({
           <h2 className="m-0 flex-1 overflow-hidden text-[14px] font-[650] text-ellipsis whitespace-nowrap">
             {title}
           </h2>
-          <button className={iconBtn()} onClick={onClose} title="閉じる">
+          <button className={iconBtn()} onClick={onClose} title={m.ui.close}>
             <Icon name="x" />
           </button>
         </header>
@@ -483,6 +486,7 @@ function FormDialog({
   const action = spec.action;
   const [actionBusy, setActionBusy] = useState(false);
   const busy = actionBusy || autoBusy;
+  const m = useT();
 
   const submit = () => {
     if (missing || busy) return;
@@ -527,14 +531,14 @@ function FormDialog({
             </>
           ) : null}
           <button className={btn("ghost")} onClick={() => resolve(null)}>
-            キャンセル
+            {m.ui.cancel}
           </button>
           <button
             className={btn(spec.danger ? "danger" : "primary")}
             disabled={missing || busy}
             onClick={submit}
           >
-            {spec.submitLabel ?? "OK"}
+            {spec.submitLabel ?? m.ui.ok}
           </button>
         </>
       }
@@ -615,7 +619,7 @@ function FormDialog({
                     onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
                   />
                   <button className={btn("ghost")} onClick={() => pickDir(f.name)}>
-                    <Icon name="folder" /> 選択
+                    <Icon name="folder" /> {m.ui.choose}
                   </button>
                 </div>
               ) : (
@@ -637,10 +641,7 @@ function FormDialog({
   );
 }
 
-const MD_TABS = [
-  { id: "write", label: "書く" },
-  { id: "preview", label: "プレビュー" },
-] as const;
+const MD_TABS = ["write", "preview"] as const;
 
 /** GitHub のコメント欄と同じく、入力欄の上のタブで Markdown のプレビューに切り替える */
 function MarkdownTextarea({
@@ -656,7 +657,8 @@ function MarkdownTextarea({
   value: string;
   onChange: (value: string) => void;
 }) {
-  const [tab, setTab] = useState<(typeof MD_TABS)[number]["id"]>("write");
+  const [tab, setTab] = useState<(typeof MD_TABS)[number]>("write");
+  const m = useT();
   // プレビューに切り替えても枠の高さが縮まないよう、直前の textarea の高さを引き継ぐ
   const [height, setHeight] = useState<number>();
   const textarea = useRef<HTMLTextAreaElement | null>(null);
@@ -677,20 +679,20 @@ function MarkdownTextarea({
   return (
     <div className="overflow-hidden rounded-md border border-line bg-bg-1 focus-within:border-accent">
       <div className="flex gap-1 border-b border-line bg-bg-2 px-1.5" role="tablist">
-        {MD_TABS.map((t) => (
+        {MD_TABS.map((id) => (
           <button
-            key={t.id}
+            key={id}
             type="button"
             role="tab"
-            aria-selected={tab === t.id}
+            aria-selected={tab === id}
             className={`-mb-px cursor-pointer border-x-0 border-t-0 border-b-2 bg-transparent px-2.5 py-1.5 text-[12px] ${
-              tab === t.id
+              tab === id
                 ? "border-accent font-[650] text-fg"
                 : "border-transparent text-fg-dim hover:text-fg"
             }`}
-            onClick={() => select(t.id)}
+            onClick={() => select(id)}
           >
-            {t.label}
+            {m.ui.mdTabs[id]}
           </button>
         ))}
       </div>
@@ -710,7 +712,7 @@ function MarkdownTextarea({
           {value.trim() ? (
             <Markdown source={value} />
           ) : (
-            <p className="m-0 text-[12.5px] text-fg-faint">プレビューする内容がありません</p>
+            <p className="m-0 text-[12.5px] text-fg-faint">{m.ui.nothingToPreview}</p>
           )}
         </div>
       )}
@@ -719,6 +721,7 @@ function MarkdownTextarea({
 }
 
 function ConfirmDialog({ spec, resolve }: { spec: ConfirmSpec; resolve: (v: boolean) => void }) {
+  const m = useT();
   return (
     <Modal
       title={spec.title}
@@ -727,10 +730,10 @@ function ConfirmDialog({ spec, resolve }: { spec: ConfirmSpec; resolve: (v: bool
       footer={
         <>
           <button className={btn("ghost")} onClick={() => resolve(false)}>
-            キャンセル
+            {m.ui.cancel}
           </button>
           <button className={btn(spec.danger ? "danger" : "primary")} onClick={() => resolve(true)}>
-            {spec.confirmLabel ?? "実行"}
+            {spec.confirmLabel ?? m.ui.run}
           </button>
         </>
       }

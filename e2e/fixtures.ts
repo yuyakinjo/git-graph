@@ -207,6 +207,11 @@ export const test = base.extend<Options & { repo: TestRepo; app: App }, { bridge
           },
           convertFileSrc: (p: string) => p,
         };
+        // 文言でアサートするので表示言語は日本語に固定する (テスト中の切り替えは残す)
+        if (!sessionStorage.getItem("e2e.locale")) {
+          localStorage.setItem("gitsquid.locale", "ja");
+          sessionStorage.setItem("e2e.locale", "1");
+        }
         // 起動時に開くリポジトリ (bootApp が最初に見る)
         if (path && !sessionStorage.getItem("e2e.booted")) {
           localStorage.setItem("gitsquid.last", path);

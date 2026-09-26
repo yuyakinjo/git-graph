@@ -15,6 +15,7 @@ import { Avatar } from "./Avatar";
 import { btn, ctxBackdrop, ctxIconGap, ctxItem, ctxSep, iconBtn, popMenu } from "./classes";
 import { Icon, type MenuItem } from "./ui";
 import { useMenu } from "./ui-context";
+import { useT } from "../i18n";
 
 /** 行と見出しで同じ幅を使うため、列のクラスは 1 か所にまとめる */
 /** ブランチ列 (タグも並べる)。見出しと同じ左揃えにし、右端はグラフの線と少し間を空ける */
@@ -28,13 +29,16 @@ const COL_DATE = "flex-none overflow-hidden text-right text-[11.5px] text-fg-dim
 const HEADER_ROW =
   "relative flex h-5.5 flex-none items-center border-b border-line bg-bg-1 pr-2.5 text-[10.5px] tracking-wider text-fg-faint uppercase select-none";
 /** 見出しの並び。行の列順に合わせる。col が無い列 (メッセージ) は幅を変えられない */
-const HEADER_CELLS: { key: GraphColumnKey; col: GraphColumnWidthKey | null; label: string }[] = [
-  { key: "refs", col: "refs", label: "ブランチ / タグ" },
-  { key: "graph", col: "graph", label: "グラフ" },
-  { key: "subject", col: null, label: "メッセージ" },
-  { key: "author", col: "author", label: "作者" },
-  { key: "sha", col: "sha", label: "SHA" },
-  { key: "date", col: "date", label: "日時" },
+const HEADER_CELLS: {
+  key: Exclude<GraphColumnKey, "nodeAvatar" | "tags">;
+  col: GraphColumnWidthKey | null;
+}[] = [
+  { key: "refs", col: "refs" },
+  { key: "graph", col: "graph" },
+  { key: "subject", col: null },
+  { key: "author", col: "author" },
+  { key: "sha", col: "sha" },
+  { key: "date", col: "date" },
 ];
 
 /** 見出しのセル。区切り線を右端に引き、文字は左揃えにする */
@@ -137,6 +141,7 @@ function RefBadge({
   onCheckout: () => void;
   onMenu: (e: React.MouseEvent) => void;
 }) {
+  const m = useT();
   const icon =
     deco.kind === "tag"
       ? "tag"
@@ -155,7 +160,7 @@ function RefBadge({
           : (REF_BADGE_KIND[deco.kind] ?? REF_BADGE_KIND.commit)
       }`}
       style={minNameWidth === undefined ? undefined : { minWidth: minNameWidth + REF_BADGE_FRAME }}
-      title={tracking ? `${deco.full}\n${tracking.full}（同位置）` : deco.full}
+      title={tracking ? m.graphPane.refTracking(deco.full, tracking.full) : deco.full}
       onDoubleClick={(e) => {
         e.stopPropagation();
         onCheckout();
@@ -193,6 +198,7 @@ function CommitRefs({
   onCheckout: (d: RefDeco) => void;
   onMenu: (d: RefDeco) => (e: React.MouseEvent) => void;
 }) {
+  const m = useT();
   const [open, setOpen] = useState(false);
   const { primary, tracking, others } = groupRefs(refs, upstreams);
   if (!primary) return null;
@@ -211,7 +217,7 @@ function CommitRefs({
         <>
           <button
             className="flex-none rounded px-1 text-[11px] text-fg-dim hover:bg-bg-3"
-            aria-label={`その他の参照 ${others.length} 件`}
+            aria-label={m.graphPane.otherRefs(others.length)}
             aria-expanded={open}
             onClick={(e) => {
               e.stopPropagation();
@@ -341,10 +347,15 @@ function RefsCell({
 
 function ColumnMenu() {
   const s = useStore();
+  const m = useT();
   const [open, setOpen] = useState(false);
   if (!open) {
     return (
-      <button className={iconBtn({ tiny: true })} title="表示する列" onClick={() => setOpen(true)}>
+      <button
+        className={iconBtn({ tiny: true })}
+        title={m.graphPane.visibleColumns}
+        onClick={() => setOpen(true)}
+      >
         <Icon name="columns" size={14} />
       </button>
     );
@@ -353,7 +364,7 @@ function ColumnMenu() {
     <span className="relative inline-flex">
       <button
         className={iconBtn({ tiny: true, on: true })}
-        title="表示する列"
+        title={m.graphPane.visibleColumns}
         onClick={() => setOpen(false)}
       >
         <Icon name="columns" size={14} />
@@ -363,13 +374,13 @@ function ColumnMenu() {
         {GRAPH_COLUMNS.map((c) => (
           <button key={c.key} className={ctxItem()} onClick={() => s.toggleColumn(c.key)}>
             {s.columns[c.key] ? <Icon name="check" size={14} /> : <span className={ctxIconGap} />}
-            <span>{c.label}</span>
+            <span>{m.store.graphColumns[c.key]}</span>
           </button>
         ))}
         <div className={ctxSep} />
         <button className={ctxItem()} onClick={s.resetColumns}>
           <span className={ctxIconGap} />
-          <span>標準表示に戻す</span>
+          <span>{m.graphPane.resetColumns}</span>
         </button>
       </div>
     </span>
@@ -469,12 +480,13 @@ function ColumnGrip({
   onResize: (col: GraphColumnWidthKey, px: number) => void;
   onAutoFit: (col: GraphColumnWidthKey) => void;
 }) {
+  const m = useT();
   return (
     <span
       className={HEADER_GRIP}
       role="separator"
       aria-orientation="vertical"
-      title="ドラッグで幅を変更・ダブルクリックで内容に合わせる"
+      title={m.graphPane.columnGrip}
       onDoubleClick={() => onAutoFit(col)}
       onPointerDown={(e) => {
         if (e.button !== 0) return;
@@ -505,6 +517,7 @@ function ColumnGrip({
 export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
   const s = useStore();
   const act = useActions();
+  const m = useT();
   const openMenu = useMenu();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -668,12 +681,12 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
   };
 
   const stashMenuItems = (stash: StashInfo): MenuItem[] => [
-    { label: "apply", icon: "check", onClick: () => act.stashApply(stash, false) },
-    { label: "pop", icon: "stash", onClick: () => act.stashApply(stash, true) },
-    { label: "名前を変更", icon: "pencil", onClick: () => act.stashRename(stash) },
+    { label: m.graphPane.stash.apply, icon: "check", onClick: () => act.stashApply(stash, false) },
+    { label: m.graphPane.stash.pop, icon: "stash", onClick: () => act.stashApply(stash, true) },
+    { label: m.graphPane.stash.rename, icon: "pencil", onClick: () => act.stashRename(stash) },
   ];
   const stashDropItem = (stash: StashInfo): MenuItem => ({
-    label: "drop",
+    label: m.graphPane.stash.drop,
     icon: "trash",
     danger: true,
     onClick: () => act.stashDrop(stash),
@@ -686,12 +699,12 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
         ...stashMenuItems(stash),
         { separator: true },
         {
-          label: `${stash.name} をコピー`,
+          label: m.graphPane.copyName(stash.name),
           icon: "copy",
           onClick: () => navigator.clipboard.writeText(stash.name).catch(() => undefined),
         },
         {
-          label: "SHA をコピー",
+          label: m.graphPane.copySha,
           icon: "copy",
           onClick: () => navigator.clipboard.writeText(c.hash).catch(() => undefined),
         },
@@ -701,26 +714,30 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
     }
     openMenu(e, [
       {
-        label: `${c.short} をチェックアウト`,
+        label: m.graphPane.checkoutName(c.short),
         icon: "commit",
         onClick: () => act.checkout(c.hash, c.short),
       },
-      { label: "ここからブランチを作成", icon: "branch", onClick: () => act.createBranch(c.hash) },
+      {
+        label: m.graphPane.createBranchHere,
+        icon: "branch",
+        onClick: () => act.createBranch(c.hash),
+      },
       { separator: true },
       {
-        label: "SHA をコピー",
+        label: m.graphPane.copySha,
         icon: "copy",
         onClick: () => navigator.clipboard.writeText(c.hash).catch(() => undefined),
       },
       {
-        label: "メッセージをコピー",
+        label: m.graphPane.copyMessage,
         icon: "copy",
         onClick: () => navigator.clipboard.writeText(c.subject).catch(() => undefined),
       },
       /** 付いているブランチ・タグ名もここからコピーできるようにする */
       ...(c.refs.length ? [{ separator: true } as MenuItem] : []),
       ...c.refs.map((d): MenuItem => ({
-        label: `${d.name} をコピー`,
+        label: m.graphPane.copyName(d.name),
         icon: d.kind === "tag" ? "tag" : d.kind === "remote" ? "remote" : "branch",
         onClick: () => navigator.clipboard.writeText(d.name).catch(() => undefined),
       })),
@@ -732,7 +749,7 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
 
   const refMenu = (deco: RefDeco) => (e: React.MouseEvent) => {
     const copyName: MenuItem = {
-      label: "名前をコピー",
+      label: m.graphPane.copyRefName,
       icon: "copy",
       onClick: () => navigator.clipboard.writeText(deco.name).catch(() => undefined),
     };
@@ -740,14 +757,14 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
       const branch = s.branches.find((b) => b.name === deco.name && b.kind === "local");
       openMenu(e, [
         {
-          label: `${deco.name} をチェックアウト`,
+          label: m.graphPane.checkoutName(deco.name),
           icon: "branch",
           onClick: () => act.checkout(deco.name),
         },
         { separator: true },
         copyName,
         {
-          label: "ブランチを削除",
+          label: m.graphPane.deleteBranch,
           icon: "trash",
           danger: true,
           disabled: deco.isHead,
@@ -760,14 +777,14 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
       const branch = s.branches.find((b) => b.name === deco.name && b.kind === "remote");
       openMenu(e, [
         {
-          label: `${deco.name} をチェックアウト`,
+          label: m.graphPane.checkoutName(deco.name),
           icon: "branch",
           onClick: () => act.checkoutRemote(deco.name),
         },
         { separator: true },
         copyName,
         {
-          label: "リモートブランチを削除",
+          label: m.graphPane.deleteRemoteBranch,
           icon: "trash",
           danger: true,
           onClick: () => branch && act.deleteBranch(branch),
@@ -782,7 +799,7 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
     }
     openMenu(e, [
       {
-        label: `${deco.name} をチェックアウト`,
+        label: m.graphPane.checkoutName(deco.name),
         icon: "tag",
         onClick: () => act.checkout(deco.name),
       },
@@ -830,8 +847,8 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
           {cols.refs ? <div className={COL_REFS} style={{ width: w.refs }} /> : null}
           {cols.graph ? <div className="flex-none" style={{ width: graphW }} /> : null}
           <div className={COL_MSG}>
-            <span className="font-bold text-amber">未コミットの変更</span>
-            <span className="ml-2 text-[11.5px] text-fg-faint">{count} ファイル</span>
+            <span className="font-bold text-amber">{m.graphPane.uncommitted}</span>
+            <span className="ml-2 text-[11.5px] text-fg-faint">{m.graphPane.fileCount(count)}</span>
           </div>
           {cols.author ? <div className={COL_AUTHOR} style={{ width: w.author }} /> : null}
           {cols.sha ? <div className={COL_SHA} style={{ width: w.sha }} /> : null}
@@ -926,12 +943,16 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
           <Icon name="search" size={14} />
           <input
             className="min-w-0 flex-1 border-0 bg-none text-[12px] text-fg outline-none"
-            placeholder="コミット・作者・SHA を検索"
+            placeholder={m.graphPane.searchPlaceholder}
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
           />
           {query ? (
-            <button className={iconBtn({ tiny: true })} onClick={() => setQuery("")} title="クリア">
+            <button
+              className={iconBtn({ tiny: true })}
+              onClick={() => setQuery("")}
+              title={m.graphPane.clear}
+            >
               <Icon name="x" size={12} />
             </button>
           ) : null}
@@ -946,7 +967,7 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
             revealRow(headRow + rowOffset, true);
           }}
         >
-          HEADへ
+          {m.graphPane.goToHead}
         </button>
       </div>
       <div
@@ -963,7 +984,7 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
               className={`${HEADER_CELL} ${h.col ? "flex-none" : "min-w-0 flex-1"}`}
               style={width === undefined ? undefined : { width }}
             >
-              {cols[h.key] ? <span className="truncate">{h.label}</span> : null}
+              {cols[h.key] ? <span className="truncate">{m.graphPane.headers[h.key]}</span> : null}
               {h.col ? (
                 <ColumnGrip
                   col={h.col}
@@ -1177,8 +1198,9 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
       </div>
       {s.graph.truncated ? (
         <div className="flex-none border-t border-line px-3 py-1 text-[11px] text-fg-faint">
-          直近 {commits.length} 件を表示しています
-          {s.loadingMore ? " — 続きを読み込み中…" : ""}
+          {s.loadingMore
+            ? m.graphPane.showingRecentLoading(commits.length)
+            : m.graphPane.showingRecent(commits.length)}
         </div>
       ) : null}
     </div>

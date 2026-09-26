@@ -50,6 +50,8 @@ export const api = {
 
   // デバッグ用ログ
   appLogs: () => invoke<CmdLog[]>("app_logs"),
+  /** Rust 側が返すメッセージの言語を合わせる */
+  setLocale: (locale: string) => invoke<void>("set_locale", { locale }),
   clearAppLogs: () => invoke<void>("app_logs_clear"),
 
   // add / commit

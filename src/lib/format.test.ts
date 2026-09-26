@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, setSystemTime } from "bun:test";
+import { setLocale } from "../i18n";
 import {
   absoluteTime,
   avatarColor,
@@ -7,6 +8,7 @@ import {
   initials,
   laneColor,
   relativeTime,
+  statusLabel,
 } from "./format";
 
 describe("laneColor", () => {
@@ -40,6 +42,18 @@ describe("relativeTime", () => {
   });
 
   test("30 日以上前は日付で出す", () => {
+    expect(relativeTime(sec - 86400 * 30)).toBe("2026/08/24");
+  });
+
+  test("英語では単数/複数を分ける", () => {
+    setLocale("en");
+    expect(relativeTime(sec - 30)).toBe("just now");
+    expect(relativeTime(sec - 60)).toBe("1 minute ago");
+    expect(relativeTime(sec - 300)).toBe("5 minutes ago");
+    expect(relativeTime(sec - 3600)).toBe("1 hour ago");
+    expect(relativeTime(sec - 7200)).toBe("2 hours ago");
+    expect(relativeTime(sec - 86400)).toBe("1 day ago");
+    expect(relativeTime(sec - 86400 * 29)).toBe("29 days ago");
     expect(relativeTime(sec - 86400 * 30)).toBe("2026/08/24");
   });
 });
@@ -79,6 +93,15 @@ describe("avatarColor", () => {
   test("パレットの色を返す", () => {
     expect(avatarColor("")).toBe("#5B8FF9");
     expect(avatarColor("someone")).toMatch(/^#[0-9A-F]{6}$/);
+  });
+});
+
+describe("statusLabel", () => {
+  test("変更種別を表示言語で返す", () => {
+    expect(statusLabel("M")).toBe("変更");
+    setLocale("en");
+    expect(statusLabel("M")).toBe("Modified");
+    expect(statusLabel("X")).toBe("X");
   });
 });
 

@@ -1,3 +1,5 @@
+import { t } from "../i18n";
+
 /** レーン色の数。実際の色は外観ごとに styles.css の --color-lane-N で持つ。 */
 const LANE_COUNT = 12;
 
@@ -7,10 +9,11 @@ export const laneColor = (i: number) =>
 export function relativeTime(unix: number): string {
   if (!unix) return "";
   const diff = Date.now() / 1000 - unix;
-  if (diff < 60) return "たった今";
-  if (diff < 3600) return `${Math.floor(diff / 60)} 分前`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)} 時間前`;
-  if (diff < 86400 * 30) return `${Math.floor(diff / 86400)} 日前`;
+  const m = t().format;
+  if (diff < 60) return m.justNow;
+  if (diff < 3600) return m.minutesAgo(Math.floor(diff / 60));
+  if (diff < 86400) return m.hoursAgo(Math.floor(diff / 3600));
+  if (diff < 86400 * 30) return m.daysAgo(Math.floor(diff / 86400));
   const d = new Date(unix * 1000);
   return `${d.getFullYear()}/${`${d.getMonth() + 1}`.padStart(2, "0")}/${`${d.getDate()}`.padStart(2, "0")}`;
 }
@@ -49,16 +52,10 @@ export function avatarColor(seed: string): string {
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
 
-export const statusLabel: Record<string, string> = {
-  A: "追加",
-  M: "変更",
-  D: "削除",
-  R: "リネーム",
-  C: "コピー",
-  T: "種別変更",
-  "?": "未追跡",
-  U: "衝突",
-};
+/** 変更種別 (A / M / D ...) の表示名。知らない記号はそのまま返す。 */
+export function statusLabel(status: string): string {
+  return t().format.status[status] ?? status;
+}
 
 export function basename(p: string) {
   const i = p.lastIndexOf("/");

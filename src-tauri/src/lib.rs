@@ -4,6 +4,7 @@ mod avatar;
 pub mod commands;
 mod github;
 mod graph;
+mod i18n;
 mod recompose;
 mod repo;
 mod sh;
@@ -107,6 +108,7 @@ pub fn run() {
             commands::initial_repo,
             commands::app_logs,
             commands::app_logs_clear,
+            commands::set_locale,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

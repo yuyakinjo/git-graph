@@ -29,15 +29,17 @@ import {
 import { recomposeMode } from "../lib/recompose";
 import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
+import { useT } from "../i18n";
 import { Icon } from "./ui";
 import { useDialogs, useMenu } from "./ui-context";
 
-const BAR_META: Record<DashBar, { icon: string; title: string }> = {
-  git: { icon: "branch", title: "git" },
-  github: { icon: "github", title: "GitHub" },
-  ai: { icon: "sparkle", title: "AI" },
-  custom: { icon: "user", title: "カスタム" },
-  recent: { icon: "clock", title: "最近使った操作" },
+/** バーのアイコン。名前は i18n の dashPanel.bars から引く */
+const BAR_ICON: Record<DashBar, string> = {
+  git: "branch",
+  github: "github",
+  ai: "sparkle",
+  custom: "user",
+  recent: "clock",
 };
 
 const BAR =
@@ -76,6 +78,8 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
   const act = useActions();
   const openMenu = useMenu();
   const dialogs = useDialogs();
+  const m = useT();
+  const d = m.dashPanel;
   const [buttons, setButtons] = useState(loadDash);
   const [recent, setRecent] = useState(loadRecent);
   const [hidden, setHidden] = useState(loadHiddenBars);
@@ -112,7 +116,7 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
     const web = (path: string) => ({
       run: () => ghUrl && act.webOpen(`${ghUrl}${path}`),
       disabled: !ghUrl,
-      title: ghUrl ? `${ghUrl}${path}` : "GitHub リポジトリではありません",
+      title: ghUrl ? `${ghUrl}${path}` : d.notGitHubRepo,
     });
     switch (id) {
       case "fetch":
@@ -139,7 +143,7 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
         return {
           run: () => act.createBranch(),
           disabled: busy,
-          title: "ブランチを作成",
+          title: d.createBranch,
         };
       case "stash":
         return {
@@ -165,18 +169,18 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
           ? {
               run: act.unstageAll,
               disabled: busy,
-              label: "すべてアンステージ",
+              label: d.unstageAll,
               icon: "minus",
               badge: s.status?.staged.length,
-              title: "ステージ済みの変更をすべてアンステージ",
+              title: d.unstageAllTitle,
             }
           : {
               run: act.stageAll,
               disabled: busy || !stageMode,
-              label: "すべてステージ",
+              label: d.stageAll,
               icon: "plus",
               badge: (s.status?.unstaged.length ?? 0) + (s.status?.conflicts.length ?? 0),
-              title: stageMode ? "変更をすべてステージ (git add -A)" : "変更はありません",
+              title: stageMode ? d.stageAllTitle : d.noChanges,
             };
       case "commit": {
         const staged = s.status?.staged.length ?? 0;
@@ -187,10 +191,10 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
           badge: staged,
           title:
             staged + changed === 0
-              ? "変更はありません"
+              ? d.noChanges
               : staged > 0
-                ? `ステージ済みの ${staged} 件をコミット`
-                : "すべての変更をステージしてコミット",
+                ? d.commitStaged(staged)
+                : d.commitAll,
         };
       }
       case "aiCommit": {
@@ -202,37 +206,37 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
           badge: staged,
           title:
             staged + changed === 0
-              ? "変更はありません"
-              : `${staged > 0 ? `ステージ済みの ${staged} 件` : "すべての変更"}から Claude Code でメッセージを生成してコミット`,
+              ? d.noChanges
+              : staged > 0
+                ? d.aiCommitStaged(staged)
+                : d.aiCommitAll,
         };
       }
       case "aiAmend":
         return {
           run: () => act.commitPrompt({ ai: true, amend: true }),
           disabled: busy || !s.repo?.headHash,
-          title: s.repo?.headHash
-            ? "直前のコミット (+ ステージ済み) から Claude Code でメッセージを生成して修正"
-            : "コミットがありません",
+          title: s.repo?.headHash ? d.aiAmend : d.noCommits,
         };
       case "aiPrCreate":
         return {
           run: () => act.prCreate({ ai: true }),
           disabled: busy,
-          title: "差分とコミットから Claude Code でタイトルと本文を生成して PR 作成",
+          title: d.aiPrCreate,
         };
       case "recompose": {
         const mode = recomposeMode(s.repo, head, dirty);
         return {
           run: () => act.recompose(),
           disabled: busy || !mode,
-          label: mode ?? undefined,
+          label: mode ? d.recomposeLabel[mode] : undefined,
           title: !mode
             ? s.repo?.headBranch === s.repo?.defaultBranch
-              ? "既定ブランチに未プッシュのコミットも作業中の変更もありません"
-              : "チェックアウト中のブランチがありません (または操作の途中です)"
+              ? d.recomposeNothingOnDefault
+              : d.recomposeNoBranch
             : mode === "compose"
-              ? "未プッシュのコミットと作業中の変更を、Claude Code が立てたプランで新しいブランチに切り出す"
-              : "ブランチの変更を Claude Code が立てたプランでコミットし直し、新しいブランチに積む",
+              ? d.composeTitle
+              : d.recomposeTitle,
         };
       }
       case "prCreate":
@@ -241,9 +245,7 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
         return {
           run: () => currentPr && act.prOpen(currentPr),
           disabled: !currentPr,
-          title: currentPr
-            ? `#${currentPr.number} ${currentPr.title}`
-            : "このブランチの PR はありません",
+          title: currentPr ? `#${currentPr.number} ${currentPr.title}` : d.noPrForBranch,
         };
       case "prList":
         return web("/pulls");
@@ -257,7 +259,7 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
         return {
           run: act.tidy,
           disabled: busy,
-          title: "マージ済みのブランチと worktree を整理",
+          title: d.tidyTitle,
         };
       case "pullRebase":
         return {
@@ -281,7 +283,7 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
         return {
           run: act.remoteCreate,
           disabled: busy || Boolean(s.repo?.remotes.length),
-          title: "GitHub に新規リポジトリを作って origin に登録",
+          title: d.remoteCreateTitle,
         };
     }
   };
@@ -310,19 +312,19 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
     const tail = [
       { separator: true },
       ...DASH_BARS.map((b) => ({
-        label: `${BAR_META[b].title} バー`,
+        label: d.barToggle(d.bars[b]),
         icon: hidden.includes(b) ? undefined : "check",
         // 最後の 1 本は隠せない
         disabled: !hidden.includes(b) && hidden.length + 1 >= DASH_BARS.length,
         onClick: () => toggleBar(b),
       })),
       { separator: true },
-      { label: "パネルを隠す", icon: "x", onClick: onHide },
+      { label: d.hidePanel, icon: "x", onClick: onHide },
     ];
     if (bar === "recent") {
       openMenu(e, [
         {
-          label: "履歴を消去",
+          label: d.clearHistory,
           icon: "trash",
           onClick: () => {
             setRecent([]);
@@ -336,14 +338,14 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
     const ids = buttons[bar];
     openMenu(e, [
       ...actionsOf(bar).map((id) => ({
-        label: DASH_BUTTONS[id].label,
+        label: m.dashButtons[id],
         icon: ids.includes(id) ? "check" : undefined,
         disabled: !ids.includes(id) && ids.length >= DASH_MAX,
         onClick: () => updateDash(bar, toggleDash(ids, id)),
       })),
       { separator: true },
       {
-        label: "既定に戻す",
+        label: d.resetToDefault,
         icon: "fetch",
         onClick: () => updateDash(bar, DEFAULT_DASH[bar]),
       },
@@ -491,7 +493,7 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
     <div
       ref={attach}
       role="toolbar"
-      aria-label="ダッシュパネル"
+      aria-label={d.ariaLabel}
       className="fixed z-50 flex flex-col items-start gap-2"
       style={pos ? { left: pos.x, top: pos.y } : { left: "50%", bottom: 40, translate: "-50% 0" }}
     >
@@ -499,10 +501,10 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
         <div key={bar.id} className={BAR} onContextMenu={(e) => editMenu(e, bar.id)}>
           <button
             className={GROUP_ICON}
-            title={`${BAR_META[bar.id].title}${bar.id === "recent" ? "" : " (クリックでボタンを選ぶ)"}`}
+            title={bar.id === "recent" ? d.bars.recent : d.barIconTitle(d.bars[bar.id])}
             onClick={(e) => editMenu(e, bar.id)}
           >
-            <Icon name={BAR_META[bar.id].icon} size={17} />
+            <Icon name={BAR_ICON[bar.id]} size={17} />
           </button>
           {bar.ids.map((id) => {
             const a = DASH_BUTTONS[id];
@@ -516,7 +518,7 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
                 data-dash-button
                 className={`${ACTION} ${reorder?.id === id && reorder.group === group ? "opacity-50" : ""}`}
                 aria-disabled={sp.disabled || undefined}
-                title={group ? `${sp.title ?? ""} (ドラッグで並べ替え)` : sp.title}
+                title={group ? d.dragToReorder(sp.title ?? "") : sp.title}
                 {...(group ? buttonDragProps(group, id) : {})}
                 onClick={() => {
                   if (reordered.current) {
@@ -534,15 +536,15 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
                   />
                 ) : null}
                 <Icon name={sp.icon ?? a.icon} size={15} />
-                <span>{sp.label ?? a.label}</span>
+                <span>{sp.label ?? m.dashButtons[id]}</span>
                 {sp.badge ? <em className={BADGE}>{sp.badge}</em> : null}
               </button>
             );
           })}
           {bar.ids.length === 0 ? (
-            <span className="px-1.5 text-[11.5px] text-on-bolt/60">右クリックでボタンを追加</span>
+            <span className="px-1.5 text-[11.5px] text-on-bolt/60">{d.emptyBar}</span>
           ) : null}
-          <div className={GRIP} title="ドラッグで移動" {...gripHandlers}>
+          <div className={GRIP} title={d.dragToMove} {...gripHandlers}>
             <GripDots />
           </div>
         </div>
