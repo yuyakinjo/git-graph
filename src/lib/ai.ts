@@ -347,5 +347,5 @@ export async function generateThemeKeys(
     if (res.keys) return res.keys;
     invalid = { text, errors: res.errors };
   }
-  throw new Error(t().ai.invalidThemeAssignment(invalid!.errors.join("\n")));
+  throw new Error(t().ai.invalidThemeAssignment);
 }
