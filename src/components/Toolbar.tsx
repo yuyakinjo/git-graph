@@ -28,7 +28,7 @@ export function DashDock({
   return (
     <div
       data-dash-dock={edge}
-      className={`flex h-10 flex-none items-center gap-2.5 border-line-soft bg-bg-0 px-2.5 ${edge === "bottom" ? "order-1 border-t" : "border-b"}`}
+      className={`flex h-10 flex-none items-center gap-2.5 bg-bg-0 px-2.5 ${edge === "bottom" ? "order-1 border-t border-line-soft" : ""}`}
     >
       <div
         className={`relative flex h-full min-w-0 flex-1 items-center rounded-lg transition-colors ${
