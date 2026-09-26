@@ -1,79 +1,95 @@
 @import "tailwindcss";
 
 /*
- * 色はすべて役割で名前を付けたトークン。ここに書くのはダーク外観の値で、
- * ライト外観 / コントラストを上げる設定での値は @layer base の :root で差し替える。
- * 半透明の色は color-mix ではわずかにずれるため、rgba() をトークン化して持つ。
- * 文字色は地の色に対して 4.5:1 以上 (fg-faint は bg-2 で 4.58:1) を保つこと。
+ * 色はすべて役割で名前を付けたトークン。
+ *
+ * テーマが持つのはキーカラー 7 色 (--t-bg / fg / accent / green / red / amber / violet) だけで、
+ * 残りのトークンはここでキーカラーから混ぜて作る。ここに書くのはダーク系テーマの作り方で、
+ * ライト系の作り方は @layer base の [data-scheme="light"] で差し替える。
+ * テーマの一覧と <html data-theme / data-scheme> への反映は src/lib/theme.ts。
+ *
+ * キーカラーを選ぶときは、文字色が地の色に対して 4.5:1 以上になるよう保つこと
+ * (fg-faint は bg-2 の上、accent / green / red / amber / violet は bg-1〜bg-3 の上で)。
  */
 @theme static {
-  /* ---- 面 ---- */
-  --color-bg-0: #12161d;
-  --color-bg-1: #171c25;
-  --color-bg-2: #1e2531;
-  --color-bg-3: #27303e;
-  --color-bg-4: #313c4c; /* .btn:hover / スクロールバーつまみ */
-  --color-bg-hover: #222b38;
-  --color-line: #2b3441;
-  --color-line-soft: #222a36;
-  --color-pop: #222a36; /* メニュー・トーストの地 */
-  --color-pop-line: #333e4e;
+  /* ---- 面 (地の色を本文色の側へ少しずつ寄せて重ねる) ---- */
+  --color-bg-0: color-mix(in srgb, var(--t-bg), #000 20%);
+  --color-bg-1: var(--t-bg);
+  --color-bg-2: color-mix(in srgb, var(--t-bg), var(--t-fg) 5%);
+  --color-bg-3: color-mix(in srgb, var(--t-bg), var(--t-fg) 10%);
+  --color-bg-4: color-mix(
+    in srgb,
+    var(--t-bg),
+    var(--t-fg) 15%
+  ); /* .btn:hover / スクロールバーつまみ */
+  --color-bg-hover: color-mix(in srgb, var(--t-bg), var(--t-fg) 7%);
+  --color-line: color-mix(in srgb, var(--t-bg), var(--t-fg) 10%);
+  --color-line-soft: color-mix(in srgb, var(--t-bg), var(--t-fg) 6%);
+  --color-pop: color-mix(in srgb, var(--t-bg), var(--t-fg) 7%); /* メニュー・トーストの地 */
+  --color-pop-line: color-mix(in srgb, var(--t-bg), var(--t-fg) 14%);
 
   /* ---- 文字 ---- */
-  --color-fg: #dde4ec;
-  --color-fg-dim: #9ba6b5;
-  --color-fg-faint: #828d9d;
-  --color-on-accent: #08121a;
+  --color-fg: var(--t-fg);
+  --color-fg-dim: color-mix(in srgb, var(--t-fg), var(--t-bg) 30%);
+  --color-fg-faint: color-mix(in srgb, var(--t-fg), var(--t-bg) 38%);
+  --color-on-accent: color-mix(in srgb, var(--t-bg), #000 55%);
 
-  /* ---- アクセント ---- */
-  --color-accent: #4fc3f7;
-  --color-accent-hover: #6bcdfa;
-  --color-accent-soft: rgba(79, 195, 247, 0.16);
-  --color-accent-14: rgba(79, 195, 247, 0.14);
-  --color-accent-15: rgba(79, 195, 247, 0.15);
-  --color-accent-35: rgba(79, 195, 247, 0.35);
+  /*
+   * ---- アクセントと意味を持つ色 ----
+   * 半透明の段は「キーカラーを N% だけ乗せる」で作る。--t-tint はライト系で薄めるための倍率。
+   */
+  --color-accent: var(--t-accent);
+  --color-accent-hover: color-mix(in srgb, var(--t-accent), #fff 15%);
+  --color-accent-soft: color-mix(in srgb, var(--t-accent) calc(16% * var(--t-tint)), transparent);
+  --color-accent-14: color-mix(in srgb, var(--t-accent) calc(14% * var(--t-tint)), transparent);
+  --color-accent-15: color-mix(in srgb, var(--t-accent) calc(15% * var(--t-tint)), transparent);
+  --color-accent-35: color-mix(in srgb, var(--t-accent) calc(35% * var(--t-tint)), transparent);
 
-  /* ---- ダッシュパネル (⚡) ---- */
-  --color-bolt: #ffc93c;
-  --color-bolt-line: #ffdc73;
-  --color-on-bolt: #2a1d00;
+  /* ---- ダッシュパネル (⚡)。テーマのアクセント色で塗り、文字は on-accent と同じ ---- */
+  --color-bolt: var(--t-accent);
+  --color-bolt-line: color-mix(in srgb, var(--t-accent), #fff 30%);
+  --color-on-bolt: var(--color-on-accent);
 
-  --color-violet: #a78bfa;
-  --color-violet-12: rgba(167, 139, 250, 0.12);
-  --color-violet-16: rgba(167, 139, 250, 0.16);
-  --color-violet-30: rgba(167, 139, 250, 0.3);
+  --color-violet: var(--t-violet);
+  --color-violet-12: color-mix(in srgb, var(--t-violet) calc(12% * var(--t-tint)), transparent);
+  --color-violet-16: color-mix(in srgb, var(--t-violet) calc(16% * var(--t-tint)), transparent);
+  --color-violet-30: color-mix(in srgb, var(--t-violet) calc(30% * var(--t-tint)), transparent);
 
-  --color-green: #34d399;
-  --color-green-10: rgba(52, 211, 153, 0.1);
-  --color-green-15: rgba(52, 211, 153, 0.15);
-  --color-green-16: rgba(52, 211, 153, 0.16);
+  --color-green: var(--t-green);
+  --color-green-10: color-mix(in srgb, var(--t-green) calc(10% * var(--t-tint)), transparent);
+  --color-green-15: color-mix(in srgb, var(--t-green) calc(15% * var(--t-tint)), transparent);
+  --color-green-16: color-mix(in srgb, var(--t-green) calc(16% * var(--t-tint)), transparent);
 
-  --color-red: #f87171;
-  --color-red-10: rgba(248, 113, 113, 0.1);
-  --color-red-15: rgba(248, 113, 113, 0.15);
-  --color-red-16: rgba(248, 113, 113, 0.16);
-  --color-red-45: rgba(248, 113, 113, 0.45);
+  --color-red: var(--t-red);
+  --color-red-10: color-mix(in srgb, var(--t-red) calc(10% * var(--t-tint)), transparent);
+  --color-red-15: color-mix(in srgb, var(--t-red) calc(15% * var(--t-tint)), transparent);
+  --color-red-16: color-mix(in srgb, var(--t-red) calc(16% * var(--t-tint)), transparent);
+  --color-red-45: color-mix(in srgb, var(--t-red) calc(45% * var(--t-tint)), transparent);
 
-  --color-amber: #fbbf24;
-  --color-amber-12: rgba(251, 191, 36, 0.12);
-  --color-amber-16: rgba(251, 191, 36, 0.16);
-  --color-amber-30: rgba(251, 191, 36, 0.3);
+  --color-amber: var(--t-amber);
+  --color-amber-12: color-mix(in srgb, var(--t-amber) calc(12% * var(--t-tint)), transparent);
+  --color-amber-16: color-mix(in srgb, var(--t-amber) calc(16% * var(--t-tint)), transparent);
+  --color-amber-30: color-mix(in srgb, var(--t-amber) calc(30% * var(--t-tint)), transparent);
 
-  --color-danger: #b93b3b;
-  --color-danger-hover: #cf4848;
-  --color-danger-fg: #ff9a9a;
+  /* 白文字を載せるボタンの地なので、赤を沈めて使う */
+  --color-danger: color-mix(in srgb, var(--t-red), #000 35%);
+  --color-danger-hover: color-mix(in srgb, var(--t-red), #000 22%);
+  --color-danger-fg: color-mix(in srgb, var(--t-red), #fff 30%);
 
-  --color-diff-add: #b7f2d8;
-  --color-diff-del: #f9c9c9;
+  --color-diff-add: color-mix(in srgb, var(--t-green), #fff 62%);
+  --color-diff-del: color-mix(in srgb, var(--t-red), #fff 62%);
 
   /* 行ホバー / モーダル背面 / 読み込み中の覆い */
-  --color-row-hover: rgba(255, 255, 255, 0.035);
-  --color-scrim: rgba(6, 9, 13, 0.6);
-  --color-veil: rgba(18, 22, 29, 0.62);
+  --color-row-hover: color-mix(in srgb, var(--t-fg) 4%, transparent);
+  --color-scrim: color-mix(in srgb, color-mix(in srgb, var(--t-bg), #000 60%) 60%, transparent);
+  --color-veil: color-mix(in srgb, var(--t-bg) 62%, transparent);
   --color-avatar-fg: rgba(0, 0, 0, 0.72);
-  --color-scroll-hover: #3d4a5c;
+  --color-scroll-hover: color-mix(in srgb, var(--t-bg), var(--t-fg) 21%);
 
-  /* ---- コミットグラフのレーン (format.ts の laneColor が参照する) ---- */
+  /*
+   * ---- コミットグラフのレーン (format.ts の laneColor が参照する) ----
+   * 12 色を並べる都合でキーカラーからは作らず、ダーク系 / ライト系で 1 組ずつ持つ。
+   */
   --color-lane-0: #4fc3f7;
   --color-lane-1: #a78bfa;
   --color-lane-2: #f472b6;
@@ -125,105 +141,126 @@
 }
 
 @layer base {
-  /* システムの外観 (ライト / ダーク / 自動) にそのまま従う。アプリ独自の切り替えは持たない。 */
-  :root {
-    color-scheme: light dark;
+  /*
+   * ---- テーマのキーカラー ----
+   * data-theme が無いとき (theme.ts が当てる前) は標準のダークにしておく。
+   * テーマを足すときは src/lib/theme.ts の THEMES にも足す。
+   */
+  :root,
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --t-tint: 1;
+    --t-bg: #171c25;
+    --t-fg: #dde4ec;
+    --t-accent: #4fc3f7;
+    --t-green: #34d399;
+    --t-red: #f87171;
+    --t-amber: #fbbf24;
+    --t-violet: #a78bfa;
+  }
+  :root[data-theme="light"] {
+    --t-bg: #f6f7f9;
+    --t-fg: #1b2330;
+    --t-accent: #0369a1;
+    --t-green: #047857;
+    --t-red: #b91c1c;
+    --t-amber: #92400e;
+    --t-violet: #6d28d9;
+  }
+  /* Nord の配色を土台に、文字として読める明るさまで赤と紫を持ち上げたもの */
+  :root[data-theme="nord"] {
+    --t-bg: #2a2f3a;
+    --t-fg: #eceff4;
+    --t-accent: #88c0d0;
+    --t-green: #a3be8c;
+    --t-red: #ec959c;
+    --t-amber: #ebcb8b;
+    --t-violet: #d0b0ca;
+  }
+  :root[data-theme="dracula"] {
+    --t-bg: #262833;
+    --t-fg: #f8f8f2;
+    --t-accent: #c7a6fb;
+    --t-green: #50fa7b;
+    --t-red: #ff8a8a;
+    --t-amber: #ffb86c;
+    --t-violet: #ff8fd0;
+  }
+  /* Solarized Light。原色のままだと地に対して薄いので、色相を保って沈めている */
+  :root[data-theme="solarized"] {
+    --t-bg: #fdf6e3;
+    --t-fg: #073642;
+    --t-accent: #1a6aa8;
+    --t-green: #5c6b00;
+    --t-red: #b62d2a;
+    --t-amber: #855f00;
+    --t-violet: #5559b0;
   }
 
   /*
-   * ライト外観。ダークの反転ではなく、重なるほど明るく (モーダル・メニューが白) なるよう組む。
-   * 文字色は bg-3 (#eceff3) の上でも 4.5:1 以上、レーン色は bg-1 に対して 3:1 以上。
+   * ---- ライト系の作り方 ----
+   * ダークの反転ではなく、重なるほど明るく (モーダル・メニューが白寄り) なるよう組む。
+   * レーン色は bg-1 に対して 3:1 以上。
    */
-  @media (prefers-color-scheme: light) {
-    :root {
-      --color-bg-0: #eceef2;
-      --color-bg-1: #f6f7f9;
-      --color-bg-2: #ffffff;
-      --color-bg-3: #eceff3;
-      --color-bg-4: #dfe3e9;
-      --color-bg-hover: #edf0f4;
-      --color-line: #d5dae1;
-      --color-line-soft: #e3e7ec;
-      --color-pop: #ffffff;
-      --color-pop-line: #d5dae1;
+  :root[data-scheme="light"] {
+    color-scheme: light;
+    --t-tint: 0.75;
 
-      --color-fg: #1b2330;
-      --color-fg-dim: #525e6d;
-      --color-fg-faint: #626d7d;
-      --color-on-accent: #ffffff;
+    --color-bg-0: color-mix(in srgb, var(--t-bg), var(--t-fg) 5%);
+    --color-bg-2: color-mix(in srgb, var(--t-bg), #fff 70%);
+    --color-bg-3: color-mix(in srgb, var(--t-bg), var(--t-fg) 4%);
+    --color-bg-4: color-mix(in srgb, var(--t-bg), var(--t-fg) 9%);
+    --color-bg-hover: color-mix(in srgb, var(--t-bg), var(--t-fg) 3%);
+    --color-line: color-mix(in srgb, var(--t-bg), var(--t-fg) 12%);
+    --color-line-soft: color-mix(in srgb, var(--t-bg), var(--t-fg) 7%);
+    --color-pop: var(--color-bg-2);
+    --color-pop-line: var(--color-line);
 
-      --color-accent: #0369a1;
-      --color-accent-hover: #075985;
-      --color-accent-soft: rgba(3, 105, 161, 0.1);
-      --color-accent-14: rgba(3, 105, 161, 0.1);
-      --color-accent-15: rgba(3, 105, 161, 0.11);
-      --color-accent-35: rgba(3, 105, 161, 0.3);
+    --color-fg-dim: color-mix(in srgb, var(--t-fg), var(--t-bg) 25%);
+    --color-fg-faint: color-mix(in srgb, var(--t-fg), var(--t-bg) 30%);
+    --color-on-accent: #ffffff;
 
-      --color-bolt-line: #e0ac17;
+    --color-accent-hover: color-mix(in srgb, var(--t-accent), #000 15%);
 
-      --color-violet: #6d28d9;
-      --color-violet-12: rgba(109, 40, 217, 0.09);
-      --color-violet-16: rgba(109, 40, 217, 0.12);
-      --color-violet-30: rgba(109, 40, 217, 0.26);
+    --color-bolt-line: color-mix(in srgb, var(--t-accent), #000 20%);
 
-      --color-green: #047857;
-      --color-green-10: rgba(4, 120, 87, 0.08);
-      --color-green-15: rgba(4, 120, 87, 0.11);
-      --color-green-16: rgba(4, 120, 87, 0.12);
+    --color-danger: var(--t-red);
+    --color-danger-hover: color-mix(in srgb, var(--t-red), #000 12%);
+    --color-danger-fg: var(--t-red);
 
-      --color-red: #b91c1c;
-      --color-red-10: rgba(185, 28, 28, 0.07);
-      --color-red-15: rgba(185, 28, 28, 0.1);
-      --color-red-16: rgba(185, 28, 28, 0.11);
-      --color-red-45: rgba(185, 28, 28, 0.4);
+    --color-diff-add: color-mix(in srgb, var(--t-green), #000 15%);
+    --color-diff-del: color-mix(in srgb, var(--t-red), #000 15%);
 
-      --color-amber: #92400e;
-      --color-amber-12: rgba(217, 119, 6, 0.12);
-      --color-amber-16: rgba(217, 119, 6, 0.16);
-      --color-amber-30: rgba(217, 119, 6, 0.32);
+    --color-scrim: color-mix(in srgb, var(--t-fg) 28%, transparent);
+    --color-veil: color-mix(in srgb, var(--t-bg) 70%, transparent);
+    --color-scroll-hover: color-mix(in srgb, var(--t-bg), var(--t-fg) 20%);
 
-      --color-danger: #c62828;
-      --color-danger-hover: #b71c1c;
-      --color-danger-fg: #b91c1c;
-
-      --color-diff-add: #065f46;
-      --color-diff-del: #991b1b;
-
-      --color-row-hover: rgba(15, 23, 42, 0.04);
-      --color-scrim: rgba(15, 23, 42, 0.28);
-      --color-veil: rgba(246, 247, 249, 0.7);
-      --color-scroll-hover: #c3cad3;
-
-      --color-lane-0: #0288d1;
-      --color-lane-1: #7c3aed;
-      --color-lane-2: #db2777;
-      --color-lane-3: #c27803;
-      --color-lane-4: #059669;
-      --color-lane-5: #e11d48;
-      --color-lane-6: #2563eb;
-      --color-lane-7: #9333ea;
-      --color-lane-8: #0d9488;
-      --color-lane-9: #c2410c;
-      --color-lane-10: #4f46e5;
-      --color-lane-11: #c026d3;
-    }
+    --color-lane-0: #0288d1;
+    --color-lane-1: #7c3aed;
+    --color-lane-2: #db2777;
+    --color-lane-3: #c27803;
+    --color-lane-4: #059669;
+    --color-lane-5: #e11d48;
+    --color-lane-6: #2563eb;
+    --color-lane-7: #9333ea;
+    --color-lane-8: #0d9488;
+    --color-lane-9: #c2410c;
+    --color-lane-10: #4f46e5;
+    --color-lane-11: #c026d3;
   }
 
   /* 「コントラストを上げる」: 補助の文字と区切り線を本文側へ寄せる */
   @media (prefers-contrast: more) {
     :root {
-      --color-fg-dim: #c3ccd6;
-      --color-fg-faint: #aab4c1;
-      --color-line: #4a5667;
-      --color-pop-line: #4a5667;
+      --color-fg-dim: color-mix(in srgb, var(--t-fg), var(--t-bg) 15%);
+      --color-fg-faint: color-mix(in srgb, var(--t-fg), var(--t-bg) 22%);
+      --color-line: color-mix(in srgb, var(--t-bg), var(--t-fg) 24%);
+      --color-pop-line: var(--color-line);
     }
-  }
-  @media (prefers-contrast: more) and (prefers-color-scheme: light) {
-    :root {
-      --color-fg-dim: #323c49;
-      --color-fg-faint: #3f4a58;
-      --color-line: #9aa4b1;
-      --color-pop-line: #9aa4b1;
+    :root[data-scheme="light"] {
+      --color-fg-dim: color-mix(in srgb, var(--t-fg), var(--t-bg) 10%);
+      --color-fg-faint: color-mix(in srgb, var(--t-fg), var(--t-bg) 16%);
+      --color-line: color-mix(in srgb, var(--t-bg), var(--t-fg) 38%);
     }
   }
 

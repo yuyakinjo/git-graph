@@ -3,6 +3,7 @@ import { useState } from "react";
 import { isLocalePref, LOCALE_PREFS, useT } from "../i18n";
 import { CLAUDE_CODE_MODELS, isClaudeCodeModel } from "../lib/ai";
 import { DIFF_THEMES, isDiffTheme } from "../lib/highlight";
+import { isThemePref, THEME_SCHEMES, THEMES } from "../lib/theme";
 import { AUTOFETCH_MINUTES, useStore } from "../state/store";
 import { btn, dialogDesc, field, fieldInput, fieldLabel, hint, iconBtn } from "./classes";
 import { Icon, Modal, Spinner } from "./ui";
@@ -21,7 +22,7 @@ type Category = (typeof CATEGORIES)[number];
 /**
  * 設定 (Cmd+,)。カテゴリごとにタブで切り替える。
  * - 一般: 自動フェッチ、プロジェクトの場所
- * - スタイル: コミットグラフ、差分の表示、作者アイコン
+ * - スタイル: テーマ、コミットグラフ、差分の表示、作者アイコン
  * - AI: AI コミットメッセージ
  */
 export function Settings() {
@@ -177,6 +178,35 @@ export function Settings() {
         ) : null}
         {category === "style" ? (
           <>
+            <section>
+              <h3 className={SECTION_H3}>{m.settings.theme}</h3>
+              <div className={field}>
+                <label className={fieldLabel} htmlFor="theme">
+                  {m.settings.themeLabel}
+                </label>
+                <select
+                  className={`${fieldInput} font-sans text-[12.5px]`}
+                  id="theme"
+                  value={s.themePref}
+                  onChange={(e) => {
+                    if (isThemePref(e.target.value)) void s.setThemePref(e.target.value);
+                  }}
+                >
+                  <option value="system">{m.settings.themePref.system}</option>
+                  {THEME_SCHEMES.map((scheme) => (
+                    <optgroup key={scheme} label={m.settings.themeGroup[scheme]}>
+                      {THEMES.filter((t) => t.scheme === scheme).map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {m.settings.themePref[t.id]}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <em className={hint}>{m.settings.themeHint}</em>
+              </div>
+            </section>
+
             <section>
               <h3 className={SECTION_H3}>{m.settings.commitGraph}</h3>
               <div className={field}>

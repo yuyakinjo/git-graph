@@ -71,7 +71,7 @@ function Welcome() {
   const act = useActions();
   const m = useT().app;
   return (
-    <div className="flex flex-1 items-center justify-center bg-[radial-gradient(circle_at_30%_10%,#1d2735_0%,var(--color-bg-1)_60%)]">
+    <div className="flex flex-1 items-center justify-center bg-[radial-gradient(circle_at_30%_10%,var(--color-bg-3)_0%,var(--color-bg-1)_60%)]">
       <div className="w-120 max-w-[88vw] text-center">
         <h1 className="mx-0 mt-0 mb-6">
           <img

@@ -18,6 +18,14 @@ import {
   type RepoSnapshot,
 } from "../lib/repo-data";
 import { snapshotHash, type CachedRepo } from "../lib/snapshot-cache";
+import {
+  applyTheme,
+  loadThemePref,
+  resolveTheme,
+  saveThemePref,
+  SYSTEM_LIGHT_QUERY,
+  type ThemePref,
+} from "../lib/theme";
 import { applyZoom, clampZoom, loadZoom, saveZoom } from "../lib/zoom";
 import {
   loadLocalePref,
@@ -302,6 +310,8 @@ export function useStoreValue(boot: BootData | null) {
 
   /** 表示言語の設定値 (system は OS に合わせる)。実際の切り替えは i18n の setLocale。 */
   const [localePref, setLocalePrefState] = useState<LocalePref>(loadLocalePref);
+  /** 配色テーマの設定値 (system は OS の外観に合わせる)。実際の反映は theme.ts の applyTheme。 */
+  const [themePref, setThemePrefState] = useState<ThemePref>(loadThemePref);
 
   const toastSeq = useRef(0);
   const detailSeq = useRef(0);
@@ -863,8 +873,23 @@ export function useStoreValue(boot: BootData | null) {
     [repaintDiff],
   );
 
-  // システムの外観が切り替わったら、ライト / ダーク用の配色で塗り直す
-  useMediaChange("(prefers-color-scheme: light)", () => void repaintDiff());
+  const setThemePref = useCallback(
+    (pref: ThemePref) => {
+      setThemePrefState(pref);
+      saveThemePref(pref);
+      applyTheme(resolveTheme(pref));
+      // 差分ハイライトはテーマのダーク系 / ライト系で配色が変わる
+      return repaintDiff();
+    },
+    [repaintDiff],
+  );
+
+  // 「システムに合わせる」の間は、OS の外観の切り替えにテーマごと追従する
+  useMediaChange(SYSTEM_LIGHT_QUERY, (light) => {
+    if (themePref !== "system") return;
+    applyTheme(resolveTheme("system", light));
+    void repaintDiff();
+  });
 
   const setGraphStyle = useCallback((style: GraphStyle) => {
     setGraphStyleState(style);
@@ -962,6 +987,8 @@ export function useStoreValue(boot: BootData | null) {
     setAiCliModel,
     localePref,
     setLocalePref,
+    themePref,
+    setThemePref,
     zoom,
     setZoom,
     projectRoots,

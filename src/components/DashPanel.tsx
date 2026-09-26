@@ -50,10 +50,10 @@ const BAR =
 /** 浮かせているときだけ影を落とす */
 const FLOAT_SHADOW = "shadow-[0_12px_30px_rgba(0,0,0,0.45)]";
 const GROUP_ICON =
-  "flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-on-bolt/70 hover:bg-black/10 hover:text-on-bolt";
+  "flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-on-bolt/70 hover:bg-on-bolt/10 hover:text-on-bolt";
 /** 無効でもドラッグで並べ替えられるよう、disabled ではなく aria-disabled で表す */
 const ACTION =
-  "relative flex h-8 cursor-pointer touch-none items-center gap-1.5 rounded-full border border-black/10 bg-black/10 px-3 text-[12.5px] whitespace-nowrap text-on-bolt not-aria-disabled:hover:bg-black/20 aria-disabled:cursor-default aria-disabled:opacity-45";
+  "relative flex h-8 cursor-pointer touch-none items-center gap-1.5 rounded-full border border-on-bolt/10 bg-on-bolt/10 px-3 text-[12.5px] whitespace-nowrap text-on-bolt not-aria-disabled:hover:bg-on-bolt/20 aria-disabled:cursor-default aria-disabled:opacity-45";
 const BADGE = "rounded-lg bg-on-bolt px-[5px] py-px text-[10.5px] font-bold text-bolt not-italic";
 const GRIP =
   "flex h-8 w-5 flex-none cursor-grab touch-none items-center justify-center rounded-md text-on-bolt/50 hover:text-on-bolt/80 active:cursor-grabbing";

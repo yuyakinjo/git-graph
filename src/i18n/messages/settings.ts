@@ -1,5 +1,6 @@
 import type { LocalePref } from "..";
 import type { ClaudeCodeModel } from "../../lib/ai";
+import type { ThemePref, ThemeScheme } from "../../lib/theme";
 
 export const ja = {
   language: "言語",
@@ -36,6 +37,23 @@ export const ja = {
   scanning: "検索中...",
   reposFound: (n: number) => `現在 ${n} 件のリポジトリを認識しています。`,
   // スタイル
+  theme: "テーマ",
+  themeLabel: "配色",
+  themePref: {
+    system: "システムに合わせる（ダーク / ライト）",
+    // グループ名 (themeGroup) でダーク / ライトが分かるので、項目名は「標準」だけにする
+    dark: "標準",
+    light: "標準",
+    nord: "Nord",
+    dracula: "Dracula",
+    solarized: "Solarized Light",
+  } satisfies Record<ThemePref, string>,
+  themeGroup: {
+    dark: "ダーク",
+    light: "ライト",
+  } satisfies Record<ThemeScheme, string>,
+  themeHint:
+    "画面全体の配色を切り替えます。ライト系のテーマでは、差分のシンタックスハイライトも明るい配色で表示します。",
   commitGraph: "コミットグラフ",
   graphStyle: "スタイル",
   graphStyleDefault: "標準（従来のスタイル）",
@@ -99,6 +117,22 @@ export const en: typeof ja = {
   scanDepthHint: "Deeper searches find more repositories but take longer.",
   scanning: "Searching...",
   reposFound: (n) => `${n} ${n === 1 ? "repository" : "repositories"} found.`,
+  theme: "Theme",
+  themeLabel: "Colors",
+  themePref: {
+    system: "Match system (Dark / Light)",
+    dark: "Standard",
+    light: "Standard",
+    nord: "Nord",
+    dracula: "Dracula",
+    solarized: "Solarized Light",
+  },
+  themeGroup: {
+    dark: "Dark",
+    light: "Light",
+  },
+  themeHint:
+    "Changes the colors of the whole app. With a light theme, diff syntax highlighting also uses a light palette.",
   commitGraph: "Commit Graph",
   graphStyle: "Style",
   graphStyleDefault: "Standard (classic style)",

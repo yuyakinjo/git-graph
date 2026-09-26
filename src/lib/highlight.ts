@@ -1,11 +1,12 @@
 import type { BundledLanguage, Highlighter, ThemedToken, ThemeInput } from "shiki";
+import { currentScheme } from "./theme";
 
 /**
  * 差分ビューで選べるテーマ。
  *
  * shiki のテーマ 66 種すべてを参照すると、使わないテーマまで全部チャンクになるので、
  * ここに並べたものだけを動的 import する (= ビルド成果物に載るのもこの分だけ)。
- * 選ぶのは暗い配色で、システムがライト外観の間は light の配色に差し替えて塗る
+ * 選ぶのは暗い配色で、アプリのテーマがライト系の間は light の配色に差し替えて塗る
  * (対になるライト版が無いテーマは GitHub Light で代用)。増やすならこの配列に足す。
  * 表示名に添える説明 (「控えめ」など) は i18n の highlight.themeLabel で付ける。
  */
@@ -69,12 +70,11 @@ const LIGHT_THEMES = {
   "min-light": () => import("@shikijs/themes/min-light"),
 } satisfies Record<(typeof DIFF_THEMES)[number]["light"], unknown>;
 
-/** 選ばれたテーマを、いまのシステム外観で実際に塗る配色へ解決する。 */
+/** 選ばれたテーマを、いまのアプリのテーマ (ダーク系 / ライト系) で実際に塗る配色へ解決する。 */
 function effectiveTheme(theme: DiffTheme) {
   const entry = DIFF_THEMES.find((t) => t.id === theme);
   if (!entry) return null;
-  const light = globalThis.matchMedia?.("(prefers-color-scheme: light)").matches;
-  return light
+  return currentScheme() === "light"
     ? { id: entry.light, load: LIGHT_THEMES[entry.light] }
     : { id: entry.id, load: entry.load };
 }
