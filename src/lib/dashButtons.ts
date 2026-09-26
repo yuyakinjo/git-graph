@@ -173,12 +173,11 @@ export interface DashPos {
   y: number;
 }
 
-/** 位置は左上の座標。未保存 (null) なら画面下中央に置く。 */
+/** 旧形式のパネル位置 (左上の座標)。migrateFloating のためだけに読む。 */
 export function loadDashPos(): DashPos | null {
   const v = readJson(POS_KEY) as Partial<DashPos> | null;
   return v && Number.isFinite(v.x) && Number.isFinite(v.y) ? { x: v.x!, y: v.y! } : null;
 }
-export const saveDashPos = (p: DashPos) => localStorage.setItem(POS_KEY, JSON.stringify(p));
 
 /** パネルが画面外へはみ出さないよう、左上座標を収める。 */
 export function clampDashPos(
@@ -189,4 +188,57 @@ export function clampDashPos(
 ): DashPos {
   const clamp = (v: number, max: number) => Math.max(margin, Math.min(v, max - margin));
   return { x: clamp(p.x, view.w - size.w), y: clamp(p.y, view.h - size.h) };
+}
+
+// ------------------------------------------------------------------ ドッキング
+
+const FLOATING_KEY = "gitsquid.dashFloating";
+/** 旧形式 (パネル全体を 1 つとしてドッキング / 取り出し) の保存キー。移行のためだけに読む */
+const LEGACY_DOCK_KEY = "gitsquid.dashDocked";
+/** 旧形式から移すとき、縦に積むバーの間隔 (h-10 + gap-2) */
+const LEGACY_STACK = 48;
+
+/** 取り出して浮かせているバーと、その左上座標。載っていないバーはツールバーの列にドッキングしている。 */
+export type DashFloating = Partial<Record<DashBar, DashPos>>;
+
+/** 保存値を「既知のバー・有限の座標」だけに整える。 */
+export function normalizeFloating(saved: unknown): DashFloating {
+  const obj = saved && typeof saved === "object" ? (saved as Record<string, unknown>) : null;
+  const out: DashFloating = {};
+  for (const b of DASH_BARS) {
+    const v = obj?.[b] as Partial<DashPos> | undefined;
+    if (v && Number.isFinite(v.x) && Number.isFinite(v.y)) out[b] = { x: v.x!, y: v.y! };
+  }
+  return out;
+}
+
+/**
+ * 旧形式で「取り出し」を保存していたら、全バーを旧位置から縦に積んだ形で浮かせる。
+ * 位置が無ければ画面左上寄りに置く (出したときに画面内へ収め直す)。
+ */
+export function migrateFloating(docked: string | null, pos: DashPos | null): DashFloating {
+  if (docked !== "off") return {};
+  const base = pos ?? { x: 40, y: 120 };
+  return Object.fromEntries(
+    DASH_BARS.map((b, i) => [b, { x: base.x, y: base.y + i * LEGACY_STACK }]),
+  ) as DashFloating;
+}
+
+export function loadDashFloating(): DashFloating {
+  const saved = readJson(FLOATING_KEY);
+  if (saved !== null) return normalizeFloating(saved);
+  return migrateFloating(localStorage.getItem(LEGACY_DOCK_KEY), loadDashPos());
+}
+export const saveDashFloating = (v: DashFloating) =>
+  localStorage.setItem(FLOATING_KEY, JSON.stringify(v));
+
+/** ポインタがドック (ツールバーの列) の上にいるか。上下は slack px だけ甘めに判定する。 */
+export function isOverDock(
+  p: { x: number; y: number },
+  rect: { left: number; right: number; top: number; bottom: number },
+  slack = 12,
+): boolean {
+  return (
+    p.x >= rect.left && p.x <= rect.right && p.y >= rect.top - slack && p.y <= rect.bottom + slack
+  );
 }

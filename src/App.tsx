@@ -10,7 +10,7 @@ import { TidyModal } from "./components/TidyModal";
 import { Settings } from "./components/Settings";
 import { Sidebar } from "./components/Sidebar";
 import { TitleBar } from "./components/TitleBar";
-import { StatusBar, Toolbar } from "./components/Toolbar";
+import { DashDock, StatusBar } from "./components/Toolbar";
 import { btn, iconBtn } from "./components/classes";
 import { CopyButton, Icon, ProgressBar, Spinner } from "./components/ui";
 import { useT } from "./i18n";
@@ -220,6 +220,8 @@ export default function App() {
       return !v;
     });
   }, []);
+  const [dockEl, setDockEl] = useState<HTMLDivElement | null>(null);
+  const [dockHover, setDockHover] = useState(false);
   /** モーダル (差分・PR・設定・ログ・tidy・recompose) を開いている間はダッシュパネルを隠す */
   const modalOpen =
     s.diffModal ||
@@ -289,7 +291,7 @@ export default function App() {
     <div className="flex h-full flex-col">
       {s.busy ? <ProgressBar /> : null}
       <TitleBar dashOpen={dashOpen} onToggleDash={toggleDash} />
-      <Toolbar />
+      <DashDock slotRef={setDockEl} highlight={dockHover} />
       {s.repo ? (
         <div className="relative flex min-h-0 flex-1 bg-bg-0 px-1.5">
           <div className={PANE_BOX} style={{ width: sidebar.width, flex: "0 0 auto" }}>
@@ -326,7 +328,14 @@ export default function App() {
         <Welcome />
       )}
       <StatusBar />
-      {s.repo && dashOpen && !modalOpen ? <DashPanel onHide={toggleDash} /> : null}
+      {s.repo && dashOpen ? (
+        <DashPanel
+          onHide={toggleDash}
+          dockEl={dockEl}
+          onDockHover={setDockHover}
+          floatingHidden={modalOpen}
+        />
+      ) : null}
       <Toasts />
       {s.diffModal ? <DiffModal /> : null}
       {pr ? <PrModal pr={pr} onClose={() => setPr(null)} /> : null}

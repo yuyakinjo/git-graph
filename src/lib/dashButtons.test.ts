@@ -3,6 +3,9 @@ import {
   DEFAULT_DASH,
   DASH_MAX,
   clampDashPos,
+  isOverDock,
+  migrateFloating,
+  normalizeFloating,
   loadDashPos,
   loadDash,
   loadRecent,
@@ -166,5 +169,50 @@ describe("stageToggleMode", () => {
   });
   test("変更が無ければ null", () => {
     expect(stageToggleMode({ staged: 0, unstaged: 0, conflicts: 0 })).toBeNull();
+  });
+});
+
+describe("isOverDock", () => {
+  const rect = { left: 0, right: 800, top: 40, bottom: 86 };
+  test("列の中なら true", () => {
+    expect(isOverDock({ x: 100, y: 60 }, rect)).toBe(true);
+  });
+  test("上下は slack の分だけ甘く判定する", () => {
+    expect(isOverDock({ x: 100, y: 96 }, rect)).toBe(true);
+    expect(isOverDock({ x: 100, y: 99 }, rect)).toBe(false);
+    expect(isOverDock({ x: 100, y: 29 }, rect, 10)).toBe(false);
+  });
+  test("左右にはみ出たら false", () => {
+    expect(isOverDock({ x: 801, y: 60 }, rect)).toBe(false);
+  });
+});
+
+describe("normalizeFloating", () => {
+  test("既知のバーと有限の座標だけを残す", () => {
+    expect(
+      normalizeFloating({
+        git: { x: 10, y: 20 },
+        ai: { x: "1", y: 2 },
+        nope: { x: 1, y: 2 },
+        recent: { x: Number.NaN, y: 0 },
+      }),
+    ).toEqual({ git: { x: 10, y: 20 } });
+  });
+  test("壊れた値なら空 (全部ドッキング)", () => {
+    expect(normalizeFloating(null)).toEqual({});
+    expect(normalizeFloating([1, 2])).toEqual({});
+  });
+});
+
+describe("migrateFloating", () => {
+  test("旧形式でドッキングしていたら何も浮かせない", () => {
+    expect(migrateFloating(null, { x: 1, y: 2 })).toEqual({});
+    expect(migrateFloating("on", null)).toEqual({});
+  });
+  test("旧形式で取り出していたら、全バーを旧位置から縦に積む", () => {
+    const f = migrateFloating("off", { x: 100, y: 200 });
+    expect(f.git).toEqual({ x: 100, y: 200 });
+    expect(f.github).toEqual({ x: 100, y: 248 });
+    expect(Object.keys(f)).toHaveLength(5);
   });
 });

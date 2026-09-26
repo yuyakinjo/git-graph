@@ -5,166 +5,42 @@ import { useT } from "../i18n";
 import { Icon, Spinner } from "./ui";
 import { useDialogs, useMenu } from "./ui-context";
 
-const TOOL_BASE =
-  "flex h-[30px] cursor-pointer items-center gap-1.5 border-0 bg-transparent text-[12.5px] whitespace-nowrap not-disabled:hover:bg-bg-3 disabled:cursor-default disabled:opacity-40";
-/** 単独のツールボタン */
-const TOOL = `${TOOL_BASE} rounded-md px-2.5 text-fg`;
-/** ドロップダウンと連結したときの左半分 */
-const TOOL_SPLIT = `${TOOL_BASE} rounded-l-md rounded-r-none pr-1.5 pl-2.5 text-fg`;
-/** ドロップダウンを開く右半分 */
-const CARET = `${TOOL_BASE} rounded-r-md rounded-l-none px-[5px] text-fg-dim`;
-
-const TOOL_BADGE =
-  "rounded-lg bg-bg-3 px-[5px] py-px text-[10.5px] font-bold text-fg-dim not-italic";
-const TOOL_BADGE_ACCENT =
-  "rounded-lg bg-accent-soft px-[5px] py-px text-[10.5px] font-bold text-accent not-italic";
-
 /** ステータスバーの各項目 */
 const SB_ITEM = "inline-flex items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap";
 
-export function Toolbar() {
+/**
+ * タイトルバーの下の列。ダッシュパネルをここにドッキングする (DashPanel が slot へ portal で入る)。
+ * 取り出している間は空の列に戻し先のヒントを出し、右端には実行中の操作を出す。
+ */
+export function DashDock({
+  slotRef,
+  highlight,
+}: {
+  slotRef: (el: HTMLDivElement | null) => void;
+  highlight: boolean;
+}) {
   const s = useStore();
-  const act = useActions();
-  const openMenu = useMenu();
-  const m = useT().toolbar;
-  const head = s.headBranch;
-
-  const pullMenu = (e: React.MouseEvent) =>
-    openMenu(e, [
-      { label: m.pullMerge, icon: "pull", onClick: () => act.pull(false) },
-      { label: m.pullRebase, icon: "pull", onClick: () => act.pull(true) },
-      { separator: true },
-      { label: m.fetchPrune, icon: "fetch", onClick: () => act.fetch() },
-      { separator: true },
-      { label: m.tidyMerged, icon: "sweep", onClick: () => act.tidy() },
-    ]);
-
-  const pushMenu = (e: React.MouseEvent) =>
-    openMenu(e, [
-      { label: m.push, icon: "push", onClick: () => act.push() },
-      {
-        label: m.forcePush,
-        icon: "push",
-        danger: true,
-        onClick: () => act.forcePush(),
-      },
-    ]);
-
-  const stashMenu = (e: React.MouseEvent) =>
-    openMenu(e, [
-      { label: m.stash, icon: "stash", onClick: () => act.stashPush() },
-      {
-        label: m.stashPop,
-        icon: "pull",
-        disabled: s.stashes.length === 0,
-        onClick: () => s.stashes[0] && act.stashApply(s.stashes[0], true),
-      },
-      {
-        label: m.stashApply,
-        icon: "check",
-        disabled: s.stashes.length === 0,
-        onClick: () => s.stashes[0] && act.stashApply(s.stashes[0], false),
-      },
-    ]);
-
-  const disabled = !s.repo || Boolean(s.busy);
-
+  const d = useT().dashPanel;
   return (
     <header className="flex h-11.5 flex-none items-center gap-2.5 bg-bg-0 px-2.5">
-      <div className="flex h-7.5 items-center gap-0.5">
-        <button
-          className={TOOL}
-          disabled={disabled}
-          onClick={() => act.fetch()}
-          title="git fetch --all --prune"
-        >
-          <Icon name="fetch" />
-          <span>{m.fetch}</span>
-        </button>
-        <div className="flex items-center">
-          <button
-            className={TOOL_SPLIT}
-            disabled={disabled}
-            onClick={() => act.pull(false)}
-            title="git pull"
-          >
-            <Icon name="pull" />
-            <span>{m.pull}</span>
-            {head?.behind ? <em className={TOOL_BADGE}>{head.behind}</em> : null}
-          </button>
-          <button className={CARET} disabled={disabled} onClick={pullMenu}>
-            <Icon name="chevronDown" size={11} />
-          </button>
-        </div>
-        <div className="flex items-center">
-          <button
-            className={TOOL_SPLIT}
-            disabled={disabled}
-            onClick={() => act.push()}
-            title="git push"
-          >
-            <Icon name="push" />
-            <span>{m.push}</span>
-            {head?.ahead ? <em className={TOOL_BADGE_ACCENT}>{head.ahead}</em> : null}
-          </button>
-          <button className={CARET} disabled={disabled} onClick={pushMenu}>
-            <Icon name="chevronDown" size={11} />
-          </button>
-        </div>
+      <div
+        className={`relative flex h-full min-w-0 flex-1 items-center rounded-lg transition-colors ${
+          highlight ? "bg-bolt/10 ring-1 ring-bolt/60 ring-inset" : ""
+        }`}
+      >
+        <div
+          ref={slotRef}
+          className="peer flex h-full min-w-0 flex-1 items-center overflow-x-auto [scrollbar-width:none]"
+        />
+        <span className="pointer-events-none absolute left-2 hidden text-[12px] text-fg-dim/60 peer-empty:inline">
+          {d.dockHint}
+        </span>
       </div>
-
-      <div className="flex h-7.5 items-center gap-0.5 border-l border-line pl-1.5">
-        <button
-          className={TOOL}
-          disabled={disabled}
-          onClick={() => act.createBranch()}
-          title={m.createBranch}
-        >
-          <Icon name="branch" />
-          <span>{m.branch}</span>
-        </button>
-        <div className="flex items-center">
-          <button
-            className={TOOL_SPLIT}
-            disabled={disabled}
-            onClick={() => act.stashPush()}
-            title="git stash push"
-          >
-            <Icon name="stash" />
-            <span>{m.stash}</span>
-            {s.stashes.length ? <em className={TOOL_BADGE}>{s.stashes.length}</em> : null}
-          </button>
-          <button className={CARET} disabled={disabled} onClick={stashMenu}>
-            <Icon name="chevronDown" size={11} />
-          </button>
-        </div>
-        <button
-          className={TOOL}
-          disabled={disabled}
-          onClick={() => act.worktreeAdd()}
-          title="git worktree add"
-        >
-          <Icon name="worktree" />
-          <span>{m.worktree}</span>
-        </button>
-        <button
-          className={TOOL}
-          disabled={disabled}
-          onClick={() => act.prCreate()}
-          title="gh pr create"
-        >
-          <Icon name="pr" />
-          <span>{m.prCreate}</span>
-        </button>
-      </div>
-
-      <div className="ml-auto flex items-center gap-2">
-        {s.busy ? (
-          <span className="flex items-center gap-1.5 text-[12px] text-fg-dim">
-            <Spinner /> {s.busy}
-          </span>
-        ) : null}
-      </div>
+      {s.busy ? (
+        <span className="flex flex-none items-center gap-1.5 text-[12px] text-fg-dim">
+          <Spinner /> {s.busy}
+        </span>
+      ) : null}
     </header>
   );
 }

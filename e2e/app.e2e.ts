@@ -57,10 +57,14 @@ test.describe("起動", () => {
 });
 
 test.describe("ブランチ", () => {
-  test("ツールバーからブランチを作成してチェックアウトする", async ({ app }) => {
+  test("ダッシュパネルからブランチを作成してチェックアウトする", async ({ app }) => {
     const { page, repo } = app;
+    const panel = page.getByRole("toolbar", { name: "ダッシュパネル" });
 
-    await page.getByRole("button", { name: "ブランチ", exact: true }).click();
+    // 既定の git バーには無いので、左端アイコンのメニューから足してから押す
+    await panel.getByTitle("git (クリックでボタンを選ぶ)").click();
+    await page.getByRole("button", { name: "ブランチ" }).last().click();
+    await panel.getByRole("button", { name: "ブランチ", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "ブランチを作成" });
     await dialog.getByLabel("ブランチ名").fill("feature/e2e");
     await dialog.getByRole("button", { name: "作成" }).click();
@@ -133,8 +137,8 @@ test.describe("変更", () => {
     await app.refresh();
 
     // ダイアログを挟まず、日時から付けた名前ですぐスタッシュする
-    // サイドバーの見出しにも同名のボタンがあるので、ツールバーの方をコマンド表記で選ぶ
-    await page.getByTitle("git stash push").click();
+    // サイドバーのスタッシュ見出しにある + ボタンから
+    await page.locator("aside").getByTitle("スタッシュ", { exact: true }).click();
 
     await expect(page.getByText("スタッシュ 1", { exact: true })).toBeVisible();
     expect(repo.git("stash", "list", "--format=%s")).toMatch(/: WIP \d{4}-\d{2}-\d{2} /);
@@ -177,7 +181,9 @@ test.describe("同期", () => {
     await app.refresh();
 
     // ahead の件数がプッシュボタンに出る
-    const push = page.locator("header").getByRole("button", { name: /^プッシュ/ });
+    const push = page
+      .getByRole("toolbar", { name: "ダッシュパネル" })
+      .getByRole("button", { name: /^プッシュ/ });
     await expect(push).toHaveText(/プッシュ\s*1/);
     await push.click();
 
@@ -205,8 +211,10 @@ test.describe("同期", () => {
     );
     repo.git("-C", other, "push", "-q", "origin", "main");
 
-    await page.getByTitle("git fetch --all --prune").click();
-    const pull = page.locator("header").getByRole("button", { name: /^プル/ });
+    await page.locator("aside").getByTitle("フェッチ", { exact: true }).click();
+    const pull = page
+      .getByRole("toolbar", { name: "ダッシュパネル" })
+      .getByRole("button", { name: /^プル/ });
     await expect(pull).toHaveText(/プル\s*1/);
     await pull.click();
 
@@ -290,7 +298,7 @@ test.describe("サイドバー", () => {
 });
 
 test.describe("ダッシュパネル", () => {
-  test("ダッシュボタンを出し、ダイアログの間は隠れる", async ({ app }) => {
+  test("ダッシュボタンを出し、ドッキング中はダイアログの間も列に残る", async ({ app }) => {
     const { page } = app;
     const panel = page.getByRole("toolbar", { name: "ダッシュパネル" });
 
@@ -305,10 +313,10 @@ test.describe("ダッシュパネル", () => {
     const branchBtn = panel.getByRole("button", { name: "ブランチ", exact: true });
     await expect(branchBtn).toBeVisible();
 
-    // 押すとフォームダイアログが開き、パネルは隠れる。最近使ったにも載る
+    // 押すとフォームダイアログが開く (ドッキング中なので列からは消えない)。最近使ったにも載る
     await branchBtn.click();
     await expect(page.getByRole("dialog", { name: "ブランチを作成" })).toBeVisible();
-    await expect(panel).toHaveCount(0);
+    await expect(panel).toHaveCount(1);
     await page.keyboard.press("Escape");
     await expect(panel.getByTitle("最近使った操作")).toBeVisible();
     await page.screenshot({ path: "test-results/dash-panel-recent.png" });
@@ -344,6 +352,55 @@ test.describe("ダッシュパネル", () => {
     await page.getByRole("button", { name: "GitHub バー" }).click();
     await expect(prBtn).toHaveCount(0);
     await page.screenshot({ path: "test-results/dash-panel-reorder.png" });
+  });
+
+  test("バーを 1 本ずつ取り出し、列へ戻すとドッキングする", async ({ app }) => {
+    const { page } = app;
+    const docked = page.getByRole("toolbar", { name: "ダッシュパネル" });
+    const floating = page.getByRole("toolbar", { name: "取り出したダッシュバー" });
+    await expect(docked.locator("[data-bar=git]")).toBeVisible();
+
+    const dragGrip = async (
+      bar: string,
+      to: (g: { x: number; y: number }) => { x: number; y: number },
+    ) => {
+      const grip = await page.locator(`[data-bar=${bar}] [data-grip]`).boundingBox();
+      if (!grip) throw new Error(`${bar} のつまみが見つかりません`);
+      const from = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 };
+      const dest = to(from);
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      await page.mouse.move(dest.x, dest.y, { steps: 10 });
+      await page.mouse.up();
+    };
+
+    // git バーだけを列の外 (下) へ引き出す。ほかのバーは列に残る
+    await dragGrip("git", (g) => ({ x: g.x, y: g.y + 300 }));
+    await expect(floating.locator("[data-bar=git]")).toBeVisible();
+    await expect(docked.locator("[data-bar=git]")).toHaveCount(0);
+    await expect(docked.locator("[data-bar=github]")).toBeVisible();
+
+    // AI バーも別の場所へ取り出す
+    await dragGrip("ai", (g) => ({ x: g.x, y: g.y + 450 }));
+    await expect(floating.locator("[data-bar]")).toHaveCount(2);
+
+    // 再読み込みしても取り出したまま
+    await page.reload();
+    await expect(floating.locator("[data-bar]")).toHaveCount(2);
+    await expect(docked.locator("[data-bar=github]")).toBeVisible();
+
+    // git バーを列の上で離すと、git バーだけがドッキングに戻る
+    const slot = await docked.boundingBox();
+    if (!slot) throw new Error("列が見つかりません");
+    await dragGrip("git", () => ({ x: slot.x + slot.width + 40, y: slot.y + slot.height / 2 }));
+    await expect(docked.locator("[data-bar=git]")).toBeVisible();
+    await expect(floating.locator("[data-bar]")).toHaveCount(1);
+
+    // 残った AI バーはメニューから戻す
+    await floating.getByTitle("AI (クリックでボタンを選ぶ)").click();
+    await page.getByRole("button", { name: "このバーをツールバーに戻す" }).click();
+    await expect(floating).toHaveCount(0);
+    await expect(docked.locator("[data-bar=ai]")).toBeVisible();
   });
 
   test("AI でコミットすると、生成したメッセージ入りのダイアログが開く", async ({ app }) => {

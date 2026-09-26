@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useWindowEvent } from "../lib/effects";
 import {
   DASH_BARS,
@@ -8,13 +9,14 @@ import {
   DEFAULT_DASH,
   actionsOf,
   clampDashPos,
-  loadDashPos,
+  isOverDock,
+  loadDashFloating,
   loadDash,
   loadHiddenBars,
   loadRecent,
   moveDash,
   pushRecent,
-  saveDashPos,
+  saveDashFloating,
   saveDash,
   saveHiddenBars,
   saveRecent,
@@ -22,6 +24,7 @@ import {
   toggleDash,
   toggleHiddenBar,
   type DashBar,
+  type DashFloating,
   type DashPos,
   type DashButtonId,
   type DashGroup,
@@ -43,7 +46,9 @@ const BAR_ICON: Record<DashBar, string> = {
 };
 
 const BAR =
-  "flex h-10 items-center gap-1 rounded-full border border-bolt-line bg-bolt py-1 pr-1.5 pl-1 text-on-bolt shadow-[0_12px_30px_rgba(0,0,0,0.45)]";
+  "flex h-10 flex-none items-center gap-1 rounded-full border border-bolt-line bg-bolt py-1 pr-1.5 pl-1 text-on-bolt";
+/** 浮かせているときだけ影を落とす */
+const FLOAT_SHADOW = "shadow-[0_12px_30px_rgba(0,0,0,0.45)]";
 const GROUP_ICON =
   "flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-on-bolt/70 hover:bg-black/10 hover:text-on-bolt";
 /** 無効でもドラッグで並べ替えられるよう、disabled ではなく aria-disabled で表す */
@@ -72,8 +77,25 @@ function GripDots() {
  * git / GitHub / AI / カスタム / 最近使った のバーを縦に積み、⋮⋮ をドラッグして動かす。
  * バーを右クリック (または左端のアイコンをクリック) すると、出すボタンを最大 5 個まで選べる。
  * ボタンはドラッグで同じバーの中を並べ替えられ、バーごとに表示・非表示を切り替えられる。
+ *
+ * ふだんはタイトルバー下の列 (DashDock の slot = dockEl) にドッキングし、バーを横一列に並べる。
+ * バーの ⋮⋮ をつかんで列の外へ出すと、そのバーだけを取り出して浮かせられる。
+ * 浮かせたバーは 1 本ずつ好きな位置に置け、列の上で離すとまたドッキングする。
  */
-export function DashPanel({ onHide }: { onHide: () => void }) {
+export function DashPanel({
+  onHide,
+  dockEl,
+  onDockHover,
+  floatingHidden,
+}: {
+  onHide: () => void;
+  /** ドッキング先 (DashDock の slot)。まだ描かれていなければ null */
+  dockEl: HTMLElement | null;
+  /** 浮かせたバーをドラッグして列の上に来た / 離れたとき (列を光らせる) */
+  onDockHover: (over: boolean) => void;
+  /** モーダルを開いている間など。浮かせたバーだけを隠す */
+  floatingHidden: boolean;
+}) {
   const s = useStore();
   const act = useActions();
   const openMenu = useMenu();
@@ -83,9 +105,18 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
   const [buttons, setButtons] = useState(loadDash);
   const [recent, setRecent] = useState(loadRecent);
   const [hidden, setHidden] = useState(loadHiddenBars);
-  const [pos, setPos] = useState<DashPos | null>(loadDashPos);
-  const ref = useRef<HTMLDivElement>(null);
-  const drag = useRef<{ dx: number; dy: number } | null>(null);
+  const [floating, setFloating] = useState<DashFloating>(loadDashFloating);
+  /** バーの要素 (ドッキング中も浮動中も) */
+  const barRefs = useRef(new Map<DashBar, HTMLDivElement>());
+  /** ⋮⋮ のドラッグ。dx / dy はつかんだ点からバー左上までのずれ */
+  const drag = useRef<{
+    bar: DashBar;
+    dx: number;
+    dy: number;
+    x0: number;
+    y0: number;
+    moved: boolean;
+  } | null>(null);
 
   const head = s.headBranch;
   const ghUrl = s.gh?.url ?? null;
@@ -319,6 +350,12 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
         onClick: () => toggleBar(b),
       })),
       { separator: true },
+      floating[bar]
+        ? { label: d.dock, icon: "pull", onClick: () => dockBar(bar) }
+        : { label: d.undock, icon: "push", onClick: () => undockBar(bar) },
+      ...(Object.keys(floating).length > 1 || (Object.keys(floating).length === 1 && !floating[bar])
+        ? [{ label: d.dockAll, icon: "pull", onClick: () => commitFloating({}) }]
+        : []),
       { label: d.hidePanel, icon: "x", onClick: onHide },
     ];
     if (bar === "recent") {
@@ -353,9 +390,15 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
     ]);
   };
 
-  // ---------------------------------------------------------- ドラッグ移動
-  const place = (p: DashPos) => {
-    const el = ref.current;
+  // ---------------------------------------------------------- ドラッグ移動 / ドッキング
+  const commitFloating = (next: DashFloating) => {
+    setFloating(next);
+    saveDashFloating(next);
+  };
+
+  /** バーが画面外へはみ出さないよう、左上座標を収める */
+  const place = (bar: DashBar, p: DashPos) => {
+    const el = barRefs.current.get(bar);
     if (!el) return p;
     return clampDashPos(
       p,
@@ -364,31 +407,65 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
     );
   };
 
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    const rect = ref.current?.getBoundingClientRect();
+  const dockBar = (bar: DashBar) => {
+    const next = { ...floating };
+    delete next[bar];
+    commitFloating(next);
+  };
+
+  /** メニューから取り出すときは、今いる場所の少し下に浮かせる */
+  const undockBar = (bar: DashBar) => {
+    const r = barRefs.current.get(bar)?.getBoundingClientRect();
+    const p = r ? { x: r.left, y: r.bottom + 24 } : { x: 40, y: 120 };
+    commitFloating({ ...floating, [bar]: place(bar, p) });
+  };
+
+  const overDock = (p: { x: number; y: number }) =>
+    dockEl ? isOverDock(p, dockEl.getBoundingClientRect()) : false;
+
+  // ドッキング / 取り出しで portal 先が変わるとバーの要素が作り直され、pointer capture が外れる。
+  // そのため move / up は window で受ける。バーの形はどちらでも同じなので、つかんだ点のずれはそのまま使える。
+  const onGripDown = (e: React.PointerEvent<HTMLDivElement>, bar: DashBar) => {
+    if (e.button !== 0) return;
+    const rect = barRefs.current.get(bar)?.getBoundingClientRect();
     if (!rect) return;
     e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+    drag.current = {
+      bar,
+      dx: e.clientX - rect.left,
+      dy: e.clientY - rect.top,
+      x0: e.clientX,
+      y0: e.clientY,
+      moved: false,
+    };
     document.body.classList.add("dragging");
   };
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!drag.current) return;
-    setPos(place({ x: e.clientX - drag.current.dx, y: e.clientY - drag.current.dy }));
-  };
-  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!drag.current) return;
+  useWindowEvent("pointermove", (e) => {
+    const g = drag.current;
+    if (!g) return;
+    const p = { x: e.clientX, y: e.clientY };
+    if (!g.moved) {
+      if (Math.hypot(p.x - g.x0, p.y - g.y0) < DRAG_THRESHOLD) return;
+      g.moved = true;
+    }
+    const over = overDock(p);
+    // ドッキング中のバーは、列の中を動かしている間はそのまま
+    if (!floating[g.bar] && over) return;
+    setFloating((f) => ({ ...f, [g.bar]: place(g.bar, { x: p.x - g.dx, y: p.y - g.dy }) }));
+    onDockHover(over);
+  });
+  const endDrag = (e: PointerEvent, cancel: boolean) => {
+    const g = drag.current;
+    if (!g) return;
     drag.current = null;
     document.body.classList.remove("dragging");
-    e.currentTarget.releasePointerCapture(e.pointerId);
-    if (pos) saveDashPos(pos);
+    onDockHover(false);
+    if (!g.moved || !floating[g.bar]) return;
+    if (!cancel && overDock({ x: e.clientX, y: e.clientY })) dockBar(g.bar);
+    else saveDashFloating(floating);
   };
-  const gripHandlers = {
-    onPointerDown,
-    onPointerMove,
-    onPointerUp,
-    onPointerCancel: onPointerUp,
-  };
+  useWindowEvent("pointerup", (e) => endDrag(e, false));
+  useWindowEvent("pointercancel", (e) => endDrag(e, true));
 
   // ---------------------------------------------------------- ボタンの並べ替え
   /** drop は「元の並びで何番目の前に落とすか」 */
@@ -464,91 +541,132 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
     return null;
   };
 
+  /** 浮かせたバーを画面内へ収め直す (変わらなければ同じオブジェクトを返す) */
+  const clampAll = (f: DashFloating) => {
+    let changed = false;
+    const next: DashFloating = { ...f };
+    for (const [bar, p] of Object.entries(f) as [DashBar, DashPos][]) {
+      const q = place(bar, p);
+      if (q.x !== p.x || q.y !== p.y) {
+        next[bar] = q;
+        changed = true;
+      }
+    }
+    return changed ? next : f;
+  };
   // ウィンドウを縮めても画面外に取り残さない
-  useWindowEvent("resize", () => setPos((p) => (p ? place(p) : p)));
-  // 保存した位置が今のウィンドウの外 (前回はもっと大きい画面だった等) でも、出したときに画面内へ戻す
-  const attach = useCallback((el: HTMLDivElement | null) => {
-    ref.current = el;
-    if (!el) return;
-    setPos((p) => {
-      if (!p) return p;
-      const next = clampDashPos(
-        p,
-        { w: el.offsetWidth, h: el.offsetHeight },
-        { w: window.innerWidth, h: window.innerHeight },
-      );
-      return next.x === p.x && next.y === p.y ? p : next;
-    });
-  }, []);
+  useWindowEvent("resize", () => setFloating(clampAll));
 
-  // ダイアログ (フォーム / 確認) を開いている間は隠す
-  if (dialogs.open) return null;
+  /** バーの要素を覚える (data-bar から id を引く)。同じ関数を使い回し、毎描画で付け外しされないようにする */
+  const barRef = useCallback((el: HTMLDivElement | null) => {
+    const bar = el?.dataset.bar as DashBar | undefined;
+    if (!el || !bar) return;
+    barRefs.current.set(bar, el);
+    // 保存した位置が今のウィンドウの外 (前回はもっと大きい画面だった等) でも、出したときに画面内へ戻す
+    setFloating(clampAll);
+    return () => {
+      if (barRefs.current.get(bar) === el) barRefs.current.delete(bar);
+    };
+  }, []);
 
   const bars: { id: DashBar; ids: DashButtonId[] }[] = [
     ...DASH_GROUPS.map((g) => ({ id: g, ids: buttons[g] })),
     ...(recent.length ? [{ id: "recent" as const, ids: recent }] : []),
   ].filter((bar) => !hidden.includes(bar.id));
 
-  return (
+  const barEl = (bar: { id: DashBar; ids: DashButtonId[] }) => (
     <div
-      ref={attach}
-      role="toolbar"
-      aria-label={d.ariaLabel}
-      className="fixed z-50 flex flex-col items-start gap-2"
-      style={pos ? { left: pos.x, top: pos.y } : { left: "50%", bottom: 40, translate: "-50% 0" }}
+      key={bar.id}
+      ref={barRef}
+      data-bar={bar.id}
+      className={floating[bar.id] ? `${BAR} ${FLOAT_SHADOW}` : BAR}
+      onContextMenu={(e) => editMenu(e, bar.id)}
     >
-      {bars.map((bar) => (
-        <div key={bar.id} className={BAR} onContextMenu={(e) => editMenu(e, bar.id)}>
+      <button
+        className={GROUP_ICON}
+        title={bar.id === "recent" ? d.bars.recent : d.barIconTitle(d.bars[bar.id])}
+        onClick={(e) => editMenu(e, bar.id)}
+      >
+        <Icon name={BAR_ICON[bar.id]} size={17} />
+      </button>
+      {bar.ids.map((id) => {
+        const a = DASH_BUTTONS[id];
+        const sp = spec(id);
+        // 「最近使った」は使った順に自動で並ぶので並べ替えない
+        const group = bar.id === "recent" ? null : bar.id;
+        const mark = group ? dropMark(group, id) : null;
+        return (
           <button
-            className={GROUP_ICON}
-            title={bar.id === "recent" ? d.bars.recent : d.barIconTitle(d.bars[bar.id])}
-            onClick={(e) => editMenu(e, bar.id)}
+            key={id}
+            data-dash-button
+            className={`${ACTION} ${reorder?.id === id && reorder.group === group ? "opacity-50" : ""}`}
+            aria-disabled={sp.disabled || undefined}
+            title={group ? d.dragToReorder(sp.title ?? "") : sp.title}
+            {...(group ? buttonDragProps(group, id) : {})}
+            onClick={() => {
+              if (reordered.current) {
+                reordered.current = false;
+                return;
+              }
+              if (!sp.disabled) invoke(id);
+            }}
           >
-            <Icon name={BAR_ICON[bar.id]} size={17} />
+            {mark ? (
+              <span
+                className={`pointer-events-none absolute top-0.5 bottom-0.5 w-0.5 rounded-full bg-on-bolt ${
+                  mark === "before" ? "-left-[3px]" : "-right-[3px]"
+                }`}
+              />
+            ) : null}
+            <Icon name={sp.icon ?? a.icon} size={15} />
+            <span>{sp.label ?? m.dashButtons[id]}</span>
+            {sp.badge ? <em className={BADGE}>{sp.badge}</em> : null}
           </button>
-          {bar.ids.map((id) => {
-            const a = DASH_BUTTONS[id];
-            const sp = spec(id);
-            // 「最近使った」は使った順に自動で並ぶので並べ替えない
-            const group = bar.id === "recent" ? null : bar.id;
-            const mark = group ? dropMark(group, id) : null;
-            return (
-              <button
-                key={id}
-                data-dash-button
-                className={`${ACTION} ${reorder?.id === id && reorder.group === group ? "opacity-50" : ""}`}
-                aria-disabled={sp.disabled || undefined}
-                title={group ? d.dragToReorder(sp.title ?? "") : sp.title}
-                {...(group ? buttonDragProps(group, id) : {})}
-                onClick={() => {
-                  if (reordered.current) {
-                    reordered.current = false;
-                    return;
-                  }
-                  if (!sp.disabled) invoke(id);
-                }}
-              >
-                {mark ? (
-                  <span
-                    className={`pointer-events-none absolute top-0.5 bottom-0.5 w-0.5 rounded-full bg-on-bolt ${
-                      mark === "before" ? "-left-[3px]" : "-right-[3px]"
-                    }`}
-                  />
-                ) : null}
-                <Icon name={sp.icon ?? a.icon} size={15} />
-                <span>{sp.label ?? m.dashButtons[id]}</span>
-                {sp.badge ? <em className={BADGE}>{sp.badge}</em> : null}
-              </button>
-            );
-          })}
-          {bar.ids.length === 0 ? (
-            <span className="px-1.5 text-[11.5px] text-on-bolt/60">{d.emptyBar}</span>
-          ) : null}
-          <div className={GRIP} title={d.dragToMove} {...gripHandlers}>
-            <GripDots />
-          </div>
-        </div>
-      ))}
+        );
+      })}
+      {bar.ids.length === 0 ? (
+        <span className="px-1.5 text-[11.5px] text-on-bolt/60">{d.emptyBar}</span>
+      ) : null}
+      <div
+        data-grip
+        className={GRIP}
+        title={d.dragToMove}
+        onPointerDown={(e) => onGripDown(e, bar.id)}
+      >
+        <GripDots />
+      </div>
     </div>
+  );
+
+  const dockedBars = bars.filter((bar) => !floating[bar.id]);
+  // ダイアログ (フォーム / 確認) やモーダルを開いている間は、浮かせたバーを隠す
+  const floatingBars = dialogs.open || floatingHidden ? [] : bars.filter((bar) => floating[bar.id]);
+
+  return (
+    <>
+      {dockEl && dockedBars.length
+        ? createPortal(
+            <div role="toolbar" aria-label={d.ariaLabel} className="flex items-center gap-2">
+              {dockedBars.map(barEl)}
+            </div>,
+            dockEl,
+          )
+        : null}
+      {floatingBars.length
+        ? createPortal(
+            <div role="toolbar" aria-label={d.floatingAriaLabel} className="contents">
+              {floatingBars.map((bar) => {
+                const p = floating[bar.id]!;
+                return (
+                  <div key={bar.id} className="fixed z-50" style={{ left: p.x, top: p.y }}>
+                    {barEl(bar)}
+                  </div>
+                );
+              })}
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
   );
 }

@@ -44,7 +44,12 @@ export const ja = {
   dragToReorder: (title: string) =>
     title ? `${title} (ドラッグで並べ替え)` : "ドラッグで並べ替え",
   emptyBar: "右クリックでボタンを追加",
-  dragToMove: "ドラッグで移動",
+  dragToMove: "ドラッグで移動 (列の外へ出すとこのバーを取り出し、列へ戻すとドッキング)",
+  dockHint: "ここへバーをドラッグするとドッキングできます",
+  dock: "このバーをツールバーに戻す",
+  undock: "このバーを取り出す",
+  dockAll: "すべてのバーをツールバーに戻す",
+  floatingAriaLabel: "取り出したダッシュバー",
 };
 
 export const en: typeof ja = {
@@ -89,5 +94,10 @@ export const en: typeof ja = {
   barIconTitle: (bar) => `${bar} (click to choose buttons)`,
   dragToReorder: (title) => (title ? `${title} (drag to reorder)` : "Drag to reorder"),
   emptyBar: "Right-click to add buttons",
-  dragToMove: "Drag to move",
+  dragToMove: "Drag to move (drag out of the toolbar to detach this bar, back to dock)",
+  dockHint: "Drag a bar here to dock it",
+  dock: "Dock This Bar to Toolbar",
+  undock: "Detach This Bar",
+  dockAll: "Dock All Bars to Toolbar",
+  floatingAriaLabel: "Detached dash bars",
 };
