@@ -6,6 +6,10 @@ import { miniPill } from "./classes";
 import { Icon, Spinner } from "./ui";
 import { useMenu } from "./ui-context";
 
+/** タイトルバー右側のアイコンボタン */
+const TITLE_BTN =
+  "mr-1 mb-0.5 flex h-6.5 w-6.5 flex-none cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-fg-dim not-disabled:hover:bg-bg-3 not-disabled:hover:text-fg disabled:cursor-default disabled:opacity-40";
+
 const shortPath = (p: string) => p.replace(/^\/Users\/[^/]+/, "~");
 
 /**
@@ -29,10 +33,17 @@ function tabLabels(tabs: string[]): Record<string, string> {
  * macOS のタイトルバー領域 (titleBarStyle: Overlay) に重ねて描くタブ。
  * 信号機ボタンのぶんだけ左を空け、余白は data-tauri-drag-region でドラッグ可能にする。
  */
-export function TitleBar() {
+export function TitleBar({
+  dashOpen,
+  onToggleDash,
+}: {
+  dashOpen: boolean;
+  onToggleDash: () => void;
+}) {
   const s = useStore();
   const openMenu = useMenu();
-  const m = useT().titleBar;
+  const t = useT();
+  const m = t.titleBar;
   const [picker, setPicker] = useState<{ x: number; y: number } | null>(null);
   // 新しいリポジトリを開いている間は、読み込みが終わる前から仮のタブを並べる
   const tabs = useMemo(
@@ -155,6 +166,21 @@ export function TitleBar() {
         </button>
       </div>
       <div className="min-w-6 flex-1 self-stretch" data-tauri-drag-region />
+      <button
+        className={`${TITLE_BTN} ${dashOpen ? "bg-bg-3" : ""}`}
+        title={t.toolbar.dashPanel(dashOpen)}
+        onClick={onToggleDash}
+      >
+        <Icon name="bolt" size={14} className={dashOpen ? "text-bolt" : undefined} />
+      </button>
+      <button
+        className={TITLE_BTN}
+        title={t.toolbar.reload}
+        disabled={!s.repo}
+        onClick={() => s.refresh({ withGh: true })}
+      >
+        {s.loading ? <Spinner size={14} /> : <Icon name="fetch" size={14} />}
+      </button>
       <button
         className="mr-1 mb-0.5 flex h-6.5 w-6.5 flex-none cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-fg-dim hover:bg-bg-3 hover:text-fg"
         title={m.logs}

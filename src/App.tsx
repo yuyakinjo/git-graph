@@ -288,8 +288,8 @@ export default function App() {
   return (
     <div className="flex h-full flex-col">
       {s.busy ? <ProgressBar /> : null}
-      <TitleBar />
-      <Toolbar dashOpen={dashOpen} onToggleDash={toggleDash} />
+      <TitleBar dashOpen={dashOpen} onToggleDash={toggleDash} />
+      <Toolbar />
       {s.repo ? (
         <div className="relative flex min-h-0 flex-1 bg-bg-0 px-1.5">
           <div className={PANE_BOX} style={{ width: sidebar.width, flex: "0 0 auto" }}>

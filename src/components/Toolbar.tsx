@@ -2,7 +2,6 @@ import { ZOOM_MAX, ZOOM_MIN, ZOOM_PRESETS, ZOOM_STEP, clampZoom, zoomLabel } fro
 import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
 import { useT } from "../i18n";
-import { iconBtn } from "./classes";
 import { Icon, Spinner } from "./ui";
 import { useDialogs, useMenu } from "./ui-context";
 
@@ -23,13 +22,7 @@ const TOOL_BADGE_ACCENT =
 /** ステータスバーの各項目 */
 const SB_ITEM = "inline-flex items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap";
 
-export function Toolbar({
-  dashOpen,
-  onToggleDash,
-}: {
-  dashOpen: boolean;
-  onToggleDash: () => void;
-}) {
+export function Toolbar() {
   const s = useStore();
   const act = useActions();
   const openMenu = useMenu();
@@ -171,21 +164,6 @@ export function Toolbar({
             <Spinner /> {s.busy}
           </span>
         ) : null}
-        <button
-          className={iconBtn({ active: dashOpen })}
-          title={m.dashPanel(dashOpen)}
-          onClick={onToggleDash}
-        >
-          <Icon name="bolt" size={15} className={dashOpen ? "text-bolt" : undefined} />
-        </button>
-        <button
-          className={iconBtn()}
-          title={m.reload}
-          disabled={!s.repo}
-          onClick={() => s.refresh({ withGh: true })}
-        >
-          {s.loading ? <Spinner size={15} /> : <Icon name="fetch" size={15} />}
-        </button>
       </div>
     </header>
   );
