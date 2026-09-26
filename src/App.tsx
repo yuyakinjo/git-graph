@@ -15,6 +15,7 @@ import { btn, iconBtn } from "./components/classes";
 import { CopyButton, Icon, ProgressBar, Spinner } from "./components/ui";
 import { useT } from "./i18n";
 import { api } from "./lib/api";
+import { loadDashDockEdge, saveDashDockEdge, type DashDockEdge } from "./lib/dashButtons";
 import { useWindowEvent } from "./lib/effects";
 import type { PullRequest } from "./lib/types";
 import { ZOOM_STEP, zoomKeyAction } from "./lib/zoom";
@@ -222,6 +223,12 @@ export default function App() {
   }, []);
   const [dockEl, setDockEl] = useState<HTMLDivElement | null>(null);
   const [dockHover, setDockHover] = useState(false);
+  const [dockEdge, setDockEdge] = useState(loadDashDockEdge);
+  const moveDock = (edge: DashDockEdge) => {
+    saveDashDockEdge(edge);
+    setDockEdge(edge);
+    setDockHover(false);
+  };
   /** モーダル (差分・PR・設定・ログ・tidy・recompose) を開いている間はダッシュパネルを隠す */
   const modalOpen =
     s.diffModal ||
@@ -288,10 +295,10 @@ export default function App() {
   });
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col overflow-clip">
       {s.busy ? <ProgressBar /> : null}
       <TitleBar dashOpen={dashOpen} onToggleDash={toggleDash} />
-      <DashDock slotRef={setDockEl} highlight={dockHover} />
+      <DashDock slotRef={setDockEl} highlight={dockHover} edge={dockEdge} />
       {s.repo ? (
         <div className="relative flex min-h-0 flex-1 bg-bg-0 px-1.5">
           <div className={PANE_BOX} style={{ width: sidebar.width, flex: "0 0 auto" }}>
@@ -332,6 +339,8 @@ export default function App() {
         <DashPanel
           onHide={toggleDash}
           dockEl={dockEl}
+          dockEdge={dockEdge}
+          onMoveDock={moveDock}
           onDockHover={setDockHover}
           floatingHidden={modalOpen}
         />

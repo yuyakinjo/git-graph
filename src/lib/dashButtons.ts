@@ -134,6 +134,12 @@ const DASH_KEY = "gitsquid.dashButtons";
 const RECENT_KEY = "gitsquid.dashRecent";
 const POS_KEY = "gitsquid.dashPos";
 const HIDDEN_KEY = "gitsquid.dashHiddenBars";
+const DOCK_EDGE_KEY = "gitsquid.dashDockEdge";
+
+export type DashDockEdge = "top" | "bottom";
+export const loadDashDockEdge = (): DashDockEdge =>
+  localStorage.getItem(DOCK_EDGE_KEY) === "bottom" ? "bottom" : "top";
+export const saveDashDockEdge = (edge: DashDockEdge) => localStorage.setItem(DOCK_EDGE_KEY, edge);
 
 const readJson = (key: string): unknown => {
   try {

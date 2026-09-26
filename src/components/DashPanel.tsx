@@ -28,6 +28,7 @@ import {
   type DashPos,
   type DashButtonId,
   type DashGroup,
+  type DashDockEdge,
 } from "../lib/dashButtons";
 import { recomposeMode } from "../lib/recompose";
 import { useActions } from "../state/actions";
@@ -45,18 +46,18 @@ const BAR_ICON: Record<DashBar, string> = {
   recent: "clock",
 };
 
-const BAR =
-  "flex h-10 flex-none items-center gap-1 rounded-full border border-bolt-line bg-bolt py-1 pr-1.5 pl-1 text-on-bolt";
+const BAR = "group/dash flex h-8 flex-none items-center gap-0.5 px-1 text-fg-dim";
 /** 浮かせているときだけ影を落とす */
-const FLOAT_SHADOW = "shadow-[0_12px_30px_rgba(0,0,0,0.45)]";
+const FLOAT_SHADOW = "rounded-lg border border-pop-line bg-pop shadow-[0_8px_24px_rgba(0,0,0,0.3)]";
 const GROUP_ICON =
-  "flex h-8 w-8 flex-none cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-on-bolt/70 hover:bg-on-bolt/10 hover:text-on-bolt";
+  "flex h-7 w-7 flex-none cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-fg-faint hover:bg-bg-hover hover:text-fg";
 /** 無効でもドラッグで並べ替えられるよう、disabled ではなく aria-disabled で表す */
 const ACTION =
-  "relative flex h-8 cursor-pointer touch-none items-center gap-1.5 rounded-full border border-on-bolt/10 bg-on-bolt/10 px-3 text-[12.5px] whitespace-nowrap text-on-bolt not-aria-disabled:hover:bg-on-bolt/20 aria-disabled:cursor-default aria-disabled:opacity-45";
-const BADGE = "rounded-lg bg-on-bolt px-[5px] py-px text-[10.5px] font-bold text-bolt not-italic";
+  "relative flex h-7 cursor-pointer touch-none items-center gap-1.5 rounded-md border-0 bg-transparent px-2 text-[12px] whitespace-nowrap text-fg-dim not-aria-disabled:hover:bg-bg-hover not-aria-disabled:hover:text-fg aria-disabled:cursor-default aria-disabled:opacity-45";
+const BADGE =
+  "rounded bg-accent-soft px-[5px] py-px text-[10.5px] font-semibold text-accent not-italic";
 const GRIP =
-  "flex h-8 w-5 flex-none cursor-grab touch-none items-center justify-center rounded-md text-on-bolt/50 hover:text-on-bolt/80 active:cursor-grabbing";
+  "flex h-7 w-4 flex-none cursor-grab touch-none items-center justify-center rounded border-0 bg-transparent text-fg-faint opacity-0 transition-opacity group-hover/dash:opacity-100 group-focus-within/dash:opacity-100 hover:text-fg active:cursor-grabbing active:opacity-100 [@media(hover:none)]:opacity-100";
 /** これ以上動かしたらクリックではなくドラッグとみなす (px) */
 const DRAG_THRESHOLD = 4;
 
@@ -78,19 +79,23 @@ function GripDots() {
  * バーを右クリック (または左端のアイコンをクリック) すると、出すボタンを最大 5 個まで選べる。
  * ボタンはドラッグで同じバーの中を並べ替えられ、バーごとに表示・非表示を切り替えられる。
  *
- * ふだんはタイトルバー下の列 (DashDock の slot = dockEl) にドッキングし、バーを横一列に並べる。
+ * タイトルバー下、またはステータスバー上の列 (DashDock の slot = dockEl) に横一列に並べる。
  * バーの ⋮⋮ をつかんで列の外へ出すと、そのバーだけを取り出して浮かせられる。
  * 浮かせたバーは 1 本ずつ好きな位置に置け、列の上で離すとまたドッキングする。
  */
 export function DashPanel({
   onHide,
   dockEl,
+  dockEdge,
+  onMoveDock,
   onDockHover,
   floatingHidden,
 }: {
   onHide: () => void;
   /** ドッキング先 (DashDock の slot)。まだ描かれていなければ null */
   dockEl: HTMLElement | null;
+  dockEdge: DashDockEdge;
+  onMoveDock: (edge: DashDockEdge) => void;
   /** 浮かせたバーをドラッグして列の上に来た / 離れたとき (列を光らせる) */
   onDockHover: (over: boolean) => void;
   /** モーダルを開いている間など。浮かせたバーだけを隠す */
@@ -340,6 +345,9 @@ export function DashPanel({
 
   const editMenu = (e: React.MouseEvent, bar: DashBar) => {
     e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const anchor =
+      e.type === "click" && e.detail === 0 ? { clientX: rect.left, clientY: rect.bottom } : e;
     const tail = [
       { separator: true },
       ...DASH_BARS.map((b) => ({
@@ -348,6 +356,12 @@ export function DashPanel({
         // 最後の 1 本は隠せない
         disabled: !hidden.includes(b) && hidden.length + 1 >= DASH_BARS.length,
         onClick: () => toggleBar(b),
+      })),
+      { separator: true },
+      ...(["top", "bottom"] as const).map((edge) => ({
+        label: d.dockEdge[edge],
+        icon: dockEdge === edge ? "check" : undefined,
+        onClick: () => onMoveDock(edge),
       })),
       { separator: true },
       floating[bar]
@@ -359,7 +373,7 @@ export function DashPanel({
       { label: d.hidePanel, icon: "x", onClick: onHide },
     ];
     if (bar === "recent") {
-      openMenu(e, [
+      openMenu(anchor, [
         {
           label: d.clearHistory,
           icon: "trash",
@@ -373,7 +387,7 @@ export function DashPanel({
       return;
     }
     const ids = buttons[bar];
-    openMenu(e, [
+    openMenu(anchor, [
       ...actionsOf(bar).map((id) => ({
         label: m.dashButtons[id],
         icon: ids.includes(id) ? "check" : undefined,
@@ -413,10 +427,12 @@ export function DashPanel({
     commitFloating(next);
   };
 
-  /** メニューから取り出すときは、今いる場所の少し下に浮かせる */
+  /** メニューから取り出すときは、ドックの内側に浮かせる */
   const undockBar = (bar: DashBar) => {
     const r = barRefs.current.get(bar)?.getBoundingClientRect();
-    const p = r ? { x: r.left, y: r.bottom + 24 } : { x: 40, y: 120 };
+    const p = r
+      ? { x: r.left, y: dockEdge === "bottom" ? r.top - r.height - 24 : r.bottom + 24 }
+      : { x: 40, y: 120 };
     commitFloating({ ...floating, [bar]: place(bar, p) });
   };
 
@@ -425,7 +441,7 @@ export function DashPanel({
 
   // ドッキング / 取り出しで portal 先が変わるとバーの要素が作り直され、pointer capture が外れる。
   // そのため move / up は window で受ける。バーの形はどちらでも同じなので、つかんだ点のずれはそのまま使える。
-  const onGripDown = (e: React.PointerEvent<HTMLDivElement>, bar: DashBar) => {
+  const onGripDown = (e: React.PointerEvent<HTMLButtonElement>, bar: DashBar) => {
     if (e.button !== 0) return;
     const rect = barRefs.current.get(bar)?.getBoundingClientRect();
     if (!rect) return;
@@ -587,7 +603,7 @@ export function DashPanel({
         title={bar.id === "recent" ? d.bars.recent : d.barIconTitle(d.bars[bar.id])}
         onClick={(e) => editMenu(e, bar.id)}
       >
-        <Icon name={BAR_ICON[bar.id]} size={17} />
+        <Icon name={BAR_ICON[bar.id]} size={15} />
       </button>
       {bar.ids.map((id) => {
         const a = DASH_BUTTONS[id];
@@ -613,7 +629,7 @@ export function DashPanel({
           >
             {mark ? (
               <span
-                className={`pointer-events-none absolute top-0.5 bottom-0.5 w-0.5 rounded-full bg-on-bolt ${
+                className={`pointer-events-none absolute top-0.5 bottom-0.5 w-0.5 rounded-full bg-accent ${
                   mark === "before" ? "-left-[3px]" : "-right-[3px]"
                 }`}
               />
@@ -625,16 +641,20 @@ export function DashPanel({
         );
       })}
       {bar.ids.length === 0 ? (
-        <span className="px-1.5 text-[11.5px] text-on-bolt/60">{d.emptyBar}</span>
+        <span className="px-1.5 text-[11.5px] text-fg-faint">{d.emptyBar}</span>
       ) : null}
-      <div
+      <button
         data-grip
         className={GRIP}
         title={d.dragToMove}
+        aria-label={d.barActions(d.bars[bar.id])}
         onPointerDown={(e) => onGripDown(e, bar.id)}
+        onClick={(e) => {
+          if (e.detail === 0) editMenu(e, bar.id);
+        }}
       >
         <GripDots />
-      </div>
+      </button>
     </div>
   );
 
@@ -646,7 +666,11 @@ export function DashPanel({
     <>
       {dockEl && dockedBars.length
         ? createPortal(
-            <div role="toolbar" aria-label={d.ariaLabel} className="flex items-center gap-2">
+            <div
+              role="toolbar"
+              aria-label={d.ariaLabel}
+              className="flex items-center divide-x divide-line"
+            >
               {dockedBars.map(barEl)}
             </div>,
             dockEl,

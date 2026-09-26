@@ -298,6 +298,55 @@ test.describe("サイドバー", () => {
 });
 
 test.describe("ダッシュパネル", () => {
+  test("下部への配置を保存し、下部でも取り出しと再ドッキングができる", async ({ app }) => {
+    const { page } = app;
+    await page.evaluate(() => localStorage.setItem("gitsquid.theme", "nord"));
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "nord");
+    const panel = page.getByRole("toolbar", { name: "ダッシュパネル", exact: true });
+    const floating = page.getByRole("toolbar", { name: "取り出したダッシュバー" });
+    const top = page.locator('[data-dash-dock="top"]');
+    const bottom = page.locator('[data-dash-dock="bottom"]');
+    await expect(top.getByRole("toolbar")).toBeVisible();
+    await page.screenshot({ path: "test-results/dash-panel-top-dark.png" });
+
+    // キーボードからも設定メニューを開ける。
+    await panel.getByRole("button", { name: "git バーの移動・設定" }).focus();
+    await page.keyboard.press("Enter");
+    await page.getByRole("button", { name: "ツールバーを下部に配置" }).click();
+    await expect(bottom.getByRole("toolbar")).toBeVisible();
+    await expect(top).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    const dockBox = await bottom.boundingBox();
+    const footerBox = await page.locator("footer").boundingBox();
+    if (!dockBox || !footerBox) throw new Error("ドックまたはステータスバーが見つかりません");
+    expect(Math.abs(dockBox.y + dockBox.height - footerBox.y)).toBeLessThan(1);
+    await page.screenshot({ path: "test-results/dash-panel-bottom.png" });
+    await expect.poll(() => page.locator("body").evaluate((el) => el.scrollTop)).toBe(0);
+
+    await page.reload();
+    await expect(bottom.getByRole("toolbar")).toBeVisible();
+    await panel.getByTitle("git (クリックでボタンを選ぶ)").click();
+    await page.getByRole("button", { name: "このバーを取り出す" }).click();
+    const barBox = await floating.locator("[data-bar=git]").boundingBox();
+    if (!barBox) throw new Error("取り出したバーが見つかりません");
+    expect(barBox.y + barBox.height).toBeLessThan(dockBox.y);
+
+    const grip = await floating.locator("[data-grip]").boundingBox();
+    if (!grip) throw new Error("つまみが見つかりません");
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(dockBox.x + 100, dockBox.y + dockBox.height / 2, { steps: 10 });
+    await page.mouse.up();
+    await expect(bottom.locator("[data-bar=git]")).toBeVisible();
+    await expect(floating).toHaveCount(0);
+
+    await panel.getByTitle("git (クリックでボタンを選ぶ)").click();
+    await page.getByRole("button", { name: "ツールバーを上部に配置" }).click();
+    await expect(top.getByRole("toolbar")).toBeVisible();
+    await expect(bottom).toHaveCount(0);
+  });
+
   test("ダッシュボタンを出し、ドッキング中はダイアログの間も列に残る", async ({ app }) => {
     const { page } = app;
     const panel = page.getByRole("toolbar", { name: "ダッシュパネル" });
@@ -349,7 +398,7 @@ test.describe("ダッシュパネル", () => {
     const prBtn = panel.getByRole("button", { name: "PR 作成", exact: true });
     await expect(prBtn).toBeVisible();
     await panel.getByTitle("git (クリックでボタンを選ぶ)").click();
-    await page.getByRole("button", { name: "GitHub バー" }).click();
+    await page.getByRole("button", { name: "GitHub バー", exact: true }).click();
     await expect(prBtn).toHaveCount(0);
     await page.screenshot({ path: "test-results/dash-panel-reorder.png" });
   });

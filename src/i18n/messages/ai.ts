@@ -2,7 +2,8 @@ export const ja = {
   emptyResponse: "Claude Code から空の応答が返りました。",
   missingBranch: "branch (ブランチ名) がありません",
   incompletePlan: (errors: string) => `AI のプランが不完全です:\n${errors}`,
-  invalidThemeAssignment: "AI がパレットの色をうまく割り当てられませんでした。もう一度試してください。",
+  invalidThemeAssignment:
+    "AI がパレットの色をうまく割り当てられませんでした。もう一度試してください。",
 };
 
 export const en: typeof ja = {

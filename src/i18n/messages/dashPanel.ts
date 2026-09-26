@@ -41,6 +41,8 @@ export const ja = {
   clearHistory: "履歴を消去",
   resetToDefault: "既定に戻す",
   barIconTitle: (bar: string) => `${bar} (クリックでボタンを選ぶ)`,
+  barActions: (bar: string) => `${bar} バーの移動・設定`,
+  dockEdge: { top: "ツールバーを上部に配置", bottom: "ツールバーを下部に配置" },
   dragToReorder: (title: string) =>
     title ? `${title} (ドラッグで並べ替え)` : "ドラッグで並べ替え",
   emptyBar: "右クリックでボタンを追加",
@@ -92,6 +94,8 @@ export const en: typeof ja = {
   clearHistory: "Clear History",
   resetToDefault: "Reset to Default",
   barIconTitle: (bar) => `${bar} (click to choose buttons)`,
+  barActions: (bar) => `Move or configure ${bar} bar`,
+  dockEdge: { top: "Place Toolbar at Top", bottom: "Place Toolbar at Bottom" },
   dragToReorder: (title) => (title ? `${title} (drag to reorder)` : "Drag to reorder"),
   emptyBar: "Right-click to add buttons",
   dragToMove: "Drag to move (drag out of the toolbar to detach this bar, back to dock)",

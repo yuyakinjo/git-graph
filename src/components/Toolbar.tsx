@@ -1,4 +1,5 @@
 import { ZOOM_MAX, ZOOM_MIN, ZOOM_PRESETS, ZOOM_STEP, clampZoom, zoomLabel } from "../lib/zoom";
+import type { DashDockEdge } from "../lib/dashButtons";
 import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
 import { useT } from "../i18n";
@@ -9,23 +10,29 @@ import { useDialogs, useMenu } from "./ui-context";
 const SB_ITEM = "inline-flex items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap";
 
 /**
- * タイトルバーの下の列。ダッシュパネルをここにドッキングする (DashPanel が slot へ portal で入る)。
+ * タイトルバー下、またはステータスバー上の列。DashPanel が slot へ portal で入る。
+ * order で移動し、ドックとその中のボタンを作り直さない。
  * 取り出している間は空の列に戻し先のヒントを出し、右端には実行中の操作を出す。
  */
 export function DashDock({
   slotRef,
   highlight,
+  edge,
 }: {
   slotRef: (el: HTMLDivElement | null) => void;
   highlight: boolean;
+  edge: DashDockEdge;
 }) {
   const s = useStore();
   const d = useT().dashPanel;
   return (
-    <header className="flex h-11.5 flex-none items-center gap-2.5 bg-bg-0 px-2.5">
+    <div
+      data-dash-dock={edge}
+      className={`flex h-10 flex-none items-center gap-2.5 border-line-soft bg-bg-0 px-2.5 ${edge === "bottom" ? "order-1 border-t" : "border-b"}`}
+    >
       <div
         className={`relative flex h-full min-w-0 flex-1 items-center rounded-lg transition-colors ${
-          highlight ? "bg-bolt/10 ring-1 ring-bolt/60 ring-inset" : ""
+          highlight ? "bg-accent-soft ring-1 ring-accent/60 ring-inset" : ""
         }`}
       >
         <div
@@ -41,7 +48,7 @@ export function DashDock({
           <Spinner /> {s.busy}
         </span>
       ) : null}
-    </header>
+    </div>
   );
 }
 
@@ -110,7 +117,7 @@ export function StatusBar() {
   const m = useT().toolbar;
   const ghUrl = s.gh?.url ?? null;
   return (
-    <footer className="flex h-6 flex-none items-center gap-3.5 bg-bg-0 px-3 text-[11px] text-fg-dim">
+    <footer className="order-2 flex h-6 flex-none items-center gap-3.5 bg-bg-0 px-3 text-[11px] text-fg-dim">
       {s.gh?.repo ? (
         <button
           className={`${SB_ITEM} h-5 cursor-pointer rounded border-0 bg-transparent px-1.5 text-[11px] text-fg-dim hover:bg-bg-3 hover:text-fg disabled:cursor-default`}
