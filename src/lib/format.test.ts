@@ -45,15 +45,15 @@ describe("relativeTime", () => {
     expect(relativeTime(sec - 86400 * 30)).toBe("2026/08/24");
   });
 
-  test("英語では単数/複数を分ける", () => {
+  test("英語では単位を 1 文字に縮める", () => {
     setLocale("en");
     expect(relativeTime(sec - 30)).toBe("just now");
-    expect(relativeTime(sec - 60)).toBe("1 minute ago");
-    expect(relativeTime(sec - 300)).toBe("5 minutes ago");
-    expect(relativeTime(sec - 3600)).toBe("1 hour ago");
-    expect(relativeTime(sec - 7200)).toBe("2 hours ago");
-    expect(relativeTime(sec - 86400)).toBe("1 day ago");
-    expect(relativeTime(sec - 86400 * 29)).toBe("29 days ago");
+    expect(relativeTime(sec - 60)).toBe("1m ago");
+    expect(relativeTime(sec - 300)).toBe("5m ago");
+    expect(relativeTime(sec - 3600)).toBe("1h ago");
+    expect(relativeTime(sec - 7200)).toBe("2h ago");
+    expect(relativeTime(sec - 86400)).toBe("1d ago");
+    expect(relativeTime(sec - 86400 * 29)).toBe("29d ago");
     expect(relativeTime(sec - 86400 * 30)).toBe("2026/08/24");
   });
 });

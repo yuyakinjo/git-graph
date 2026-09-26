@@ -15,13 +15,11 @@ export const ja = {
   } as Record<string, string>,
 };
 
-const ago = (n: number, unit: string) => `${n} ${unit}${n === 1 ? "" : "s"} ago`;
-
 export const en: typeof ja = {
   justNow: "just now",
-  minutesAgo: (n) => ago(n, "minute"),
-  hoursAgo: (n) => ago(n, "hour"),
-  daysAgo: (n) => ago(n, "day"),
+  minutesAgo: (n) => `${n}m ago`,
+  hoursAgo: (n) => `${n}h ago`,
+  daysAgo: (n) => `${n}d ago`,
   status: {
     A: "Added",
     M: "Modified",
