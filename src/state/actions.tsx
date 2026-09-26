@@ -272,12 +272,13 @@ export function useActions() {
 
     const commit = async (message: string, amend: boolean) => {
       const staged = s.status?.staged.length ?? 0;
-      if (staged === 0 && !amend) {
-        await api.stageAll(dir).catch(() => undefined);
-      }
+      // ステージも run の中で行い、押した直後から busy を出す
       return s.run(
         amend ? msg().run.amend : msg().run.commit,
-        () => api.commit(dir, message, amend),
+        async () => {
+          if (staged === 0 && !amend) await api.stageAll(dir).catch(() => undefined);
+          return api.commit(dir, message, amend);
+        },
         {
           successDetail: false,
         },
@@ -821,32 +822,30 @@ export function useActions() {
       });
       if (!res) return;
 
-      s.toast({ kind: "info", title: msg().pr.creating });
-      try {
-        const out = await api.prCreate(dir, {
-          title: String(res.title),
-          body: String(res.body ?? ""),
-          base: String(res.base ?? ""),
-          head: head.name,
-          draft: Boolean(res.draft),
-          web: false,
-        });
-        const url = out.match(/https?:\/\/\S+/)?.[0];
-        s.toast({
-          kind: "success",
-          title: msg().pr.created,
-          detail: url ?? out,
-        });
-        await s.refresh({ silent: true });
-        await s.refreshPrs();
-        if (url) await openUrl(url).catch(() => undefined);
-      } catch (e) {
-        s.toast({
-          kind: "error",
-          title: msg().pr.createFailed,
-          detail: String(e),
-        });
-      }
+      // run を通して busy (ツールバーのスピナー) を出す。成功時は URL 付きのトーストを自前で出す
+      let out = "";
+      const ok = await s.run(
+        msg().run.prCreate,
+        async () =>
+          (out = await api.prCreate(dir, {
+            title: String(res.title),
+            body: String(res.body ?? ""),
+            base: String(res.base ?? ""),
+            head: head.name,
+            draft: Boolean(res.draft),
+            web: false,
+          })),
+        { silentSuccess: true },
+      );
+      if (!ok) return;
+      const url = out.match(/https?:\/\/\S+/)?.[0];
+      s.toast({
+        kind: "success",
+        title: msg().pr.created,
+        detail: url ?? out,
+      });
+      await s.refreshPrs();
+      if (url) await openUrl(url).catch(() => undefined);
     };
 
     const prCheckout = (pr: PullRequest) =>

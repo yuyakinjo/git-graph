@@ -14,65 +14,69 @@ use crate::repo;
 use crate::sh;
 use crate::tidy;
 
+// コマンドはすべて `#[tauri::command(async)]` にする。
+// 同期コマンドはメインスレッドで動くため、git / gh の実行中は画面の再描画まで止まり、
+// フロントで立てたローディング表示が処理の終わるまで出なくなる。
+
 /// 表示言語 ("ja" / "en") を切り替える。以降のメッセージがその言語になる。
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_locale(locale: String) {
     crate::i18n::set_locale(&locale);
 }
 
 // ------------------------------------------------------------------ 読み取り
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn repo_open(path: String) -> Result<repo::RepoInfo, String> {
     repo::info(&path)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn graph_load(dir: String, limit: usize) -> Result<graph::GraphData, String> {
     graph::load(&dir, limit)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn status_load(dir: String) -> Result<repo::StatusData, String> {
     repo::status(&dir)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn branches_load(dir: String) -> Result<Vec<repo::BranchInfo>, String> {
     repo::branches(&dir)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn tags_load(dir: String) -> Result<Vec<repo::TagInfo>, String> {
     repo::tags(&dir)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn stash_load(dir: String) -> Result<Vec<repo::StashInfo>, String> {
     repo::stash_list(&dir)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn worktree_load(dir: String) -> Result<Vec<repo::WorktreeInfo>, String> {
     repo::worktree_list(&dir)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn commit_detail(dir: String, sha: String) -> Result<repo::CommitDetail, String> {
     repo::commit_detail(&dir, &sha)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn wip_files(dir: String, staged: bool) -> Result<Vec<repo::DiffFile>, String> {
     repo::wip_files(&dir, staged)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn stash_files(dir: String, refname: String) -> Result<Vec<repo::DiffFile>, String> {
     repo::stash_files(&dir, &refname)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn diff_text(
     dir: String,
     kind: String,
@@ -85,7 +89,7 @@ pub fn diff_text(
 
 // ------------------------------------------------------------------ add / commit
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_stage(dir: String, paths: Vec<String>) -> Result<String, String> {
     if paths.is_empty() {
         return Ok(String::new());
@@ -95,12 +99,12 @@ pub fn git_stage(dir: String, paths: Vec<String>) -> Result<String, String> {
     sh::git_log(&dir, &args)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_stage_all(dir: String) -> Result<String, String> {
     sh::git_log(&dir, &["add", "-A"])
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_unstage(dir: String, paths: Vec<String>) -> Result<String, String> {
     if paths.is_empty() {
         return Ok(String::new());
@@ -110,12 +114,12 @@ pub fn git_unstage(dir: String, paths: Vec<String>) -> Result<String, String> {
     sh::git_log(&dir, &args)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_unstage_all(dir: String) -> Result<String, String> {
     sh::git_log(&dir, &["reset", "--mixed"])
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_discard(dir: String, paths: Vec<String>) -> Result<String, String> {
     let mut log = String::new();
     for p in paths {
@@ -143,7 +147,7 @@ pub fn git_discard(dir: String, paths: Vec<String>) -> Result<String, String> {
     Ok(log)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_commit(dir: String, message: String, amend: bool) -> Result<String, String> {
     let mut args: Vec<String> = vec!["commit".into()];
     if amend {
@@ -163,7 +167,7 @@ pub fn git_commit(dir: String, message: String, amend: bool) -> Result<String, S
 
 // ------------------------------------------------------------------ 同期
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_fetch(dir: String, prune: bool) -> Result<String, String> {
     let mut args: Vec<String> = vec!["fetch".into(), "--all".into(), "--tags".into()];
     if prune {
@@ -172,7 +176,7 @@ pub fn git_fetch(dir: String, prune: bool) -> Result<String, String> {
     sh::git_log(&dir, &args)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_pull(dir: String, rebase: bool, autostash: bool) -> Result<String, String> {
     let mut args: Vec<String> = vec!["pull".into()];
     args.push(if rebase {
@@ -189,7 +193,7 @@ pub fn git_pull(dir: String, rebase: bool, autostash: bool) -> Result<String, St
 /// checkout せずにローカルブランチを upstream へ早送りする。
 /// `git fetch <remote> <merge-ref>:<branch>` は fast-forward できるときだけ成功するので、
 /// 分岐しているブランチを黙って壊す心配がない。
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_fast_forward(dir: String, branch: String) -> Result<String, String> {
     let missing = || {
         Msg::NoUpstream {
@@ -214,7 +218,7 @@ pub fn git_fast_forward(dir: String, branch: String) -> Result<String, String> {
     sh::git_log(&dir, &["fetch", remote, &format!("{merge}:{branch}")])
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_push(
     dir: String,
     remote: Option<String>,
@@ -241,13 +245,13 @@ pub fn git_push(
 
 // ------------------------------------------------------------------ branch / checkout
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_checkout(dir: String, target: String) -> Result<String, String> {
     sh::git_log(&dir, &["checkout", &target])
 }
 
 /// リモートブランチから追跡ブランチを作って checkout する
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_checkout_remote(dir: String, remote_branch: String) -> Result<String, String> {
     let local = remote_branch
         .split_once('/')
@@ -270,7 +274,7 @@ pub fn git_checkout_remote(dir: String, remote_branch: String) -> Result<String,
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_create_branch(
     dir: String,
     name: String,
@@ -293,13 +297,13 @@ pub fn git_create_branch(
     sh::git_log(&dir, &args)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_delete_branch(dir: String, name: String, force: bool) -> Result<String, String> {
     let flag = if force { "-D" } else { "-d" };
     sh::git_log(&dir, &["branch", flag, &name])
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_delete_remote_branch(dir: String, remote_branch: String) -> Result<String, String> {
     let (remote, branch) = remote_branch
         .split_once('/')
@@ -307,12 +311,12 @@ pub fn git_delete_remote_branch(dir: String, remote_branch: String) -> Result<St
     sh::git_log(&dir, &["push", remote, "--delete", branch])
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_delete_tag(dir: String, name: String) -> Result<String, String> {
     sh::git_log(&dir, &["tag", "-d", &name])
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_delete_remote_tag(dir: String, remote: String, name: String) -> Result<String, String> {
     let refname = format!("refs/tags/{name}");
     sh::git_log(&dir, &["push", &remote, "--delete", &refname])
@@ -320,7 +324,7 @@ pub fn git_delete_remote_tag(dir: String, remote: String, name: String) -> Resul
 
 // ------------------------------------------------------------------ stash
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_stash_push(
     dir: String,
     message: Option<String>,
@@ -343,20 +347,20 @@ pub fn git_stash_push(
     sh::git_log(&dir, &args)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_stash_apply(dir: String, refname: String, pop: bool) -> Result<String, String> {
     let sub = if pop { "pop" } else { "apply" };
     sh::git_log(&dir, &["stash", sub, &refname])
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_stash_drop(dir: String, refname: String) -> Result<String, String> {
     sh::git_log(&dir, &["stash", "drop", &refname])
 }
 
 /// git には stash の名前を変えるコマンドが無いので、対象までの stash をいったん外し、
 /// 対象だけ新しいメッセージにして積み直す。stash@{n} の並びはそのまま保たれる。
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_stash_rename(dir: String, refname: String, message: String) -> Result<String, String> {
     let message = message.trim();
     if message.is_empty() {
@@ -416,7 +420,7 @@ pub struct StashContext {
 }
 
 /// stash の名前を AI に考えさせるために、中身の差分を集める
-#[tauri::command]
+#[tauri::command(async)]
 pub fn stash_context(dir: String, refname: String) -> Result<StashContext, String> {
     let mut diff = sh::git(
         &dir,
@@ -437,7 +441,7 @@ pub fn stash_context(dir: String, refname: String) -> Result<StashContext, Strin
 
 // ------------------------------------------------------------------ worktree
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_worktree_add(
     dir: String,
     path: String,
@@ -462,7 +466,7 @@ pub fn git_worktree_add(
     sh::git_log(&dir, &args)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_worktree_remove(dir: String, path: String, force: bool) -> Result<String, String> {
     let mut args: Vec<String> = vec!["worktree".into(), "remove".into()];
     if force {
@@ -472,7 +476,7 @@ pub fn git_worktree_remove(dir: String, path: String, force: bool) -> Result<Str
     sh::git_log(&dir, &args)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn git_worktree_prune(dir: String) -> Result<String, String> {
     sh::git_log(&dir, &["worktree", "prune", "-v"])
 }
@@ -514,17 +518,17 @@ pub fn recompose_apply(dir: String, op: recompose::RecomposeOp) -> Result<String
 
 // ------------------------------------------------------------------ GitHub (gh CLI)
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn gh_status(dir: String) -> Result<github::GhStatus, String> {
     Ok(github::status(&dir))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn gh_owners(dir: String) -> Result<Vec<String>, String> {
     Ok(github::owners(&dir))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn gh_repo_create(
     dir: String,
     name: String,
@@ -536,22 +540,22 @@ pub fn gh_repo_create(
     github::repo_create(&dir, &name, &visibility, &description, &remote, push)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn gh_pr_list(dir: String, state: String, limit: Option<u32>) -> Result<Value, String> {
     github::pr_list(&dir, &state, limit.unwrap_or(30))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn gh_pr_for_branch(dir: String, branch: String) -> Result<Value, String> {
     github::pr_for_branch(&dir, &branch)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn gh_pr_view(dir: String, number: u32) -> Result<Value, String> {
     github::pr_view(&dir, number)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn gh_pr_create(
     dir: String,
     title: String,
@@ -564,12 +568,12 @@ pub fn gh_pr_create(
     github::pr_create(&dir, &title, &body, &base, &head, draft, web)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn gh_pr_checkout(dir: String, number: u32) -> Result<String, String> {
     github::pr_checkout(&dir, number)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn gh_pr_merge(
     dir: String,
     number: u32,
@@ -579,7 +583,7 @@ pub fn gh_pr_merge(
     github::pr_merge(&dir, number, &method, delete_branch)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn gh_pr_template(dir: String) -> Result<Option<String>, String> {
     Ok(github::pr_template(&dir))
 }
@@ -595,7 +599,7 @@ fn avatar_cache_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 
 /// コミット作者のメール → GitHub アバター URL。解決できないものは null。
 /// 結果はディスクにキャッシュされるので、同じ作者で gh を何度も叩かない。
-#[tauri::command]
+#[tauri::command(async)]
 pub fn gh_avatars(
     app: tauri::AppHandle,
     dir: String,
@@ -604,7 +608,7 @@ pub fn gh_avatars(
     avatar::resolve(&dir, &avatar_cache_path(&app)?, queries)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn gh_avatars_clear(app: tauri::AppHandle) -> Result<(), String> {
     avatar::clear(&avatar_cache_path(&app)?)
 }
@@ -612,18 +616,18 @@ pub fn gh_avatars_clear(app: tauri::AppHandle) -> Result<(), String> {
 // ------------------------------------------------------------------ misc
 
 /// 設定で登録したプロジェクト置き場から git リポジトリを探す。
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scan_repos(roots: Vec<String>, depth: usize) -> Vec<repo::ProjectEntry> {
     repo::scan(&roots, depth)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn home_dir() -> String {
     std::env::var("HOME").unwrap_or_else(|_| "/".to_string())
 }
 
 /// コミットメッセージのテンプレ用: 直近のコミットメッセージ
-#[tauri::command]
+#[tauri::command(async)]
 pub fn last_commit_message(dir: String) -> Result<String, String> {
     Ok(sh::git(&dir, &["log", "-1", "--format=%B"])
         .unwrap_or_default()
@@ -651,7 +655,7 @@ pub struct CommitContext {
 
 /// コミットメッセージ生成用に、次のコミットに入る差分を集める。
 /// git_commit と同じく、ステージ済みが無ければ全部ステージされる前提で差分を取る。
-#[tauri::command]
+#[tauri::command(async)]
 pub fn commit_context(dir: String, amend: bool) -> Result<CommitContext, String> {
     let has_head = sh::git(&dir, &["rev-parse", "--verify", "-q", "HEAD"]).is_ok();
     let has_staged = !sh::exec(&dir, "git", &["diff", "--cached", "--quiet"])?.ok();
@@ -745,7 +749,7 @@ pub struct PrContext {
 
 /// PR の説明文生成用に、base から head までの変更を集める。
 /// base はリモート追跡ブランチ (origin/main など) があればそちらを優先する。
-#[tauri::command]
+#[tauri::command(async)]
 pub fn pr_context(
     dir: String,
     remote: String,
@@ -842,7 +846,7 @@ pub fn claude_generate(
 }
 
 /// 起動時に開くリポジトリ: コマンドライン引数 → GIT_SQUID_REPO → カレントディレクトリ
-#[tauri::command]
+#[tauri::command(async)]
 pub fn initial_repo() -> Option<String> {
     let arg = std::env::args()
         .skip(1)
@@ -864,12 +868,12 @@ pub fn initial_repo() -> Option<String> {
 // ------------------------------------------------------------------ デバッグ用ログ
 
 /// 実行した外部コマンドの履歴 (古い順)
-#[tauri::command]
+#[tauri::command(async)]
 pub fn app_logs() -> Vec<applog::CmdLog> {
     applog::snapshot()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn app_logs_clear() {
     applog::clear()
 }
