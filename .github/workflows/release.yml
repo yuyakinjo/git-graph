@@ -91,15 +91,16 @@ jobs:
             desc "Simple Git GUI with a GitKraken-style commit graph"
             homepage "https://github.com/yuyakinjo/git-squid"
 
-            depends_on macos: :big_sur
             depends_on arch: :arm64
+            depends_on :macos
 
             app "GitSquid.app"
 
-            postflight do
-              system_command "/usr/bin/xattr",
-                             args:         ["-dr", "com.apple.quarantine", "#{appdir}/GitSquid.app"],
-                             print_stderr: false
+            postflight_steps do
+              run "/usr/bin/xattr",
+                  args:         ["-dr", "com.apple.quarantine", "{{appdir}}/GitSquid.app"],
+                  must_succeed: false,
+                  print_stderr: false
             end
 
             zap trash: [
