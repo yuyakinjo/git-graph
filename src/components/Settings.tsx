@@ -1,5 +1,6 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
+import { isLocalePref, LOCALE_PREFS, useT } from "../i18n";
 import { CLAUDE_CODE_MODELS, isClaudeCodeModel } from "../lib/ai";
 import { DIFF_THEMES, isDiffTheme } from "../lib/highlight";
 import { AUTOFETCH_MINUTES, useStore } from "../state/store";
@@ -28,6 +29,7 @@ type Category = (typeof CATEGORIES)[number]["id"];
  */
 export function Settings() {
   const s = useStore();
+  const m = useT();
   const [category, setCategory] = useState<Category>("general");
 
   const addRoot = async () => {
@@ -63,6 +65,30 @@ export function Settings() {
       <div role="tabpanel">
         {category === "general" ? (
           <>
+            <section>
+              <h3 className={SECTION_H3}>{m.settings.language}</h3>
+              <div className={field}>
+                <label className={fieldLabel} htmlFor="locale">
+                  {m.settings.languageLabel}
+                </label>
+                <select
+                  className={`${fieldInput} font-sans text-[12.5px]`}
+                  id="locale"
+                  value={s.localePref}
+                  onChange={(e) => {
+                    if (isLocalePref(e.target.value)) s.setLocalePref(e.target.value);
+                  }}
+                >
+                  {LOCALE_PREFS.map((p) => (
+                    <option key={p} value={p}>
+                      {m.settings.localePref[p]}
+                    </option>
+                  ))}
+                </select>
+                <em className={hint}>{m.settings.languageHint}</em>
+              </div>
+            </section>
+
             <section>
               <h3 className={SECTION_H3}>自動フェッチ</h3>
               <div className={field}>

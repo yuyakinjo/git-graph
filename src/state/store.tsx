@@ -19,6 +19,7 @@ import {
 } from "../lib/repo-data";
 import { snapshotHash, type CachedRepo } from "../lib/snapshot-cache";
 import { applyZoom, clampZoom, loadZoom, saveZoom } from "../lib/zoom";
+import { loadLocalePref, resolveLocale, saveLocalePref, setLocale, type LocalePref } from "../i18n";
 import type {
   BranchInfo,
   CmdLog,
@@ -291,6 +292,9 @@ export function useStoreValue(boot: BootData | null) {
     const saved = localStorage.getItem(AI_CLI_MODEL_KEY);
     return isClaudeCodeModel(saved) ? saved : DEFAULT_CLAUDE_CODE_MODEL;
   });
+
+  /** 表示言語の設定値 (system は OS に合わせる)。実際の切り替えは i18n の setLocale。 */
+  const [localePref, setLocalePrefState] = useState<LocalePref>(loadLocalePref);
 
   const toastSeq = useRef(0);
   const detailSeq = useRef(0);
@@ -865,6 +869,12 @@ export function useStoreValue(boot: BootData | null) {
     localStorage.setItem(AI_CLI_MODEL_KEY, model);
   }, []);
 
+  const setLocalePref = useCallback((pref: LocalePref) => {
+    setLocalePrefState(pref);
+    saveLocalePref(pref);
+    setLocale(resolveLocale(pref));
+  }, []);
+
   const openSettings = useCallback(() => setSettingsOpen(true), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
   /** Rust 側のコマンド履歴を取り直す (ログ画面を開いている間は定期的に呼ぶ) */
@@ -943,6 +953,8 @@ export function useStoreValue(boot: BootData | null) {
     setDiffTheme,
     aiCliModel,
     setAiCliModel,
+    localePref,
+    setLocalePref,
     zoom,
     setZoom,
     projectRoots,
