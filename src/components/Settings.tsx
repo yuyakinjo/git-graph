@@ -3,9 +3,18 @@ import { useState } from "react";
 import { isLocalePref, LOCALE_PREFS, useT } from "../i18n";
 import { CLAUDE_CODE_MODELS, isClaudeCodeModel } from "../lib/ai";
 import { DIFF_THEMES, isDiffTheme } from "../lib/highlight";
-import { isThemePref, THEME_SCHEMES, THEMES } from "../lib/theme";
+import {
+  currentKeys,
+  isCustomThemeId,
+  isThemePref,
+  newCustomThemeId,
+  THEME_SCHEMES,
+  THEMES,
+  type CustomTheme,
+} from "../lib/theme";
 import { AUTOFETCH_MINUTES, useStore } from "../state/store";
 import { btn, dialogDesc, field, fieldInput, fieldLabel, hint, iconBtn } from "./classes";
+import { ThemeEditor } from "./ThemeEditor";
 import { Icon, Modal, Spinner } from "./ui";
 
 const SECTION_H3 = "mx-0 mt-0 mb-1.5 text-[13px]";
@@ -29,6 +38,11 @@ export function Settings() {
   const s = useStore();
   const m = useT();
   const [category, setCategory] = useState<Category>("general");
+  /** 編集中のカスタムテーマ。isNew は「新しいテーマ」から作り始めたもの */
+  const [editing, setEditing] = useState<{ theme: CustomTheme; isNew: boolean } | null>(null);
+  const selectedCustom = isCustomThemeId(s.themePref)
+    ? s.customThemes.find((t) => t.id === s.themePref)
+    : undefined;
 
   const addRoot = async () => {
     const picked = await openDialog({ directory: true, multiple: true });
@@ -53,7 +67,12 @@ export function Settings() {
                 ? "border-accent font-[650] text-fg"
                 : "border-transparent text-fg-dim hover:text-fg"
             }`}
-            onClick={() => setCategory(c)}
+            onClick={() => {
+              // タブを離れると編集欄が消えるので、試しに当てていた配色も戻す
+              if (editing) void s.previewTheme(null);
+              setEditing(null);
+              setCategory(c);
+            }}
           >
             {m.settings.categories[c]}
           </button>
@@ -188,6 +207,7 @@ export function Settings() {
                   className={`${fieldInput} font-sans text-[12.5px]`}
                   id="theme"
                   value={s.themePref}
+                  disabled={!!editing}
                   onChange={(e) => {
                     if (isThemePref(e.target.value)) void s.setThemePref(e.target.value);
                   }}
@@ -202,9 +222,52 @@ export function Settings() {
                       ))}
                     </optgroup>
                   ))}
+                  {s.customThemes.length ? (
+                    <optgroup label={m.settings.themeGroupCustom}>
+                      {s.customThemes.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null}
                 </select>
                 <em className={hint}>{m.settings.themeHint}</em>
               </div>
+              {editing ? (
+                <ThemeEditor
+                  key={editing.theme.id}
+                  initial={editing.theme}
+                  isNew={editing.isNew}
+                  onClose={() => setEditing(null)}
+                />
+              ) : (
+                <div className="mt-2 mb-3.5">
+                  <button
+                    className={btn("ghost")}
+                    onClick={() =>
+                      setEditing({
+                        theme: {
+                          id: newCustomThemeId(),
+                          name: m.settings.customThemeDefaultName,
+                          keys: currentKeys(),
+                        },
+                        isNew: true,
+                      })
+                    }
+                  >
+                    <Icon name="plus" size={14} /> {m.settings.newTheme}
+                  </button>
+                  {selectedCustom ? (
+                    <button
+                      className={btn("ghost")}
+                      onClick={() => setEditing({ theme: selectedCustom, isNew: false })}
+                    >
+                      <Icon name="pencil" size={14} /> {m.settings.editTheme}
+                    </button>
+                  ) : null}
+                </div>
+              )}
             </section>
 
             <section>

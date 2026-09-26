@@ -20,10 +20,15 @@ import {
 import { snapshotHash, type CachedRepo } from "../lib/snapshot-cache";
 import {
   applyTheme,
+  loadCustomThemes,
   loadThemePref,
   resolveTheme,
+  saveCustomThemes,
   saveThemePref,
   SYSTEM_LIGHT_QUERY,
+  type CustomTheme,
+  type CustomThemeId,
+  type ResolvedTheme,
   type ThemePref,
 } from "../lib/theme";
 import { applyZoom, clampZoom, loadZoom, saveZoom } from "../lib/zoom";
@@ -312,6 +317,8 @@ export function useStoreValue(boot: BootData | null) {
   const [localePref, setLocalePrefState] = useState<LocalePref>(loadLocalePref);
   /** 配色テーマの設定値 (system は OS の外観に合わせる)。実際の反映は theme.ts の applyTheme。 */
   const [themePref, setThemePrefState] = useState<ThemePref>(loadThemePref);
+  /** 利用者が作ったテーマ (名前とキーカラー 7 色) */
+  const [customThemes, setCustomThemesState] = useState<CustomTheme[]>(loadCustomThemes);
 
   const toastSeq = useRef(0);
   const detailSeq = useRef(0);
@@ -873,22 +880,84 @@ export function useStoreValue(boot: BootData | null) {
     [repaintDiff],
   );
 
-  const setThemePref = useCallback(
-    (pref: ThemePref) => {
-      setThemePrefState(pref);
-      saveThemePref(pref);
-      applyTheme(resolveTheme(pref));
-      // 差分ハイライトはテーマのダーク系 / ライト系で配色が変わる
+  /** テーマを当て、差分ハイライトも塗り直す (テーマのダーク系 / ライト系で配色が変わるため) */
+  const paintTheme = useCallback(
+    (theme: ResolvedTheme) => {
+      applyTheme(theme);
       return repaintDiff();
     },
     [repaintDiff],
   );
 
+  // 設定画面から続けて呼ばれる (保存してすぐ選ぶ、編集をやめて元に戻す) ので、
+  // 再描画を待たずに最新の値を読めるよう ref にも持つ
+  const themeRef = useRef({ pref: themePref, customs: customThemes });
+  /** 編集中のカスタムテーマを保存せずに当てている最中か */
+  const previewingRef = useRef(false);
+
+  /** テーマの設定値とカスタムテーマの一覧を更新し、保存して当て直す */
+  const commitTheme = useCallback(
+    (pref: ThemePref, customs: CustomTheme[]) => {
+      const prev = themeRef.current;
+      themeRef.current = { pref, customs };
+      previewingRef.current = false;
+      if (pref !== prev.pref) {
+        setThemePrefState(pref);
+        saveThemePref(pref);
+      }
+      if (customs !== prev.customs) {
+        setCustomThemesState(customs);
+        saveCustomThemes(customs);
+      }
+      return paintTheme(resolveTheme(pref, customs));
+    },
+    [paintTheme],
+  );
+
+  const setThemePref = useCallback(
+    (pref: ThemePref) => commitTheme(pref, themeRef.current.customs),
+    [commitTheme],
+  );
+
+  /** カスタムテーマを追加 / 上書きする。select を付けるとそのテーマを選ぶ。 */
+  const saveCustomTheme = useCallback(
+    (theme: CustomTheme, select = false) => {
+      const { pref, customs } = themeRef.current;
+      const next = customs.some((t) => t.id === theme.id)
+        ? customs.map((t) => (t.id === theme.id ? theme : t))
+        : [...customs, theme];
+      return commitTheme(select ? theme.id : pref, next);
+    },
+    [commitTheme],
+  );
+
+  /** カスタムテーマを消す。選んでいたものなら「システムに合わせる」へ戻す。 */
+  const deleteCustomTheme = useCallback(
+    (id: CustomThemeId) => {
+      const { pref, customs } = themeRef.current;
+      return commitTheme(
+        pref === id ? "system" : pref,
+        customs.filter((t) => t.id !== id),
+      );
+    },
+    [commitTheme],
+  );
+
+  /** 編集中のテーマを保存せずに当ててみる。null で設定どおりに戻す。 */
+  const previewTheme = useCallback(
+    (theme: ResolvedTheme | null) => {
+      if (!theme && !previewingRef.current) return;
+      previewingRef.current = !!theme;
+      const { pref, customs } = themeRef.current;
+      return paintTheme(theme ?? resolveTheme(pref, customs));
+    },
+    [paintTheme],
+  );
+
   // 「システムに合わせる」の間は、OS の外観の切り替えにテーマごと追従する
   useMediaChange(SYSTEM_LIGHT_QUERY, (light) => {
     if (themePref !== "system") return;
-    applyTheme(resolveTheme("system", light));
-    void repaintDiff();
+    void paintTheme(resolveTheme("system", [], light));
   });
 
   const setGraphStyle = useCallback((style: GraphStyle) => {
@@ -908,7 +977,11 @@ export function useStoreValue(boot: BootData | null) {
   }, []);
 
   const openSettings = useCallback(() => setSettingsOpen(true), []);
-  const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  const closeSettings = useCallback(() => {
+    // カスタムテーマの編集を保存せずに閉じたら、試しに当てていた配色を戻す
+    void previewTheme(null);
+    setSettingsOpen(false);
+  }, [previewTheme]);
   /** Rust 側のコマンド履歴を取り直す (ログ画面を開いている間は定期的に呼ぶ) */
   const reloadLogs = useCallback(async () => {
     setCmdLogs(await api.appLogs().catch(() => []));
@@ -989,6 +1062,10 @@ export function useStoreValue(boot: BootData | null) {
     setLocalePref,
     themePref,
     setThemePref,
+    customThemes,
+    saveCustomTheme,
+    deleteCustomTheme,
+    previewTheme,
     zoom,
     setZoom,
     projectRoots,

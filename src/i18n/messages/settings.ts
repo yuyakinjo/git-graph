@@ -1,6 +1,6 @@
 import type { LocalePref } from "..";
 import type { ClaudeCodeModel } from "../../lib/ai";
-import type { ThemePref, ThemeScheme } from "../../lib/theme";
+import type { KeyColor, ThemeId, ThemeScheme } from "../../lib/theme";
 
 export const ja = {
   language: "言語",
@@ -47,11 +47,37 @@ export const ja = {
     nord: "Nord",
     dracula: "Dracula",
     solarized: "Solarized Light",
-  } satisfies Record<ThemePref, string>,
+  } satisfies Record<"system" | ThemeId, string>,
   themeGroup: {
     dark: "ダーク",
     light: "ライト",
   } satisfies Record<ThemeScheme, string>,
+  themeGroupCustom: "カスタム",
+  newTheme: "新しいテーマ",
+  editTheme: "編集",
+  deleteTheme: "削除",
+  saveTheme: "保存",
+  cancelTheme: "キャンセル",
+  customThemeName: "テーマ名",
+  customThemeDefaultName: "マイテーマ",
+  customThemeNameMissing: "テーマ名を入力してください。",
+  keyColors: {
+    bg: "背景",
+    fg: "文字",
+    accent: "アクセント",
+    green: "成功・追加",
+    red: "エラー・削除",
+    amber: "警告",
+    violet: "補助",
+  } satisfies Record<KeyColor, string>,
+  customThemeDesc:
+    "テーマ名とキーカラー 7 色を決めると、残りの色はそこから自動で作ります。編集中の色は画面にそのまま反映されます。",
+  customThemeScheme: (scheme: ThemeScheme) =>
+    `背景の明るさから${scheme === "light" ? "ライト" : "ダーク"}系のテーマとして扱います。`,
+  customThemeLowContrast: (names: string) =>
+    `${names} は背景とのコントラストが 4.5:1 に届かず、文字が読みにくいかもしれません。`,
+  deleteThemeTitle: "テーマを削除",
+  deleteThemeMessage: (name: string) => `「${name}」を削除しますか？`,
   themeHint:
     "画面全体の配色を切り替えます。ライト系のテーマでは、差分のシンタックスハイライトも明るい配色で表示します。",
   commitGraph: "コミットグラフ",
@@ -131,6 +157,32 @@ export const en: typeof ja = {
     dark: "Dark",
     light: "Light",
   },
+  themeGroupCustom: "Custom",
+  newTheme: "New Theme",
+  editTheme: "Edit",
+  deleteTheme: "Delete",
+  saveTheme: "Save",
+  cancelTheme: "Cancel",
+  customThemeName: "Theme name",
+  customThemeDefaultName: "My Theme",
+  customThemeNameMissing: "Enter a theme name.",
+  keyColors: {
+    bg: "Background",
+    fg: "Text",
+    accent: "Accent",
+    green: "Success / Added",
+    red: "Error / Deleted",
+    amber: "Warning",
+    violet: "Secondary",
+  },
+  customThemeDesc:
+    "Pick a name and 7 key colors; the remaining colors are derived from them. Changes are previewed live while editing.",
+  customThemeScheme: (scheme) =>
+    `Treated as a ${scheme === "light" ? "light" : "dark"} theme based on the background brightness.`,
+  customThemeLowContrast: (names) =>
+    `${names} ${names.includes(",") ? "have" : "has"} less than 4.5:1 contrast against the background and may be hard to read.`,
+  deleteThemeTitle: "Delete Theme",
+  deleteThemeMessage: (name) => `Delete "${name}"?`,
   themeHint:
     "Changes the colors of the whole app. With a light theme, diff syntax highlighting also uses a light palette.",
   commitGraph: "Commit Graph",

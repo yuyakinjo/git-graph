@@ -6,7 +6,7 @@ import { api } from "./lib/api";
 import { DialogProvider, MenuProvider } from "./components/ui";
 import { appLog } from "./lib/log";
 import { bootApp } from "./lib/repo-data";
-import { applyTheme, loadThemePref, resolveTheme } from "./lib/theme";
+import { applyTheme, loadCustomThemes, loadThemePref, resolveTheme } from "./lib/theme";
 import { applyZoom } from "./lib/zoom";
 import { StoreProvider } from "./state/StoreProvider";
 import "./styles.css";
@@ -42,7 +42,7 @@ window.addEventListener("languagechange", () => {
 // 前回の表示倍率を最初の描画前に戻す (拡大した状態で起動してもチラつかせない)
 applyZoom();
 // テーマも同じく最初の描画前に当てる
-applyTheme(resolveTheme(loadThemePref()));
+applyTheme(resolveTheme(loadThemePref(), loadCustomThemes()));
 
 // 初期データは React のマウント前に読み切り、store の初期値として上から流す。
 // 「マウント後に取りに行って state を書き戻す」という逆流を作らないため。
