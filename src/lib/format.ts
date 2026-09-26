@@ -1,20 +1,8 @@
-const LANE_COLORS = [
-  "#4FC3F7",
-  "#A78BFA",
-  "#F472B6",
-  "#FBBF24",
-  "#34D399",
-  "#FB7185",
-  "#60A5FA",
-  "#C084FC",
-  "#2DD4BF",
-  "#F59E0B",
-  "#818CF8",
-  "#E879F9",
-];
+/** レーン色の数。実際の色は外観ごとに styles.css の --color-lane-N で持つ。 */
+const LANE_COUNT = 12;
 
 export const laneColor = (i: number) =>
-  LANE_COLORS[((i % LANE_COLORS.length) + LANE_COLORS.length) % LANE_COLORS.length];
+  `var(--color-lane-${((i % LANE_COUNT) + LANE_COUNT) % LANE_COUNT})`;
 
 export function relativeTime(unix: number): string {
   if (!unix) return "";

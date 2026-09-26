@@ -75,7 +75,7 @@ export function Toolbar({
   const disabled = !s.repo || Boolean(s.busy);
 
   return (
-    <header className="flex h-11.5 flex-none items-center gap-2.5 border-b border-line bg-bg-0 px-2.5">
+    <header className="flex h-11.5 flex-none items-center gap-2.5 bg-bg-0 px-2.5">
       <div className="flex h-7.5 items-center gap-0.5">
         <button
           className={TOOL}
@@ -252,7 +252,7 @@ export function StatusBar() {
   const act = useActions();
   const ghUrl = s.gh?.url ?? null;
   return (
-    <footer className="flex h-6 flex-none items-center gap-3.5 border-t border-line bg-bg-0 px-3 text-[11px] text-fg-dim">
+    <footer className="flex h-6 flex-none items-center gap-3.5 bg-bg-0 px-3 text-[11px] text-fg-dim">
       {s.gh?.repo ? (
         <button
           className={`${SB_ITEM} h-5 cursor-pointer rounded border-0 bg-transparent px-1.5 text-[11px] text-fg-dim hover:bg-bg-3 hover:text-fg disabled:cursor-default`}

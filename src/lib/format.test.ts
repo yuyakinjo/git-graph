@@ -11,7 +11,7 @@ import {
 
 describe("laneColor", () => {
   test("12 色で循環し、負の添字でも色を返す", () => {
-    expect(laneColor(0)).toBe("#4FC3F7");
+    expect(laneColor(0)).toBe("var(--color-lane-0)");
     expect(laneColor(12)).toBe(laneColor(0));
     expect(laneColor(13)).toBe(laneColor(1));
     expect(laneColor(-1)).toBe(laneColor(11));
