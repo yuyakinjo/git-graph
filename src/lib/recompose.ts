@@ -1,4 +1,6 @@
+import * as z from "zod/mini";
 import { t } from "../i18n";
+import { lenientArray } from "./schema";
 import type { ChangedFile, RecomposePlan, RepoInfo } from "./types";
 
 /**
@@ -27,6 +29,22 @@ export function recomposeMode(
 /** 新しいブランチ名の初期値 */
 export const recomposeBranchName = (branch: string) => `${RECOMPOSE_PREFIX}${branch}`;
 
+const trimmed = z.string().check(z.trim());
+
+/**
+ * AI が返すプランの形。commits さえ配列なら、崩れた項目は空にして validatePlan で理由を伝える
+ * (文字列でないファイルは捨てる)。
+ */
+const PlanSchema = z.object({
+  branch: z.catch(trimmed, ""),
+  commits: z.array(
+    z.catch(
+      z.object({ message: z.catch(trimmed, ""), files: z.catch(lenientArray(trimmed), []) }),
+      { message: "", files: [] },
+    ),
+  ),
+});
+
 /** AI の応答から JSON のプランを取り出す。コードフェンスや前置きが付いていても拾う。 */
 export function parsePlan(text: string): RecomposePlan {
   const start = text.indexOf("{");
@@ -38,18 +56,9 @@ export function parsePlan(text: string): RecomposePlan {
   } catch (e) {
     throw new Error(t().recompose.invalidJson(String(e)));
   }
-  const obj = (raw ?? {}) as { branch?: unknown; commits?: unknown };
-  if (!Array.isArray(obj.commits)) throw new Error(t().recompose.noCommitsField);
-  const commits = obj.commits.map((c) => {
-    const item = (c ?? {}) as { message?: unknown; files?: unknown };
-    return {
-      message: typeof item.message === "string" ? item.message.trim() : "",
-      files: Array.isArray(item.files)
-        ? item.files.filter((f): f is string => typeof f === "string").map((f) => f.trim())
-        : [],
-    };
-  });
-  const branch = typeof obj.branch === "string" ? obj.branch.trim() : "";
+  const r = PlanSchema.safeParse(raw);
+  if (!r.success) throw new Error(t().recompose.noCommitsField);
+  const { branch, commits } = r.data;
   return branch ? { branch, commits } : { commits };
 }
 

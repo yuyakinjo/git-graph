@@ -1,7 +1,9 @@
 import { Fragment, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import * as z from "zod/mini";
 import { buildBranchTree, type BranchNode } from "../lib/branchTree";
 import { relativeTime } from "../lib/format";
 import { recomposeMode } from "../lib/recompose";
+import { lenientArray, readStored } from "../lib/schema";
 import {
   loadSectionOrder,
   moveSection,
@@ -46,13 +48,9 @@ const OPEN_KEY = "gitsquid.sections";
 const DEFAULT_CLOSED = new Set(["tag"]);
 
 function useSections() {
-  const [open, setOpen] = useState<Record<string, boolean>>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(OPEN_KEY) ?? "{}");
-    } catch {
-      return {};
-    }
-  });
+  const [open, setOpen] = useState<Record<string, boolean>>(() =>
+    readStored(OPEN_KEY, z.record(z.string(), z.boolean()), {}),
+  );
   const toggle = (k: string) =>
     setOpen((prev) => {
       const cur = prev[k] ?? !DEFAULT_CLOSED.has(k);
@@ -367,13 +365,9 @@ const FOLDER_KEY = "gitsquid.branchFolders";
 
 /** 閉じたフォルダだけを覚える (初期状態は全開き) */
 function useFolders() {
-  const [closed, setClosed] = useState<Set<string>>(() => {
-    try {
-      return new Set<string>(JSON.parse(localStorage.getItem(FOLDER_KEY) ?? "[]"));
-    } catch {
-      return new Set();
-    }
-  });
+  const [closed, setClosed] = useState<Set<string>>(
+    () => new Set(readStored(FOLDER_KEY, lenientArray(z.string()), [])),
+  );
   const toggle = (key: string) =>
     setClosed((prev) => {
       const next = new Set(prev);

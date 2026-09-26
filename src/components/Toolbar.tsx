@@ -37,7 +37,7 @@ export function DashDock({
       >
         <div
           ref={slotRef}
-          className="peer flex h-full min-w-0 flex-1 items-center overflow-x-auto [scrollbar-width:none]"
+          className="peer flex h-full min-w-0 flex-1 items-center overflow-x-auto scrollbar-none"
         />
         <span className="pointer-events-none absolute left-2 hidden text-[12px] text-fg-dim/60 peer-empty:inline">
           {d.dockHint}

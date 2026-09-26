@@ -1,7 +1,8 @@
+import * as z from "zod/mini";
 import { getLocale, type Locale, t } from "../i18n";
 import { api } from "./api";
 import { parsePlan, validatePlan } from "./recompose";
-import { KEY_COLORS, type ThemeKeys } from "./theme";
+import { KEY_COLORS, keyColorsSchema, type ThemeKeys } from "./theme";
 import type {
   CommitContext,
   PrContext,
@@ -292,6 +293,9 @@ function buildThemePrompt(
   return parts.join("\n\n");
 }
 
+/** AI が返す割り当て。文字列でない役割は空にして「無い」と伝える。 */
+const ThemeAnswerSchema = keyColorsSchema(z.catch(z.string().check(z.trim(), z.toLowerCase()), ""));
+
 /**
  * AI の割り当てを読む。パレットの色をちょうど 1 回ずつ使っていないものは errors に理由を返す
  * (理由は AI に作り直させるときにそのまま渡すので英語)。
@@ -308,13 +312,12 @@ export function parseThemeAssignment(
   } catch {
     raw = undefined;
   }
-  if (typeof raw !== "object" || raw === null)
-    return { errors: ["The answer is not a JSON object."] };
-  const obj = raw as Record<string, unknown>;
+  const answer = ThemeAnswerSchema.safeParse(raw);
+  if (!answer.success) return { errors: ["The answer is not a JSON object."] };
   const errors: string[] = [];
   const keys: Partial<ThemeKeys> = {};
   for (const c of KEY_COLORS) {
-    const v = typeof obj[c] === "string" ? obj[c].trim().toLowerCase() : "";
+    const v = answer.data[c];
     if (!palette.includes(v)) {
       errors.push(v ? `"${c}" is ${v}, which is not in the palette.` : `"${c}" is missing.`);
     } else keys[c] = v;

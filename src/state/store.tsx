@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import type { ThemedToken } from "shiki";
+import * as z from "zod/mini";
 import { DEFAULT_CLAUDE_CODE_MODEL, isClaudeCodeModel, type ClaudeCodeModel } from "../lib/ai";
 import { api } from "../lib/api";
 import { parseDiff, tokenizeDiff, type DiffLine } from "../lib/diff";
@@ -17,6 +18,7 @@ import {
   type BootData,
   type RepoSnapshot,
 } from "../lib/repo-data";
+import { lenientArray, readStored } from "../lib/schema";
 import { snapshotHash, type CachedRepo } from "../lib/snapshot-cache";
 import {
   applyTheme,
@@ -195,14 +197,7 @@ export function loadColumns(): GraphColumns {
   return next;
 }
 
-export function loadPaths(key: string): string[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(key) ?? "[]");
-    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
-}
+export const loadPaths = (key: string): string[] => readStored(key, lenientArray(z.string()), []);
 
 function savePaths(key: string, paths: string[]) {
   localStorage.setItem(key, JSON.stringify(paths));

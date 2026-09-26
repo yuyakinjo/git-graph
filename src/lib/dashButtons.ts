@@ -4,6 +4,8 @@
  * グループごとに最大 DASH_MAX 個のボタンを選べる。選択 (並び順込み) と「最近使った」履歴、
  * 隠したバー、パネルの位置は localStorage に保存し、再起動後も復元する。
  */
+import * as z from "zod/mini";
+import { readStored } from "./schema";
 
 export const DASH_MAX = 5;
 
@@ -174,16 +176,11 @@ export function toggleHiddenBar(hidden: DashBar[], bar: DashBar): DashBar[] {
 export const loadHiddenBars = () => normalizeHiddenBars(readJson(HIDDEN_KEY));
 export const saveHiddenBars = (v: DashBar[]) => localStorage.setItem(HIDDEN_KEY, JSON.stringify(v));
 
-export interface DashPos {
-  x: number;
-  y: number;
-}
+const DashPosSchema = z.object({ x: z.number(), y: z.number() });
+export type DashPos = z.infer<typeof DashPosSchema>;
 
 /** 旧形式のパネル位置 (左上の座標)。migrateFloating のためだけに読む。 */
-export function loadDashPos(): DashPos | null {
-  const v = readJson(POS_KEY) as Partial<DashPos> | null;
-  return v && Number.isFinite(v.x) && Number.isFinite(v.y) ? { x: v.x!, y: v.y! } : null;
-}
+export const loadDashPos = (): DashPos | null => readStored(POS_KEY, DashPosSchema, null);
 
 /** パネルが画面外へはみ出さないよう、左上座標を収める。 */
 export function clampDashPos(
@@ -212,8 +209,8 @@ export function normalizeFloating(saved: unknown): DashFloating {
   const obj = saved && typeof saved === "object" ? (saved as Record<string, unknown>) : null;
   const out: DashFloating = {};
   for (const b of DASH_BARS) {
-    const v = obj?.[b] as Partial<DashPos> | undefined;
-    if (v && Number.isFinite(v.x) && Number.isFinite(v.y)) out[b] = { x: v.x!, y: v.y! };
+    const r = DashPosSchema.safeParse(obj?.[b]);
+    if (r.success) out[b] = r.data;
   }
   return out;
 }

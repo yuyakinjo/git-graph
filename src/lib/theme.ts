@@ -8,6 +8,8 @@
  * 組み込みテーマのキーカラーは styles.css の [data-theme] に、
  * 利用者が作ったカスタムテーマのキーカラーは localStorage にあり、<html> の style に直接書き込む。
  */
+import * as z from "zod/mini";
+import { lenientArray, readStored } from "./schema";
 
 export const THEMES = [
   { id: "dark", scheme: "dark" },
@@ -107,25 +109,19 @@ export function saveThemePref(pref: ThemePref) {
   localStorage.setItem(THEME_KEY, pref);
 }
 
+/** キーカラー 7 色すべてを value の形で持つオブジェクト。余分なキーは落とす。 */
+export const keyColorsSchema = <T extends z.ZodMiniType>(value: T) =>
+  z.object(Object.fromEntries(KEY_COLORS.map((c) => [c, value])) as Record<KeyColor, T>);
+
+const CustomThemeSchema = z.object({
+  id: z.custom<CustomThemeId>(isCustomThemeId),
+  name: z.string(),
+  keys: keyColorsSchema(z.string().check(z.regex(HEX))),
+});
+
 /** 保存済みのカスタムテーマ。形の崩れたものは読み飛ばす。 */
-export function loadCustomThemes(): CustomTheme[] {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(localStorage.getItem(CUSTOM_THEMES_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
-  if (!Array.isArray(raw)) return [];
-  return raw.flatMap((v: unknown): CustomTheme[] => {
-    if (typeof v !== "object" || v === null) return [];
-    const { id, name, keys } = v as Record<string, unknown>;
-    if (!isCustomThemeId(id) || typeof name !== "string") return [];
-    if (typeof keys !== "object" || keys === null) return [];
-    const k = keys as Record<string, unknown>;
-    if (!KEY_COLORS.every((c) => isHexColor(k[c]))) return [];
-    return [{ id, name, keys: Object.fromEntries(KEY_COLORS.map((c) => [c, k[c]])) as ThemeKeys }];
-  });
-}
+export const loadCustomThemes = (): CustomTheme[] =>
+  readStored(CUSTOM_THEMES_KEY, lenientArray(CustomThemeSchema), []);
 
 export function saveCustomThemes(themes: readonly CustomTheme[]) {
   localStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(themes));

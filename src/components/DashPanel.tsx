@@ -630,7 +630,7 @@ export function DashPanel({
             {mark ? (
               <span
                 className={`pointer-events-none absolute top-0.5 bottom-0.5 w-0.5 rounded-full bg-accent ${
-                  mark === "before" ? "-left-[3px]" : "-right-[3px]"
+                  mark === "before" ? "-left-0.75" : "-right-0.75"
                 }`}
               />
             ) : null}
