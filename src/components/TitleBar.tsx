@@ -91,8 +91,9 @@ export function TitleBar({
   };
 
   return (
+    // 下線は inset shadow で引く。子要素の背景が上に塗られるので、アクティブなタブの下だけ線が途切れる
     <header
-      className="flex h-10 flex-none items-end border-b border-line bg-bg-0 pl-24.5 select-none"
+      className="flex h-10 flex-none items-end bg-bg-0 pl-24.5 shadow-[inset_0_-1px_0_var(--color-line)] select-none"
       data-tauri-drag-region
     >
       <div className="flex min-w-0 items-end gap-0.5 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:h-0">
@@ -103,10 +104,10 @@ export function TitleBar({
           return (
             <div
               key={path}
-              className={`group flex h-7.5 min-w-24 flex-initial cursor-default items-center gap-1.5 rounded-t-lg border border-transparent border-b-0 py-0 pr-1.5 pl-2.5 text-[12.5px] ${
+              className={`group flex h-7.5 min-w-24 flex-initial cursor-default items-center gap-1.5 rounded-t-lg border border-b-0 py-0 pr-1.5 pl-2.5 text-[12.5px] ${
                 active
-                  ? "max-w-105 border-line bg-bg-1 font-semibold text-fg"
-                  : "max-w-47.5 text-fg-dim hover:bg-bg-hover hover:text-fg"
+                  ? "max-w-105 border-line bg-bg-0 font-semibold text-fg"
+                  : "max-w-47.5 border-transparent text-fg-dim hover:bg-bg-hover hover:text-fg"
               }`}
               title={shortPath(path)}
               onClick={() => !active && !s.opening && s.openRepo(path)}
