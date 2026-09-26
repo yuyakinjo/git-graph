@@ -1,9 +1,10 @@
 @import "tailwindcss";
 
 /*
- * 旧 styles.css の CSS 変数をそのままトークンとして移設したもの。
- * 見た目を変えないことが目的なので、色は 1 つ残らず元の値のまま。
+ * 色はすべて役割で名前を付けたトークン。ここに書くのはダーク外観の値で、
+ * ライト外観 / コントラストを上げる設定での値は @layer base の :root で差し替える。
  * 半透明の色は color-mix ではわずかにずれるため、rgba() をトークン化して持つ。
+ * 文字色は地の色に対して 4.5:1 以上 (fg-faint は bg-2 で 4.58:1) を保つこと。
  */
 @theme static {
   /* ---- 面 ---- */
@@ -20,8 +21,8 @@
 
   /* ---- 文字 ---- */
   --color-fg: #dde4ec;
-  --color-fg-dim: #8b97a7;
-  --color-fg-faint: #5f6b7a;
+  --color-fg-dim: #9ba6b5;
+  --color-fg-faint: #828d9d;
   --color-on-accent: #08121a;
 
   /* ---- アクセント ---- */
@@ -70,6 +71,21 @@
   --color-scrim: rgba(6, 9, 13, 0.6);
   --color-veil: rgba(18, 22, 29, 0.62);
   --color-avatar-fg: rgba(0, 0, 0, 0.72);
+  --color-scroll-hover: #3d4a5c;
+
+  /* ---- コミットグラフのレーン (format.ts の laneColor が参照する) ---- */
+  --color-lane-0: #4fc3f7;
+  --color-lane-1: #a78bfa;
+  --color-lane-2: #f472b6;
+  --color-lane-3: #fbbf24;
+  --color-lane-4: #34d399;
+  --color-lane-5: #fb7185;
+  --color-lane-6: #60a5fa;
+  --color-lane-7: #c084fc;
+  --color-lane-8: #2dd4bf;
+  --color-lane-9: #f59e0b;
+  --color-lane-10: #818cf8;
+  --color-lane-11: #e879f9;
 
   /* ---- 書体 ---- */
   --font-sans:
@@ -109,8 +125,126 @@
 }
 
 @layer base {
+  /* システムの外観 (ライト / ダーク / 自動) にそのまま従う。アプリ独自の切り替えは持たない。 */
   :root {
-    color-scheme: dark;
+    color-scheme: light dark;
+  }
+
+  /*
+   * ライト外観。ダークの反転ではなく、重なるほど明るく (モーダル・メニューが白) なるよう組む。
+   * 文字色は bg-3 (#eceff3) の上でも 4.5:1 以上、レーン色は bg-1 に対して 3:1 以上。
+   */
+  @media (prefers-color-scheme: light) {
+    :root {
+      --color-bg-0: #eceef2;
+      --color-bg-1: #f6f7f9;
+      --color-bg-2: #ffffff;
+      --color-bg-3: #eceff3;
+      --color-bg-4: #dfe3e9;
+      --color-bg-hover: #edf0f4;
+      --color-line: #d5dae1;
+      --color-line-soft: #e3e7ec;
+      --color-pop: #ffffff;
+      --color-pop-line: #d5dae1;
+
+      --color-fg: #1b2330;
+      --color-fg-dim: #525e6d;
+      --color-fg-faint: #626d7d;
+      --color-on-accent: #ffffff;
+
+      --color-accent: #0369a1;
+      --color-accent-hover: #075985;
+      --color-accent-soft: rgba(3, 105, 161, 0.1);
+      --color-accent-14: rgba(3, 105, 161, 0.1);
+      --color-accent-15: rgba(3, 105, 161, 0.11);
+      --color-accent-35: rgba(3, 105, 161, 0.3);
+
+      --color-bolt-line: #e0ac17;
+
+      --color-violet: #6d28d9;
+      --color-violet-12: rgba(109, 40, 217, 0.09);
+      --color-violet-16: rgba(109, 40, 217, 0.12);
+      --color-violet-30: rgba(109, 40, 217, 0.26);
+
+      --color-green: #047857;
+      --color-green-10: rgba(4, 120, 87, 0.08);
+      --color-green-15: rgba(4, 120, 87, 0.11);
+      --color-green-16: rgba(4, 120, 87, 0.12);
+
+      --color-red: #b91c1c;
+      --color-red-10: rgba(185, 28, 28, 0.07);
+      --color-red-15: rgba(185, 28, 28, 0.1);
+      --color-red-16: rgba(185, 28, 28, 0.11);
+      --color-red-45: rgba(185, 28, 28, 0.4);
+
+      --color-amber: #92400e;
+      --color-amber-12: rgba(217, 119, 6, 0.12);
+      --color-amber-16: rgba(217, 119, 6, 0.16);
+      --color-amber-30: rgba(217, 119, 6, 0.32);
+
+      --color-danger: #c62828;
+      --color-danger-hover: #b71c1c;
+      --color-danger-fg: #b91c1c;
+
+      --color-diff-add: #065f46;
+      --color-diff-del: #991b1b;
+
+      --color-row-hover: rgba(15, 23, 42, 0.04);
+      --color-scrim: rgba(15, 23, 42, 0.28);
+      --color-veil: rgba(246, 247, 249, 0.7);
+      --color-scroll-hover: #c3cad3;
+
+      --color-lane-0: #0288d1;
+      --color-lane-1: #7c3aed;
+      --color-lane-2: #db2777;
+      --color-lane-3: #c27803;
+      --color-lane-4: #059669;
+      --color-lane-5: #e11d48;
+      --color-lane-6: #2563eb;
+      --color-lane-7: #9333ea;
+      --color-lane-8: #0d9488;
+      --color-lane-9: #c2410c;
+      --color-lane-10: #4f46e5;
+      --color-lane-11: #c026d3;
+    }
+  }
+
+  /* 「コントラストを上げる」: 補助の文字と区切り線を本文側へ寄せる */
+  @media (prefers-contrast: more) {
+    :root {
+      --color-fg-dim: #c3ccd6;
+      --color-fg-faint: #aab4c1;
+      --color-line: #4a5667;
+      --color-pop-line: #4a5667;
+    }
+  }
+  @media (prefers-contrast: more) and (prefers-color-scheme: light) {
+    :root {
+      --color-fg-dim: #323c49;
+      --color-fg-faint: #3f4a58;
+      --color-line: #9aa4b1;
+      --color-pop-line: #9aa4b1;
+    }
+  }
+
+  /* 「視差効果を減らす」: 出入りの動きは消す。スピナーなど状態を表す動きは残す */
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --animate-toast-in: none;
+      --animate-veil-in: none;
+    }
+    *,
+    ::before,
+    ::after {
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* キーボード操作時のフォーカスはどの外観でもアクセント色の輪で示す */
+  :where(button, a, summary, select, [role="menuitem"], input[type="checkbox"]):focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
   }
 
   html,
@@ -152,7 +286,7 @@
     background-clip: content-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #3d4a5c;
+    background: var(--color-scroll-hover);
     background-clip: content-box;
   }
   ::-webkit-scrollbar-track {

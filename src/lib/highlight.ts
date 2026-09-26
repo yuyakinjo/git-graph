@@ -5,26 +5,78 @@ import type { BundledLanguage, Highlighter, ThemedToken, ThemeInput } from "shik
  *
  * shiki のテーマ 66 種すべてを参照すると、使わないテーマまで全部チャンクになるので、
  * ここに並べたものだけを動的 import する (= ビルド成果物に載るのもこの分だけ)。
- * アプリ自体が dark 固定なので暗い配色を中心にしている。増やすならこの配列に足す。
+ * 選ぶのは暗い配色で、システムがライト外観の間は light の配色に差し替えて塗る
+ * (対になるライト版が無いテーマは GitHub Light で代用)。増やすならこの配列に足す。
  */
 export const DIFF_THEMES = [
-  { id: "one-dark-pro", label: "One Dark Pro", load: () => import("@shikijs/themes/one-dark-pro") },
+  {
+    id: "one-dark-pro",
+    label: "One Dark Pro",
+    light: "one-light",
+    load: () => import("@shikijs/themes/one-dark-pro"),
+  },
   {
     id: "github-dark-default",
     label: "GitHub Dark",
+    light: "github-light-default",
     load: () => import("@shikijs/themes/github-dark-default"),
   },
-  { id: "vitesse-dark", label: "Vitesse Dark", load: () => import("@shikijs/themes/vitesse-dark") },
-  { id: "dracula", label: "Dracula", load: () => import("@shikijs/themes/dracula") },
-  { id: "nord", label: "Nord", load: () => import("@shikijs/themes/nord") },
-  { id: "tokyo-night", label: "Tokyo Night", load: () => import("@shikijs/themes/tokyo-night") },
+  {
+    id: "vitesse-dark",
+    label: "Vitesse Dark",
+    light: "vitesse-light",
+    load: () => import("@shikijs/themes/vitesse-dark"),
+  },
+  {
+    id: "dracula",
+    label: "Dracula",
+    light: "github-light-default",
+    load: () => import("@shikijs/themes/dracula"),
+  },
+  {
+    id: "nord",
+    label: "Nord",
+    light: "github-light-default",
+    load: () => import("@shikijs/themes/nord"),
+  },
+  {
+    id: "tokyo-night",
+    label: "Tokyo Night",
+    light: "github-light-default",
+    load: () => import("@shikijs/themes/tokyo-night"),
+  },
   {
     id: "catppuccin-mocha",
     label: "Catppuccin Mocha",
+    light: "catppuccin-latte",
     load: () => import("@shikijs/themes/catppuccin-mocha"),
   },
-  { id: "min-dark", label: "Min Dark (控えめ)", load: () => import("@shikijs/themes/min-dark") },
+  {
+    id: "min-dark",
+    label: "Min Dark (控えめ)",
+    light: "min-light",
+    load: () => import("@shikijs/themes/min-dark"),
+  },
 ] as const;
+
+/** ライト外観で使う配色。DIFF_THEMES の light から参照されるものだけを置く。 */
+const LIGHT_THEMES = {
+  "one-light": () => import("@shikijs/themes/one-light"),
+  "github-light-default": () => import("@shikijs/themes/github-light-default"),
+  "vitesse-light": () => import("@shikijs/themes/vitesse-light"),
+  "catppuccin-latte": () => import("@shikijs/themes/catppuccin-latte"),
+  "min-light": () => import("@shikijs/themes/min-light"),
+} satisfies Record<(typeof DIFF_THEMES)[number]["light"], unknown>;
+
+/** 選ばれたテーマを、いまのシステム外観で実際に塗る配色へ解決する。 */
+function effectiveTheme(theme: DiffTheme) {
+  const entry = DIFF_THEMES.find((t) => t.id === theme);
+  if (!entry) return null;
+  const light = globalThis.matchMedia?.("(prefers-color-scheme: light)").matches;
+  return light
+    ? { id: entry.light, load: LIGHT_THEMES[entry.light] }
+    : { id: entry.id, load: entry.load };
+}
 
 export type DiffTheme = (typeof DIFF_THEMES)[number]["id"];
 
@@ -78,7 +130,7 @@ export function langOf(path: string | undefined): string | null {
  */
 let highlighter: Promise<Highlighter> | null = null;
 const langs = new Map<string, Promise<boolean>>();
-const themes = new Map<DiffTheme, Promise<boolean>>();
+const themes = new Map<string, Promise<boolean>>();
 
 function getHighlighter() {
   highlighter ??= import("shiki").then((shiki) =>
@@ -106,19 +158,16 @@ function loadLang(lang: string): Promise<boolean> {
 }
 
 /** テーマも初回参照時だけ読み込む (選ばれたものだけが実際に取得される)。 */
-function loadTheme(theme: DiffTheme): Promise<boolean> {
-  let p = themes.get(theme);
+function loadTheme(entry: { id: string; load: () => Promise<unknown> }): Promise<boolean> {
+  let p = themes.get(entry.id);
   if (!p) {
-    const entry = DIFF_THEMES.find((t) => t.id === theme);
-    p = !entry
-      ? Promise.resolve(false)
-      : getHighlighter()
-          .then(async (h) => {
-            await h.loadTheme(entry.load as ThemeInput);
-            return true;
-          })
-          .catch(() => false);
-    themes.set(theme, p);
+    p = getHighlighter()
+      .then(async (h) => {
+        await h.loadTheme(entry.load as ThemeInput);
+        return true;
+      })
+      .catch(() => false);
+    themes.set(entry.id, p);
   }
   return p;
 }
@@ -133,12 +182,13 @@ export async function tokenizeLines(
   theme: DiffTheme,
 ): Promise<ThemedToken[][] | null> {
   const lang = langOf(path);
-  if (!lang || code.length > MAX_CHARS) return null;
-  const [okLang, okTheme] = await Promise.all([loadLang(lang), loadTheme(theme)]);
+  const paint = effectiveTheme(theme);
+  if (!lang || !paint || code.length > MAX_CHARS) return null;
+  const [okLang, okTheme] = await Promise.all([loadLang(lang), loadTheme(paint)]);
   if (!okLang || !okTheme) return null;
   try {
     const h = await getHighlighter();
-    return h.codeToTokens(code, { lang: lang as BundledLanguage, theme }).tokens;
+    return h.codeToTokens(code, { lang: lang as BundledLanguage, theme: paint.id }).tokens;
   } catch {
     return null;
   }

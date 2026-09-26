@@ -41,3 +41,14 @@ export function useInterval(fn: () => void, ms: number | null) {
     return () => window.clearInterval(id);
   }, [ms, latest]);
 }
+
+/** メディアクエリ (外観の切り替えなど) の一致状態が変わるたびに handler を呼ぶ。 */
+export function useMediaChange(query: string, handler: (matches: boolean) => void) {
+  const latest = useLatest(handler);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const h = (e: MediaQueryListEvent) => latest.current(e.matches);
+    mq.addEventListener("change", h);
+    return () => mq.removeEventListener("change", h);
+  }, [query, latest]);
+}

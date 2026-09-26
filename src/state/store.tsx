@@ -4,7 +4,7 @@ import { DEFAULT_CLAUDE_CODE_MODEL, isClaudeCodeModel, type ClaudeCodeModel } fr
 import { api } from "../lib/api";
 import { parseDiff, tokenizeDiff, type DiffLine } from "../lib/diff";
 import { DEFAULT_DIFF_THEME, isDiffTheme, type DiffTheme } from "../lib/highlight";
-import { useInterval } from "../lib/effects";
+import { useInterval, useMediaChange } from "../lib/effects";
 import { appLog, clearAppLogs } from "../lib/log";
 import {
   GRAPH_LIMIT,
@@ -832,18 +832,28 @@ export function useStoreValue(boot: BootData | null) {
     applyZoom(z);
   }, []);
 
-  /** テーマを変えたら、いま開いている差分だけその場で塗り直す。 */
-  const setDiffTheme = useCallback(async (theme: DiffTheme) => {
-    setDiffThemeState(theme);
-    diffThemeRef.current = theme;
-    localStorage.setItem(DIFF_THEME_KEY, theme);
+  /** いま開いている差分だけ、その場で塗り直す。 */
+  const repaintDiff = useCallback(async () => {
     const { text, lines } = diffRef.current;
     const path = fileRef.current?.path;
     if (text === null || !lines.length) return;
     const id = ++diffSeq.current;
-    const tokens = await tokenizeDiff(lines, path, theme);
+    const tokens = await tokenizeDiff(lines, path, diffThemeRef.current);
     if (diffSeq.current === id) setDiff({ text, lines, tokens, loading: false });
   }, []);
+
+  const setDiffTheme = useCallback(
+    (theme: DiffTheme) => {
+      setDiffThemeState(theme);
+      diffThemeRef.current = theme;
+      localStorage.setItem(DIFF_THEME_KEY, theme);
+      return repaintDiff();
+    },
+    [repaintDiff],
+  );
+
+  // システムの外観が切り替わったら、ライト / ダーク用の配色で塗り直す
+  useMediaChange("(prefers-color-scheme: light)", () => void repaintDiff());
 
   const setGraphStyle = useCallback((style: GraphStyle) => {
     setGraphStyleState(style);
