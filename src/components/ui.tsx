@@ -534,8 +534,10 @@ function FormDialog({
       }
     >
       {spec.description ? <p className={dialogDesc}>{spec.description}</p> : null}
-      <div
-        className="flex flex-col gap-3"
+      {/* 補助アクション (AI 生成など) の実行中は結果で上書きされるため、入力欄をまとめて無効にする */}
+      <fieldset
+        disabled={busy}
+        className="m-0 flex min-w-0 flex-col gap-3 border-0 p-0 disabled:cursor-default disabled:opacity-50"
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
         }}
@@ -624,7 +626,7 @@ function FormDialog({
             </div>
           );
         })}
-      </div>
+      </fieldset>
     </Modal>
   );
 }
