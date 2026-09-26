@@ -368,8 +368,10 @@ export function useActions() {
           confirmLabel: msg().push.submit,
         });
         if (!ok) return;
-        await s.run(msg().run.push, () =>
-          api.push(dir, { remote, branch: head.name, setUpstream: true }),
+        await s.run(
+          msg().run.push,
+          () => api.push(dir, { remote, branch: head.name, setUpstream: true }),
+          { successDetail: false },
         );
         return;
       }
@@ -395,20 +397,27 @@ export function useActions() {
         if (res.how === "pull") {
           const ok = await s.run(msg().run.pull, () => api.pull(dir, false, s.dirty));
           if (!ok) return;
-          await s.run(msg().run.push, () => api.push(dir, { remote, branch: head.name }));
+          await s.run(msg().run.push, () => api.push(dir, { remote, branch: head.name }), {
+            successDetail: false,
+          });
           return;
         }
-        await s.run(msg().run.forcePush, () =>
-          api.push(dir, { remote, branch: head.name, forceWithLease: true }),
+        await s.run(
+          msg().run.forcePush,
+          () => api.push(dir, { remote, branch: head.name, forceWithLease: true }),
+          { successDetail: false },
         );
         return;
       }
-      await s.run(msg().run.push, () =>
-        api.push(dir, {
-          remote,
-          branch: head.name,
-          forceWithLease: opts.force,
-        }),
+      await s.run(
+        msg().run.push,
+        () =>
+          api.push(dir, {
+            remote,
+            branch: head.name,
+            forceWithLease: opts.force,
+          }),
+        { successDetail: false },
       );
     };
 
@@ -711,12 +720,15 @@ export function useActions() {
           confirmLabel: msg().common.pushAndContinue,
         });
         if (!ok) return;
-        const pushed = await s.run(msg().run.push, () =>
-          api.push(dir, {
-            remote: s.repo?.remotes[0] ?? "origin",
-            branch: head.name,
-            setUpstream: true,
-          }),
+        const pushed = await s.run(
+          msg().run.push,
+          () =>
+            api.push(dir, {
+              remote: s.repo?.remotes[0] ?? "origin",
+              branch: head.name,
+              setUpstream: true,
+            }),
+          { successDetail: false },
         );
         if (!pushed) return;
       } else if (head.ahead > 0) {
@@ -726,11 +738,14 @@ export function useActions() {
           confirmLabel: msg().common.pushAndContinue,
         });
         if (ok) {
-          const pushed = await s.run(msg().run.push, () =>
-            api.push(dir, {
-              remote: s.repo?.remotes[0] ?? "origin",
-              branch: head.name,
-            }),
+          const pushed = await s.run(
+            msg().run.push,
+            () =>
+              api.push(dir, {
+                remote: s.repo?.remotes[0] ?? "origin",
+                branch: head.name,
+              }),
+            { successDetail: false },
           );
           if (!pushed) return;
         }
