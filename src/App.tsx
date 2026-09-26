@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type HTMLAttributes } from "react";
 import { DetailPane } from "./components/DetailPane";
 import { DiffModal } from "./components/DiffModal";
 import { DashPanel } from "./components/DashPanel";
@@ -176,8 +176,28 @@ function Toasts() {
   );
 }
 
+/** ペイン間のすき間そのものがつまみ。ホバー中だけ中央に細い線を出す */
 const SPLITTER =
-  "w-1 flex-none cursor-col-resize bg-line-soft transition-[background] duration-150 ease-[ease] hover:bg-accent";
+  "group/split relative w-1.5 flex-none cursor-col-resize after:absolute after:inset-y-2 after:left-1/2 after:w-0.5 after:-translate-x-1/2 after:rounded-full after:transition-[background] after:duration-150 hover:after:bg-accent";
+
+/** つかめる場所だと分かるよう、すき間の中央に縦 3 点を置く (線の上でも見えるよう地の色で縁取る) */
+const GRIP_DOT =
+  "size-0.75 rounded-full bg-fg-faint ring-1 ring-bg-0 transition-[background] duration-150 group-hover/split:bg-accent";
+
+function Splitter(props: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={SPLITTER} {...props}>
+      <span className="pointer-events-none absolute top-1/2 left-1/2 z-1 flex -translate-1/2 flex-col gap-0.75">
+        <span className={GRIP_DOT} />
+        <span className={GRIP_DOT} />
+        <span className={GRIP_DOT} />
+      </span>
+    </div>
+  );
+}
+
+/** 角丸のカードとして浮かせる各ペインの箱 */
+const PANE_BOX = "min-w-0 overflow-hidden rounded-lg";
 
 /** リポジトリを開いている間、操作できないことを示す覆い。 */
 const VEIL =
@@ -268,16 +288,21 @@ export default function App() {
       <TitleBar />
       <Toolbar dashOpen={dashOpen} onToggleDash={toggleDash} />
       {s.repo ? (
-        <div className="relative flex min-h-0 flex-1 bg-bg-1">
-          <div style={{ width: sidebar.width, flex: "0 0 auto", minWidth: 0 }}>
+        <div className="relative flex min-h-0 flex-1 bg-bg-0 px-1.5">
+          <div className={PANE_BOX} style={{ width: sidebar.width, flex: "0 0 auto" }}>
             <Sidebar onOpenPr={openPr} />
           </div>
-          <div className={SPLITTER} {...sidebar.handlers} />
-          <GraphPane onOpenDetail={() => setDetailOpen(true)} />
+          <Splitter {...sidebar.handlers} />
+          <div className={`${PANE_BOX} flex flex-auto`}>
+            <GraphPane onOpenDetail={() => setDetailOpen(true)} />
+          </div>
           {detailOpen ? (
             <>
-              <div className={SPLITTER} {...detail.handlers} />
-              <div style={{ width: detail.width, flex: "0 0 auto", minWidth: 0, display: "flex" }}>
+              <Splitter {...detail.handlers} />
+              <div
+                className={`${PANE_BOX} flex bg-bg-1`}
+                style={{ width: detail.width, flex: "0 0 auto" }}
+              >
                 <DetailPane />
               </div>
             </>
