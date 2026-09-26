@@ -91,7 +91,7 @@ function FileRow({
 const STAGED_KEY = "gitsquid.stagedH";
 
 /**
- * 「ステージ済み」セクションの高さ。App.tsx の usePaneWidth と同じくポインタキャプチャで追従し、
+ * 「ステージ済み」セクションの高さ。state/layout.ts の usePaneWidth と同じくポインタキャプチャで追従し、
  * 高さはコンテナ下端からポインタまでの距離で決める。
  */
 function useStagedHeight(initial: number) {
