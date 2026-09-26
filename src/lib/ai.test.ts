@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { setLocale } from "../i18n";
-import { commitSystem, parsePrDescription } from "./ai";
+import { commitSystem, parsePrDescription, parseThemeAssignment } from "./ai";
 
 describe("parsePrDescription", () => {
   test("1 行目をタイトル、残りを本文に分ける", () => {
@@ -25,5 +25,45 @@ describe("commitSystem", () => {
     setLocale("en");
     expect(commitSystem()).toContain("write in English");
     expect(commitSystem()).not.toContain("Japanese");
+  });
+});
+
+describe("parseThemeAssignment", () => {
+  const palette = ["#111111", "#eeeeee", "#3399ff", "#33cc66", "#ee4444", "#ffbb22", "#aa77ff"];
+  const answer = {
+    bg: "#111111",
+    fg: "#EEEEEE",
+    accent: "#3399ff",
+    green: "#33cc66",
+    red: "#ee4444",
+    amber: "#ffbb22",
+    violet: "#aa77ff",
+  };
+
+  test("前後に余計な文字があっても JSON を読み、色は小文字にそろえる", () => {
+    expect(parseThemeAssignment(`はい\n${JSON.stringify(answer)}\n`, palette)).toEqual({
+      keys: { ...answer, fg: "#eeeeee" },
+      errors: [],
+    });
+  });
+
+  test("パレットに無い色・使っていない色・重複を理由にして返す", () => {
+    const res = parseThemeAssignment(
+      JSON.stringify({ ...answer, fg: "#111111", violet: "#123456" }),
+      palette,
+    );
+    expect(res.keys).toBeUndefined();
+    expect(res.errors).toEqual([
+      '"violet" is #123456, which is not in the palette.',
+      "#111111 is used 2 times.",
+      "#eeeeee is not used.",
+      "#aa77ff is not used.",
+    ]);
+  });
+
+  test("JSON でなければその旨を返す", () => {
+    expect(parseThemeAssignment("わかりません", palette).errors).toEqual([
+      "The answer is not a JSON object.",
+    ]);
   });
 });

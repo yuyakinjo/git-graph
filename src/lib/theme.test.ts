@@ -5,6 +5,7 @@ import {
   loadCustomThemes,
   loadThemePref,
   lowContrastKeys,
+  parsePalette,
   resolveTheme,
   saveCustomThemes,
   saveThemePref,
@@ -115,5 +116,27 @@ describe("コントラスト", () => {
   test("地の色に対して 4.5:1 に届かない文字色を挙げる", () => {
     expect(lowContrastKeys(DARK_KEYS)).toEqual([]);
     expect(lowContrastKeys({ ...DARK_KEYS, accent: "#2a3140" })).toEqual(["accent"]);
+  });
+});
+
+describe("parsePalette", () => {
+  test("#rrggbb と #rgb を小文字の #rrggbb で拾い、重複は除く", () => {
+    expect(parsePalette("#264653, #2A9D8F\n#fff #264653")).toEqual([
+      "#264653",
+      "#2a9d8f",
+      "#ffffff",
+    ]);
+  });
+
+  test("coolors の URL のような # の無い 6 桁も読む", () => {
+    expect(parsePalette("https://coolors.co/264653-2a9d8f-e9c46a")).toEqual([
+      "#264653",
+      "#2a9d8f",
+      "#e9c46a",
+    ]);
+  });
+
+  test("# の無い 3 桁や 8 桁は色として読まない", () => {
+    expect(parsePalette("123 abc #ff00ff80 ffffffff")).toEqual([]);
   });
 });

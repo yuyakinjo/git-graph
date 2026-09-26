@@ -1,15 +1,19 @@
 import { useState } from "react";
 import { useT } from "../i18n";
+import { generateThemeKeys } from "../lib/ai";
 import {
   isHexColor,
   KEY_COLORS,
   lowContrastKeys,
+  parsePalette,
   schemeOfKeys,
   type CustomTheme,
   type KeyColor,
+  type ThemeKeys,
 } from "../lib/theme";
 import { useStore } from "../state/store";
 import { btn, field, fieldInput, fieldLabel, hint } from "./classes";
+import { Icon, Spinner } from "./ui";
 import { useDialogs } from "./ui-context";
 
 /**
@@ -35,11 +39,11 @@ export function ThemeEditor({
   const scheme = schemeOfKeys(keys);
   const low = lowContrastKeys(keys);
 
-  const setKey = (c: KeyColor, v: string) => {
-    const next = { ...keys, [c]: v.toLowerCase() };
+  const applyKeys = (next: ThemeKeys) => {
     setKeys(next);
     void s.previewTheme({ id: initial.id, scheme: schemeOfKeys(next), keys: next });
   };
+  const setKey = (c: KeyColor, v: string) => applyKeys({ ...keys, [c]: v.toLowerCase() });
 
   const cancel = () => {
     void s.previewTheme(null);
@@ -79,6 +83,8 @@ export function ThemeEditor({
         />
       </div>
 
+      <PaletteAssign onAssign={applyKeys} />
+
       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
         {KEY_COLORS.map((c) => (
           <KeyColorField
@@ -115,6 +121,73 @@ export function ThemeEditor({
           </button>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * 7 色のパレットを貼り付けると、どの色をどのキーカラーに使うかを AI に決めてもらう欄。
+ * 決まった割り当ては下の色欄に入るので、そこから手で直してもよい。
+ */
+function PaletteAssign({ onAssign }: { onAssign: (keys: ThemeKeys) => void }) {
+  const s = useStore();
+  const m = useT().settings;
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const palette = parsePalette(text);
+  const ready = palette.length === KEY_COLORS.length;
+
+  const assign = async () => {
+    setBusy(true);
+    try {
+      onAssign(await generateThemeKeys(s.aiCliModel, palette));
+    } catch (e) {
+      s.toast({ kind: "error", title: m.aiAssignFailed, detail: String(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={field}>
+      <label className={fieldLabel} htmlFor="custom-theme-palette">
+        {m.aiPalette}
+      </label>
+      <div className="flex items-center gap-1.5">
+        <input
+          className={`${fieldInput} font-mono text-[11.5px]`}
+          id="custom-theme-palette"
+          spellCheck={false}
+          placeholder={m.aiPalettePlaceholder}
+          value={text}
+          disabled={busy}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && ready && !busy) void assign();
+          }}
+        />
+        <button
+          className={`${btn("ghost", "tiny")} flex-none`}
+          disabled={!ready || busy}
+          onClick={() => void assign()}
+        >
+          {busy ? <Spinner size={12} /> : <Icon name="sparkle" size={12} />}{" "}
+          {busy ? m.aiAssigning : m.aiAssign}
+        </button>
+      </div>
+      {palette.length ? (
+        <div className="flex gap-1">
+          {palette.map((c) => (
+            <span
+              key={c}
+              className="h-3.5 w-5 rounded-sm border border-line"
+              style={{ background: c }}
+              title={c}
+            />
+          ))}
+        </div>
+      ) : null}
+      <em className={hint}>{m.aiPaletteHint(palette.length)}</em>
     </div>
   );
 }

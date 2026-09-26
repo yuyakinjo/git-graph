@@ -76,6 +76,15 @@ export const ja = {
     `背景の明るさから${scheme === "light" ? "ライト" : "ダーク"}系のテーマとして扱います。`,
   customThemeLowContrast: (names: string) =>
     `${names} は背景とのコントラストが 4.5:1 に届かず、文字が読みにくいかもしれません。`,
+  aiPalette: "パレットから割り当て",
+  aiPalettePlaceholder: "#264653 #2a9d8f #e9c46a … を 7 色",
+  aiPaletteHint: (count: number) =>
+    count === 7
+      ? "7 色を背景・文字・アクセントなどのどこに使うか、Claude Code に決めてもらいます。"
+      : `色を 7 つ貼り付けてください (いま ${count} 色)。coolors などの URL もそのまま使えます。`,
+  aiAssign: "AI で割り当て",
+  aiAssigning: "割り当て中…",
+  aiAssignFailed: "色を割り当てられませんでした",
   deleteThemeTitle: "テーマを削除",
   deleteThemeMessage: (name: string) => `「${name}」を削除しますか？`,
   themeHint:
@@ -181,6 +190,15 @@ export const en: typeof ja = {
     `Treated as a ${scheme === "light" ? "light" : "dark"} theme based on the background brightness.`,
   customThemeLowContrast: (names) =>
     `${names} ${names.includes(",") ? "have" : "has"} less than 4.5:1 contrast against the background and may be hard to read.`,
+  aiPalette: "Assign from palette",
+  aiPalettePlaceholder: "7 colors, e.g. #264653 #2a9d8f #e9c46a …",
+  aiPaletteHint: (count) =>
+    count === 7
+      ? "Claude Code decides which of the 7 colors to use for the background, text, accent and so on."
+      : `Paste 7 colors (${count} so far). URLs from palette sites such as coolors work too.`,
+  aiAssign: "Assign with AI",
+  aiAssigning: "Assigning…",
+  aiAssignFailed: "Couldn't assign the colors",
   deleteThemeTitle: "Delete Theme",
   deleteThemeMessage: (name) => `Delete "${name}"?`,
   themeHint:

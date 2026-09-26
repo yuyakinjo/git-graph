@@ -183,3 +183,23 @@ export function contrastRatio(a: string, b: string) {
 export function lowContrastKeys(keys: ThemeKeys): KeyColor[] {
   return KEY_COLORS.filter((c) => c !== "bg" && contrastRatio(keys[c], keys.bg) < 4.5);
 }
+
+// ------------------------------------------------------------------ パレットの読み取り
+
+/**
+ * 貼り付けられた文字列から色を拾う (重複は除いて出てきた順)。
+ * #rrggbb / #rgb のほか、coolors の URL のような # の無い 6 桁も色として読む。
+ */
+export function parsePalette(text: string): string[] {
+  const found: string[] = [];
+  for (const [, hash, hex] of text.matchAll(
+    /(?<![0-9a-z])(#?)([0-9a-f]{6}|[0-9a-f]{3})(?![0-9a-z])/gi,
+  )) {
+    // # の無い 3 桁は数字などと紛らわしいので拾わない
+    if (!hash && hex.length === 3) continue;
+    const full = (hex.length === 3 ? [...hex].map((c) => c + c).join("") : hex).toLowerCase();
+    const color = `#${full}`;
+    if (!found.includes(color)) found.push(color);
+  }
+  return found;
+}

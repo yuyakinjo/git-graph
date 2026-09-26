@@ -1,6 +1,7 @@
 import { getLocale, type Locale, t } from "../i18n";
 import { api } from "./api";
 import { parsePlan, validatePlan } from "./recompose";
+import { KEY_COLORS, type ThemeKeys } from "./theme";
 import type {
   CommitContext,
   PrContext,
@@ -256,4 +257,95 @@ export async function generateRecomposePlan(
     invalid = { plan, errors };
   }
   throw new Error(t().ai.incompletePlan(invalid!.errors.join("\n")));
+}
+
+const themeSystem =
+  () => `You design color themes for a desktop Git client. The developer gives you a palette of exactly ${KEY_COLORS.length} colors; assign each color to one of the theme's key color roles.
+
+Roles:
+- bg: the background of the whole app. Panels, borders and hover states are mixed from bg and fg. Usually the darkest or the lightest color.
+- fg: the main text color. Must be very readable on bg (high contrast), usually at the opposite end of brightness from bg.
+- accent: selection, focus rings, links, primary buttons and the current branch. The most distinctive, eye-catching color.
+- green: success and added lines in diffs. Pick the color closest to green.
+- red: errors, deleted lines in diffs and destructive actions. Pick the color closest to red.
+- amber: warnings and modified files. Pick the color closest to yellow or orange.
+- violet: secondary highlights such as tags and stashes. Whatever fits best among the rest.
+
+Rules:
+- Use every palette color exactly once, copied exactly as given (lowercase #rrggbb). Do not invent, adjust or reuse colors.
+- Keep text roles (every role except bg) readable on bg where the palette allows it.
+
+Output only a JSON object, with no code fences and no explanation:
+{${KEY_COLORS.map((c) => `"${c}": "#rrggbb"`).join(", ")}}`;
+
+function buildThemePrompt(
+  palette: readonly string[],
+  invalid?: { text: string; errors: string[] },
+) {
+  const parts = [`<palette>\n${palette.join("\n")}\n</palette>`];
+  if (invalid) {
+    parts.push(
+      `Your previous answer was invalid:\n<answer>\n${invalid.text}\n</answer>\n<errors>\n${invalid.errors.join("\n")}\n</errors>\nFix these problems.`,
+    );
+  }
+  parts.push("Assign the palette colors to the roles.");
+  return parts.join("\n\n");
+}
+
+/**
+ * AI の割り当てを読む。パレットの色をちょうど 1 回ずつ使っていないものは errors に理由を返す
+ * (理由は AI に作り直させるときにそのまま渡すので英語)。
+ */
+export function parseThemeAssignment(
+  text: string,
+  palette: readonly string[],
+): { keys: ThemeKeys; errors: [] } | { keys?: undefined; errors: string[] } {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  let raw: unknown;
+  try {
+    raw = start < 0 || end <= start ? undefined : JSON.parse(text.slice(start, end + 1));
+  } catch {
+    raw = undefined;
+  }
+  if (typeof raw !== "object" || raw === null)
+    return { errors: ["The answer is not a JSON object."] };
+  const obj = raw as Record<string, unknown>;
+  const errors: string[] = [];
+  const keys: Partial<ThemeKeys> = {};
+  for (const c of KEY_COLORS) {
+    const v = typeof obj[c] === "string" ? obj[c].trim().toLowerCase() : "";
+    if (!palette.includes(v)) {
+      errors.push(v ? `"${c}" is ${v}, which is not in the palette.` : `"${c}" is missing.`);
+    } else keys[c] = v;
+  }
+  const used = Object.values(keys);
+  for (const color of palette) {
+    const n = used.filter((v) => v === color).length;
+    if (n === 0) errors.push(`${color} is not used.`);
+    else if (n > 1) errors.push(`${color} is used ${n} times.`);
+  }
+  return errors.length ? { errors } : { keys: keys as ThemeKeys, errors: [] };
+}
+
+/**
+ * キーカラーと同じ数の色のパレットを、背景・文字・アクセントなどのどれに使うか AI に決めさせる。
+ * パレットの色をちょうど 1 回ずつ使っていなければ、理由を添えて 1 回だけ作り直させる。
+ */
+export async function generateThemeKeys(
+  model: ClaudeCodeModel,
+  palette: readonly string[],
+): Promise<ThemeKeys> {
+  const effort = model === "haiku" ? undefined : "low";
+  let invalid: { text: string; errors: string[] } | undefined;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const text = (
+      await api.claudeGenerate(themeSystem(), buildThemePrompt(palette, invalid), model, effort)
+    ).trim();
+    if (!text) throw new Error(t().ai.emptyResponse);
+    const res = parseThemeAssignment(text, palette);
+    if (res.keys) return res.keys;
+    invalid = { text, errors: res.errors };
+  }
+  throw new Error(t().ai.invalidThemeAssignment(invalid!.errors.join("\n")));
 }
