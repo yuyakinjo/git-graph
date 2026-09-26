@@ -757,6 +757,7 @@ export function useActions() {
             label: "本文",
             type: "textarea",
             rows: 10,
+            markdown: true,
             value: defaultBody,
           },
           {
