@@ -4,6 +4,7 @@ mod avatar;
 pub mod commands;
 mod github;
 mod graph;
+mod recompose;
 mod repo;
 mod sh;
 mod tidy;
@@ -81,6 +82,8 @@ pub fn run() {
             commands::git_worktree_prune,
             commands::git_tidy_plan,
             commands::git_tidy_apply,
+            commands::recompose_context,
+            commands::recompose_apply,
             commands::gh_status,
             commands::gh_owners,
             commands::gh_repo_create,

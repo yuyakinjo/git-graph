@@ -8,6 +8,7 @@ use crate::applog;
 use crate::avatar;
 use crate::github;
 use crate::graph;
+use crate::recompose;
 use crate::repo;
 use crate::sh;
 use crate::tidy;
@@ -184,10 +185,16 @@ pub fn git_pull(dir: String, rebase: bool, autostash: bool) -> Result<String, St
 #[tauri::command]
 pub fn git_fast_forward(dir: String, branch: String) -> Result<String, String> {
     let missing = || format!("{branch} に upstream が設定されていません");
-    let remote = sh::git(&dir, &["config", "--get", &format!("branch.{branch}.remote")])
-        .map_err(|_| missing())?;
-    let merge = sh::git(&dir, &["config", "--get", &format!("branch.{branch}.merge")])
-        .map_err(|_| missing())?;
+    let remote = sh::git(
+        &dir,
+        &["config", "--get", &format!("branch.{branch}.remote")],
+    )
+    .map_err(|_| missing())?;
+    let merge = sh::git(
+        &dir,
+        &["config", "--get", &format!("branch.{branch}.merge")],
+    )
+    .map_err(|_| missing())?;
     let (remote, merge) = (remote.trim(), merge.trim());
     if remote.is_empty() || merge.is_empty() {
         return Err(missing());
@@ -392,6 +399,24 @@ pub fn git_tidy_apply(
     ops: Vec<tidy::TidyOp>,
 ) -> Result<Vec<tidy::TidyResult>, String> {
     tidy::apply(&dir, ops)
+}
+
+// ------------------------------------------------------------------ recompose
+
+/// ブランチの変更 (分岐点から作業中の変更まで) を集める。AI のプラン作成用。
+/// 作業ツリーを一時 index に取り込むので、大きなリポジトリでは時間がかかる。
+#[tauri::command(async)]
+pub fn recompose_context(
+    dir: String,
+    branch: String,
+) -> Result<recompose::RecomposeContext, String> {
+    recompose::context(&dir, &branch)
+}
+
+/// プランどおりにコミットを組み直した新しいブランチを作る
+#[tauri::command(async)]
+pub fn recompose_apply(dir: String, op: recompose::RecomposeOp) -> Result<String, String> {
+    recompose::apply(&dir, op)
 }
 
 // ------------------------------------------------------------------ GitHub (gh CLI)
@@ -600,7 +625,7 @@ pub fn commit_context(dir: String, amend: bool) -> Result<CommitContext, String>
 }
 
 /// 差分を COMMIT_DIFF_LIMIT で打ち切る。打ち切ったら true。
-fn truncate_diff(diff: &mut String) -> bool {
+pub(crate) fn truncate_diff(diff: &mut String) -> bool {
     if diff.len() <= COMMIT_DIFF_LIMIT {
         return false;
     }
@@ -628,7 +653,12 @@ pub struct PrContext {
 /// PR の説明文生成用に、base から head までの変更を集める。
 /// base はリモート追跡ブランチ (origin/main など) があればそちらを優先する。
 #[tauri::command]
-pub fn pr_context(dir: String, remote: String, base: String, head: String) -> Result<PrContext, String> {
+pub fn pr_context(
+    dir: String,
+    remote: String,
+    base: String,
+    head: String,
+) -> Result<PrContext, String> {
     let remote_base = format!("{remote}/{base}");
     let base_ref = [remote_base.as_str(), base.as_str()]
         .into_iter()

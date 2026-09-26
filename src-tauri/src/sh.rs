@@ -72,9 +72,20 @@ pub fn exec_with_stdin<S: AsRef<str>>(
     args: &[S],
     stdin: Option<&str>,
 ) -> Result<Out, String> {
+    exec_env(cwd, program, args, stdin, &[])
+}
+
+/// 環境変数を足して実行する (一時 index を使う `GIT_INDEX_FILE` など)
+pub fn exec_env<S: AsRef<str>>(
+    cwd: &str,
+    program: &str,
+    args: &[S],
+    stdin: Option<&str>,
+    env: &[(&str, &str)],
+) -> Result<Out, String> {
     let time = applog::now_ms();
     let started = Instant::now();
-    let res = spawn(cwd, program, args, stdin);
+    let res = spawn(cwd, program, args, stdin, env);
     let (code, stdout, stderr) = match &res {
         Ok(out) => (out.code, out.stdout.clone(), out.stderr.clone()),
         Err(e) => (-1, String::new(), e.clone()),
@@ -97,6 +108,7 @@ fn spawn<S: AsRef<str>>(
     program: &str,
     args: &[S],
     stdin: Option<&str>,
+    env: &[(&str, &str)],
 ) -> Result<Out, String> {
     if !cwd.is_empty() && !Path::new(cwd).exists() {
         return Err(format!("ディレクトリが存在しません: {cwd}"));
@@ -128,6 +140,9 @@ fn spawn<S: AsRef<str>>(
         "VSCODE_INSPECTOR_OPTIONS",
     ] {
         cmd.env_remove(var);
+    }
+    for (k, v) in env {
+        cmd.env(k, v);
     }
 
     let spawn_err = |e: std::io::Error| match e.kind() {
@@ -196,4 +211,3 @@ pub fn gh<S: AsRef<str>>(cwd: &str, args: &[S]) -> Result<String, String> {
         Err(out.message())
     }
 }
-

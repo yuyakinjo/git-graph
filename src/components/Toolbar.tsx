@@ -177,13 +177,6 @@ export function Toolbar({
           <Icon name="bolt" size={15} className={dashOpen ? "text-bolt" : undefined} />
         </button>
         <button
-          className={iconBtn({ active: s.autoFetch })}
-          title={`自動フェッチ: ${s.autoFetch ? "ON (3分間隔)" : "OFF"}`}
-          onClick={s.toggleAutoFetch}
-        >
-          <Icon name="clock" size={15} />
-        </button>
-        <button
           className={iconBtn()}
           title="再読み込み"
           disabled={!s.repo}

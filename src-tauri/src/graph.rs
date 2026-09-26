@@ -204,7 +204,10 @@ pub fn load(dir: &str, limit: usize) -> Result<GraphData, String> {
         let hash = commits[row].hash.clone();
         let parents = commits[row].parents.clone();
 
-        let column = match lanes.iter().position(|l| l.as_deref() == Some(hash.as_str())) {
+        let column = match lanes
+            .iter()
+            .position(|l| l.as_deref() == Some(hash.as_str()))
+        {
             Some(i) => i,
             None => match lanes.iter().position(|l| l.is_none()) {
                 Some(i) => i,

@@ -45,6 +45,8 @@ export interface RepoInfo {
   detached: boolean;
   remotes: string[];
   isLinkedWorktree: boolean;
+  /** origin/HEAD が指す既定ブランチ (取れなければ main / master) */
+  defaultBranch: string;
   state: "clean" | "merging" | "rebasing" | "cherry-picking" | "reverting" | "bisecting";
 }
 
@@ -134,6 +136,55 @@ export interface TidyResult {
   target: string;
   ok: boolean;
   message: string;
+}
+
+/** recompose で組み直す対象のファイル (分岐点 → 最終状態) */
+export interface ChangedFile {
+  /** A / M / D / R / C / T */
+  status: string;
+  path: string;
+  /** リネーム・コピー元 */
+  origPath: string | null;
+}
+
+/** `recompose_context`: ブランチの変更一式。AI のプラン作成に使う */
+export interface RecomposeContext {
+  branch: string;
+  /** いまチェックアウトしているブランチか (未コミットの変更も対象になる) */
+  isHead: boolean;
+  /** 既定ブランチ上での実行。新しいブランチ名も AI に考えさせる */
+  compose: boolean;
+  defaultBranch: string;
+  /** 分岐点を求めた相手 (origin/main など) */
+  baseRef: string;
+  base: string;
+  tip: string;
+  tree: string;
+  includesWorktree: boolean;
+  files: ChangedFile[];
+  diff: string;
+  truncated: boolean;
+  /** ブランチにある既存のコミットのメッセージ (古い順) */
+  commits: string[];
+  recentSubjects: string[];
+}
+
+/** AI が立てたコミットプラン */
+export interface RecomposePlan {
+  /** compose のときだけ: 新しいブランチ名の提案 */
+  branch?: string;
+  commits: { message: string; files: string[] }[];
+}
+
+export interface RecomposeOp {
+  branch: string;
+  base: string;
+  tip: string;
+  tree: string;
+  newBranch: string;
+  commits: { message: string; paths: string[] }[];
+  deleteOriginal: boolean;
+  resetDefault: boolean;
 }
 
 export interface DiffFile {
