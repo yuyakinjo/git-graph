@@ -196,7 +196,16 @@ test.describe("設定", () => {
 
     await page.getByTitle("設定 (Cmd ,)").click();
 
-    await expect(page.getByRole("dialog", { name: "設定" })).toBeVisible();
+    const dialog = page.getByRole("dialog", { name: "設定" });
+    await expect(dialog).toBeVisible();
+
+    // カテゴリのタブで表示する項目が切り替わる
+    await expect(dialog.getByText("自動フェッチ")).toBeVisible();
+    await dialog.getByRole("tab", { name: "スタイル" }).click();
+    await expect(dialog.getByText("コミットグラフ")).toBeVisible();
+    await expect(dialog.getByText("自動フェッチ")).toHaveCount(0);
+    await dialog.getByRole("tab", { name: "AI" }).click();
+    await expect(dialog.getByText("AI コミットメッセージ")).toBeVisible();
   });
 });
 
