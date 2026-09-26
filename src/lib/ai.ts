@@ -1,6 +1,12 @@
 import { api } from "./api";
 import { parsePlan, validatePlan } from "./recompose";
-import type { CommitContext, PrContext, RecomposeContext, RecomposePlan } from "./types";
+import type {
+  CommitContext,
+  PrContext,
+  RecomposeContext,
+  RecomposePlan,
+  StashContext,
+} from "./types";
 
 /**
  * コミットメッセージや PR の説明はインストール済みの Claude Code (`claude -p`) に作らせる。
@@ -103,6 +109,41 @@ export async function generatePrDescription(
   const res = parsePrDescription(text);
   if (!res.title) throw new Error("Claude Code から空の応答が返りました。");
   return res;
+}
+
+const STASH_SYSTEM = `You name a git stash so the developer can recognize it later in a list of stashes.
+
+Output only the name itself on one line: no preamble, no explanation, no quotes, no trailing period, and no "On <branch>:" prefix.
+Keep it short (about 40 characters at most) and describe what the work in progress is about, not the list of files.
+Match the language of the current name when it is written in natural language. Otherwise write in Japanese.`;
+
+function buildStashPrompt(ctx: StashContext, currentName: string): string {
+  const parts = [`<current_name>\n${currentName}\n</current_name>`, `<diff>\n${ctx.diff}\n</diff>`];
+  if (ctx.truncated) {
+    parts.push(
+      "The diff above was cut off because it is very large; infer the rest from what is shown.",
+    );
+  }
+  parts.push("Write the name for this stash.");
+  return parts.join("\n\n");
+}
+
+/** stash の中身から、一覧で見分けやすい名前を作る */
+export async function generateStashName(
+  model: ClaudeCodeModel,
+  ctx: StashContext,
+  currentName: string,
+): Promise<string> {
+  const effort = model === "haiku" ? undefined : "low";
+  const text = await api.claudeGenerate(
+    STASH_SYSTEM,
+    buildStashPrompt(ctx, currentName),
+    model,
+    effort,
+  );
+  const name = text.trim().split("\n")[0].trim();
+  if (!name) throw new Error("Claude Code から空の応答が返りました。");
+  return name;
 }
 
 const recomposeSystem = (

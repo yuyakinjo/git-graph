@@ -670,6 +670,7 @@ export function GraphPane({ onOpenDetail }: { onOpenDetail: () => void }) {
   const stashMenuItems = (stash: StashInfo): MenuItem[] => [
     { label: "apply", icon: "check", onClick: () => act.stashApply(stash, false) },
     { label: "pop", icon: "stash", onClick: () => act.stashApply(stash, true) },
+    { label: "名前を変更", icon: "pencil", onClick: () => act.stashRename(stash) },
   ];
   const stashDropItem = (stash: StashInfo): MenuItem => ({
     label: "drop",

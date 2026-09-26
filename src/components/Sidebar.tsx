@@ -638,6 +638,11 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
                       icon: "stash",
                       onClick: () => act.stashApply(st, true),
                     },
+                    {
+                      label: "名前を変更",
+                      icon: "pencil",
+                      onClick: () => act.stashRename(st),
+                    },
                     { separator: true },
                     {
                       label: "drop",

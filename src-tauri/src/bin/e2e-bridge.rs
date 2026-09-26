@@ -52,6 +52,7 @@ fn dispatch(cmd: &str, a: &Value) -> Result<Value, String> {
         "diff_text" => call!(a, c::diff_text, "dir", "kind", "path", "sha", "context"),
         "last_commit_message" => call!(a, c::last_commit_message, "dir"),
         "commit_context" => call!(a, c::commit_context, "dir", "amend"),
+        "stash_context" => call!(a, c::stash_context, "dir", "refname"),
         "pr_context" => call!(a, c::pr_context, "dir", "remote", "base", "head"),
         "scan_repos" => reply(Ok(c::scan_repos(arg(a, "roots")?, arg(a, "depth")?))),
         "home_dir" => reply(Ok(c::home_dir())),
@@ -115,6 +116,7 @@ fn dispatch(cmd: &str, a: &Value) -> Result<Value, String> {
         ),
         "git_stash_apply" => call!(a, c::git_stash_apply, "dir", "refname", "pop"),
         "git_stash_drop" => call!(a, c::git_stash_drop, "dir", "refname"),
+        "git_stash_rename" => call!(a, c::git_stash_rename, "dir", "refname", "message"),
 
         // worktree
         "git_worktree_add" => call!(

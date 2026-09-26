@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
-import { generateCommitMessage, generatePrDescription } from "../lib/ai";
+import { generateCommitMessage, generatePrDescription, generateStashName } from "../lib/ai";
 import { api } from "../lib/api";
+import { renamedStashMessage, splitStashMessage, uniqueStashName } from "../lib/stash";
 import { useDialogs } from "../components/ui-context";
 import type { RecomposeMode } from "../lib/recompose";
 import { useStore } from "./store";
@@ -137,44 +138,62 @@ export function useActions() {
     };
 
     // ---------------------------------------------------------- 2. stash
+    /** 確認せずにすぐスタッシュする。名前は日時から重ならないように付ける (あとで変更できる) */
     const stashPush = async () => {
       if (!s.dirty) {
         s.toast({ kind: "info", title: "スタッシュする変更がありません" });
         return;
       }
+      const name = uniqueStashName(s.stashes.map((st) => st.message));
+      await s.run(`「${name}」としてスタッシュ`, () => api.stashPush(dir, name, true), {
+        successDetail: false,
+      });
+    };
+
+    const stashRename = async (st: StashInfo) => {
       const res = await dialogs.form({
-        title: "変更をスタッシュ",
+        title: "スタッシュの名前を変更",
+        description: st.name,
+        width: 480,
+        action: {
+          label: "AI で生成",
+          busyLabel: "生成中…",
+          icon: "sparkle",
+          title: "スタッシュの中身から Claude Code で名前を生成",
+          run: async (values) => {
+            try {
+              const ctx = await api.stashContext(dir, st.name);
+              if (!ctx.diff.trim()) {
+                s.toast({ kind: "info", title: "スタッシュに差分がありません" });
+                return;
+              }
+              return { name: await generateStashName(s.aiCliModel, ctx, String(values.name)) };
+            } catch (e) {
+              s.toast({
+                kind: "error",
+                title: "スタッシュの名前を生成できませんでした",
+                detail: String(e),
+              });
+            }
+          },
+        },
         fields: [
           {
-            name: "message",
-            label: "メッセージ (任意)",
+            name: "name",
+            label: "名前",
             type: "text",
-            placeholder: "作業中の変更",
-          },
-          {
-            name: "untracked",
-            label: "未追跡ファイルも含める",
-            type: "checkbox",
-            value: true,
-          },
-          {
-            name: "keepIndex",
-            label: "ステージした変更は残す (--keep-index)",
-            type: "checkbox",
-            value: false,
+            required: true,
+            value: splitStashMessage(st.message).name,
           },
         ],
-        submitLabel: "スタッシュ",
+        submitLabel: "変更",
       });
       if (!res) return;
-      await s.run("スタッシュ", () =>
-        api.stashPush(
-          dir,
-          String(res.message ?? ""),
-          Boolean(res.untracked),
-          Boolean(res.keepIndex),
-        ),
-      );
+      const message = renamedStashMessage(st.message, String(res.name));
+      if (message === st.message) return;
+      await s.run(`${st.name} の名前を変更`, () => api.stashRename(dir, st.name, message), {
+        successDetail: false,
+      });
     };
 
     const stashApply = (st: StashInfo, pop: boolean) =>
@@ -856,6 +875,7 @@ export function useActions() {
       deleteTag,
       stashPush,
       stashApply,
+      stashRename,
       stashDrop,
       fetch,
       pull,

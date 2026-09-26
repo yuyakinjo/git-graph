@@ -264,6 +264,12 @@ export interface CommitContext {
   previousMessage: string | null;
 }
 
+/** AI で stash の名前を作るときに渡す、stash の中身 */
+export interface StashContext {
+  diff: string;
+  truncated: boolean;
+}
+
 /** AI で PR のタイトルと本文を作るときに渡す、PR に含まれる変更 */
 export interface PrContext {
   diff: string;

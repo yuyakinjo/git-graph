@@ -13,6 +13,7 @@ import type {
   RecomposeContext,
   RecomposeOp,
   RepoInfo,
+  StashContext,
   StashInfo,
   StatusData,
   TagInfo,
@@ -103,6 +104,10 @@ export const api = {
   stashApply: (dir: string, refname: string, pop: boolean) =>
     invoke<string>("git_stash_apply", { dir, refname, pop }),
   stashDrop: (dir: string, refname: string) => invoke<string>("git_stash_drop", { dir, refname }),
+  stashRename: (dir: string, refname: string, message: string) =>
+    invoke<string>("git_stash_rename", { dir, refname, message }),
+  stashContext: (dir: string, refname: string) =>
+    invoke<StashContext>("stash_context", { dir, refname }),
 
   // worktree
   worktreeAdd: (dir: string, path: string, branch: string, createBranch: boolean, base?: string) =>

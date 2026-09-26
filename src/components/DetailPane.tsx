@@ -564,7 +564,7 @@ function StashPanel({ refname, message }: { refname: string; message: string }) 
         <div className={DETAIL_TITLE}>
           <Icon name="stash" size={15} />
           <div className="min-w-0">
-            <h3 className={DETAIL_H3}>{message}</h3>
+            <h3 className={DETAIL_H3}>{stash?.message ?? message}</h3>
             <div className={`${DETAIL_SUB} font-mono text-[11.5px]`}>{refname}</div>
           </div>
         </div>
@@ -582,6 +582,13 @@ function StashPanel({ refname, message }: { refname: string; message: string }) 
             onClick={() => stash && act.stashApply(stash, true)}
           >
             ポップ
+          </button>
+          <button
+            className={btn("default", "tiny")}
+            disabled={!stash}
+            onClick={() => stash && act.stashRename(stash)}
+          >
+            名前を変更
           </button>
           <button
             className={btn("outlineDanger", "tiny")}

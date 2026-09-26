@@ -132,14 +132,38 @@ test.describe("変更", () => {
     repo.write("stash-me.txt", "wip\n");
     await app.refresh();
 
+    // ダイアログを挟まず、日時から付けた名前ですぐスタッシュする
     await page.getByRole("button", { name: "スタッシュ", exact: true }).click();
-    const dialog = page.getByRole("dialog", { name: "変更をスタッシュ" });
-    await dialog.getByLabel("メッセージ (任意)").fill("e2e stash");
-    await dialog.getByRole("button", { name: "スタッシュ" }).click();
 
     await expect(page.getByText("スタッシュ 1", { exact: true })).toBeVisible();
-    expect(repo.git("stash", "list", "--format=%s")).toContain("e2e stash");
+    expect(repo.git("stash", "list", "--format=%s")).toMatch(/: WIP \d{4}-\d{2}-\d{2} /);
     expect(repo.git("status", "--porcelain")).toBe("");
+  });
+
+  test("スタッシュの名前を変更する", async ({ app }) => {
+    const { page, repo } = app;
+    repo.write("first.txt", "1\n");
+    repo.git("stash", "push", "--include-untracked", "-m", "first");
+    repo.write("second.txt", "2\n");
+    repo.git("stash", "push", "--include-untracked", "-m", "second");
+    await app.refresh();
+
+    await page
+      .getByText(`On ${repo.head}: first`, { exact: true })
+      .first()
+      .click({ button: "right" });
+    await page.getByRole("button", { name: "名前を変更" }).click();
+    const dialog = page.getByRole("dialog", { name: "スタッシュの名前を変更" });
+    await dialog.getByLabel("名前").fill("renamed");
+    await dialog.getByRole("button", { name: "変更" }).click();
+
+    // 並び (stash@{n}) は変わらず、中身もそのまま。名前は reflog の件名 (%gs) に入る
+    await expect
+      .poll(() => repo.git("stash", "list", "--format=%gd %gs"))
+      .toMatch(/^stash@\{0\} On \S+: second\nstash@\{1\} On \S+: renamed/);
+    expect(repo.git("stash", "show", "--include-untracked", "--name-only", "stash@{1}")).toContain(
+      "first.txt",
+    );
   });
 });
 

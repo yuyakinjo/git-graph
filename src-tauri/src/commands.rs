@@ -342,6 +342,78 @@ pub fn git_stash_drop(dir: String, refname: String) -> Result<String, String> {
     sh::git_log(&dir, &["stash", "drop", &refname])
 }
 
+/// git には stash の名前を変えるコマンドが無いので、対象までの stash をいったん外し、
+/// 対象だけ新しいメッセージにして積み直す。stash@{n} の並びはそのまま保たれる。
+#[tauri::command]
+pub fn git_stash_rename(dir: String, refname: String, message: String) -> Result<String, String> {
+    let message = message.trim();
+    if message.is_empty() {
+        return Err("名前を入力してください".into());
+    }
+    let index: usize = refname
+        .strip_prefix("stash@{")
+        .and_then(|s| s.strip_suffix('}'))
+        .and_then(|s| s.parse().ok())
+        .ok_or_else(|| format!("stash の参照が不正です: {refname}"))?;
+    let list = sh::git(&dir, &["stash", "list", "--format=%H%x1f%gs"])?;
+    let mut top: Vec<(String, String)> = list
+        .lines()
+        .filter_map(|l| l.split_once('\x1f'))
+        .map(|(h, m)| (h.to_string(), m.to_string()))
+        .take(index + 1)
+        .collect();
+    if top.len() <= index {
+        return Err(format!("{refname} が見つかりません"));
+    }
+
+    // 外した分は古い方から積み直すと元の並びに戻る
+    let restore = |entries: &[(String, String)]| -> Result<(), String> {
+        for (hash, msg) in entries.iter().rev() {
+            sh::git(&dir, &["stash", "store", "-m", msg, hash])?;
+        }
+        Ok(())
+    };
+    for dropped in 0..top.len() {
+        if let Err(e) = sh::git(&dir, &["stash", "drop", "-q", "stash@{0}"]) {
+            // 途中で失敗したら、外した分を元のメッセージのまま戻す
+            let _ = restore(&top[..dropped]);
+            return Err(e);
+        }
+    }
+    top[index].1 = message.to_string();
+    restore(&top)?;
+    Ok(format!("{refname} の名前を「{message}」に変更しました"))
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StashContext {
+    /// stash に入っている変更 (未追跡ファイル込み) の差分
+    diff: String,
+    /// 差分を COMMIT_DIFF_LIMIT で打ち切ったか
+    truncated: bool,
+}
+
+/// stash の名前を AI に考えさせるために、中身の差分を集める
+#[tauri::command]
+pub fn stash_context(dir: String, refname: String) -> Result<StashContext, String> {
+    let mut diff = sh::git(
+        &dir,
+        &[
+            "stash",
+            "show",
+            "-p",
+            "--include-untracked",
+            "--no-color",
+            "--no-ext-diff",
+            "-M",
+            &refname,
+        ],
+    )?;
+    let truncated = truncate_diff(&mut diff);
+    Ok(StashContext { diff, truncated })
+}
+
 // ------------------------------------------------------------------ worktree
 
 #[tauri::command]
