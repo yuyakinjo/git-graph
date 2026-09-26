@@ -1,7 +1,8 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useWindowEvent } from "../lib/effects";
 import { DialogCtx, MenuCtx, type DialogApi } from "./ui-context";
+import { Markdown } from "./Markdown";
 import {
   btn,
   ctxBackdrop,
@@ -410,6 +411,8 @@ export interface FormField {
   required?: boolean;
   mono?: boolean;
   rows?: number;
+  /** textarea の上に「書く / プレビュー」タブを出し、GitHub 互換の Markdown で確認できるようにする */
+  markdown?: boolean;
 }
 
 /** フッター左に置く補助ボタン。返した値で入力欄を上書きする (AI 生成など) */
@@ -562,7 +565,15 @@ function FormDialog({
                 {f.label}
                 {f.required ? <span className="ml-0.75 text-red">*</span> : null}
               </label>
-              {f.type === "textarea" ? (
+              {f.type === "textarea" && f.markdown ? (
+                <MarkdownTextarea
+                  id={common.id}
+                  field={f}
+                  autoFocus={i === 0}
+                  value={String(values[f.name] ?? "")}
+                  onChange={(value) => setValues((v) => ({ ...v, [f.name]: value }))}
+                />
+              ) : f.type === "textarea" ? (
                 <textarea
                   {...common}
                   ref={i === 0 ? focusField : undefined}
@@ -615,6 +626,87 @@ function FormDialog({
         })}
       </div>
     </Modal>
+  );
+}
+
+const MD_TABS = [
+  { id: "write", label: "書く" },
+  { id: "preview", label: "プレビュー" },
+] as const;
+
+/** GitHub のコメント欄と同じく、入力欄の上のタブで Markdown のプレビューに切り替える */
+function MarkdownTextarea({
+  id,
+  field: f,
+  autoFocus,
+  value,
+  onChange,
+}: {
+  id: string;
+  field: FormField;
+  autoFocus: boolean;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [tab, setTab] = useState<(typeof MD_TABS)[number]["id"]>("write");
+  // プレビューに切り替えても枠の高さが縮まないよう、直前の textarea の高さを引き継ぐ
+  const [height, setHeight] = useState<number>();
+  const textarea = useRef<HTMLTextAreaElement | null>(null);
+  const attach = useCallback(
+    (el: HTMLTextAreaElement | null) => {
+      textarea.current = el;
+      if (autoFocus) focusField(el);
+    },
+    [autoFocus],
+  );
+
+  const select = (next: typeof tab) => {
+    if (next === tab) return;
+    if (next === "preview" && textarea.current) setHeight(textarea.current.offsetHeight);
+    setTab(next);
+  };
+
+  return (
+    <div className="overflow-hidden rounded-md border border-line bg-bg-1 focus-within:border-accent">
+      <div className="flex gap-1 border-b border-line bg-bg-2 px-1.5" role="tablist">
+        {MD_TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            className={`-mb-px cursor-pointer border-x-0 border-t-0 border-b-2 bg-transparent px-2.5 py-1.5 text-[12px] ${
+              tab === t.id
+                ? "border-accent font-[650] text-fg"
+                : "border-transparent text-fg-dim hover:text-fg"
+            }`}
+            onClick={() => select(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {tab === "write" ? (
+        <textarea
+          id={id}
+          ref={attach}
+          rows={f.rows ?? 6}
+          className={`block w-full resize-y border-0 bg-transparent px-2.25 py-1.75 text-fg outline-none ${f.mono ? "font-mono text-[12px]" : "font-sans text-[12.5px]"}`}
+          style={height ? { height } : undefined}
+          placeholder={f.placeholder}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      ) : (
+        <div role="tabpanel" className="overflow-auto px-3 py-2.5" style={{ height }}>
+          {value.trim() ? (
+            <Markdown source={value} />
+          ) : (
+            <p className="m-0 text-[12.5px] text-fg-faint">プレビューする内容がありません</p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
