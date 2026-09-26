@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useT } from "../i18n";
 import { useWindowEvent } from "../lib/effects";
 import { basename, dirname } from "../lib/format";
 import { useActions } from "../state/actions";
@@ -16,8 +17,6 @@ interface Entry {
   /** WIP のときだけ付く。一覧を「変更」「ステージ済み」の見出しで区切るのに使う。 */
   group?: "unstaged" | "staged";
 }
-
-const GROUP_LABEL = { unstaged: "変更", staged: "ステージ済み" } as const;
 
 const GROUP_HEAD =
   "sticky top-0 z-1 flex h-6 items-center border-b border-line-soft bg-bg-1 px-2.5 text-[11px] font-semibold text-fg-dim";
@@ -81,6 +80,7 @@ function useEntries(): Entry[] {
 export function DiffModal() {
   const s = useStore();
   const act = useActions();
+  const m = useT().diffModal;
   const entries = useEntries();
   const cur = s.file;
   const index = cur
@@ -142,19 +142,19 @@ export function DiffModal() {
         className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-line bg-bg-2 shadow-[0_24px_60px_rgba(0,0,0,0.5)]"
         onMouseDown={(e) => e.stopPropagation()}
         role="dialog"
-        aria-label={cur ? cur.path : "差分"}
+        aria-label={cur ? cur.path : m.diff}
       >
         <header className="grid flex-none grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-2.5 border-b border-line px-3.5 py-2.5">
           <div className="flex min-w-0 items-center">
             {canStage ? (
               <button
                 className={btn(staged ? "default" : "primary", "tiny")}
-                title={staged ? "このファイルをアンステージ" : "このファイルを git add"}
+                title={staged ? m.unstageTitle : m.stageTitle}
                 disabled={!!s.busy}
                 onClick={() => void toggleStage()}
               >
                 <Icon name={staged ? "minus" : "plus"} size={12} />
-                {staged ? "アンステージ" : "ステージ"}
+                {staged ? m.unstage : m.stage}
               </button>
             ) : null}
           </div>
@@ -167,7 +167,7 @@ export function DiffModal() {
               {entries[index]?.status ?? ""}
             </span>
             <h2 className="m-0 min-w-0 overflow-hidden text-[13.5px] font-[650] text-ellipsis whitespace-nowrap">
-              {cur ? basename(cur.path) : "差分"}
+              {cur ? basename(cur.path) : m.diff}
             </h2>
             <span className="min-w-0 overflow-hidden font-mono text-[11.5px] text-ellipsis whitespace-nowrap text-fg-faint">
               {cur ? dirname(cur.path) : ""}
@@ -185,7 +185,7 @@ export function DiffModal() {
             </span>
             <button
               className={iconBtn({ tiny: true })}
-              title="前のファイル (↑)"
+              title={m.prevFile}
               disabled={index <= 0}
               onClick={() => go(-1)}
             >
@@ -193,13 +193,13 @@ export function DiffModal() {
             </button>
             <button
               className={iconBtn({ tiny: true })}
-              title="次のファイル (↓)"
+              title={m.nextFile}
               disabled={index >= entries.length - 1}
               onClick={() => go(1)}
             >
               <Icon name="chevronDown" size={13} />
             </button>
-            <button className={iconBtn()} title="閉じる (Esc)" onClick={close}>
+            <button className={iconBtn()} title={m.close} onClick={close}>
               <Icon name="x" />
             </button>
           </div>
@@ -214,7 +214,7 @@ export function DiffModal() {
             {entries.map((e, i) => [
               e.group && e.group !== entries[i - 1]?.group ? (
                 <div key={`group:${e.group}`} className={GROUP_HEAD}>
-                  {GROUP_LABEL[e.group]} ({entries.filter((x) => x.group === e.group).length})
+                  {m.group[e.group]} ({entries.filter((x) => x.group === e.group).length})
                 </div>
               ) : null,
               <button

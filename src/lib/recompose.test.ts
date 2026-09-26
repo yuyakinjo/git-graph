@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { setLocale } from "../i18n";
 import { parsePlan, recomposeMode, validatePlan } from "./recompose";
 import type { ChangedFile } from "./types";
 
@@ -95,5 +96,14 @@ describe("validatePlan", () => {
     expect(errors.some((e) => e.includes("b2, c"))).toBe(true);
     expect(errors.some((e) => e.includes("2 番目のコミットにメッセージ"))).toBe(true);
     expect(errors.some((e) => e.includes("3 番目のコミットにファイル"))).toBe(true);
+  });
+
+  test("英語のエラー文", () => {
+    setLocale("en");
+    const plan = { commits: [{ message: "", files: ["a", "a"] }] };
+    const errors = validatePlan(plan, files);
+    expect(errors).toContain("The 1st commit has no message");
+    expect(errors).toContain("a is included in more than one commit");
+    expect(errors).toContain("Files not included in any commit: b2, c");
   });
 });

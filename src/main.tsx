@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import { getLocale, loadLocalePref, resolveLocale, setLocale, subscribeLocale } from "./i18n";
+import { getLocale, loadLocalePref, resolveLocale, setLocale, subscribeLocale, t } from "./i18n";
 import { api } from "./lib/api";
 import { DialogProvider, MenuProvider } from "./components/ui";
 import { appLog } from "./lib/log";
@@ -14,7 +14,7 @@ import "./styles.css";
 window.addEventListener("error", (e) => {
   appLog(
     "error",
-    `未処理の例外: ${e.message}`,
+    t().main.uncaughtError(e.message),
     e.error instanceof Error ? e.error.stack : undefined,
   );
 });
@@ -22,7 +22,7 @@ window.addEventListener("unhandledrejection", (e) => {
   const r: unknown = e.reason;
   appLog(
     "error",
-    "未処理の Promise の失敗",
+    t().main.unhandledRejection,
     r instanceof Error ? (r.stack ?? r.message) : String(r),
   );
 });

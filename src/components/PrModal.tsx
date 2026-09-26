@@ -1,3 +1,4 @@
+import { useT } from "../i18n";
 import { relativeTime } from "../lib/format";
 import type { PullRequest } from "../lib/types";
 import { useActions } from "../state/actions";
@@ -18,6 +19,7 @@ const CHECK_CHIP =
 /** 表示専用。詳細の取得は PR を開く側 (App) が行い、pr として渡ってくる。 */
 export function PrModal({ pr, onClose }: { pr: PullRequest; onClose: () => void }) {
   const act = useActions();
+  const m = useT().prModal;
   const d = pr;
   const checks = d.statusCheckRollup ?? [];
 
@@ -29,7 +31,7 @@ export function PrModal({ pr, onClose }: { pr: PullRequest; onClose: () => void 
       footer={
         <>
           <button className={btn("ghost")} onClick={() => act.prOpen(d)}>
-            <Icon name="external" size={14} /> ブラウザで開く
+            <Icon name="external" size={14} /> {m.openInBrowser}
           </button>
           <span className="flex-1" />
           <button
@@ -39,7 +41,7 @@ export function PrModal({ pr, onClose }: { pr: PullRequest; onClose: () => void 
               await act.prCheckout(d);
             }}
           >
-            <Icon name="branch" size={14} /> チェックアウト
+            <Icon name="branch" size={14} /> {m.checkout}
           </button>
           <button
             className={btn("primary")}
@@ -48,7 +50,7 @@ export function PrModal({ pr, onClose }: { pr: PullRequest; onClose: () => void 
               await act.prMerge(d);
             }}
           >
-            <Icon name="merge" size={14} /> マージ
+            <Icon name="merge" size={14} /> {m.merge}
           </button>
         </>
       }
@@ -65,7 +67,7 @@ export function PrModal({ pr, onClose }: { pr: PullRequest; onClose: () => void 
           {d.headRefName} → {d.baseRefName}
         </span>
         {d.author?.login ? <span>{d.author.login}</span> : null}
-        <span>{relativeTime(Math.floor(new Date(d.updatedAt).getTime() / 1000))}更新</span>
+        <span>{m.updated(relativeTime(Math.floor(new Date(d.updatedAt).getTime() / 1000)))}</span>
         {d.reviewDecision ? <span className={miniPill()}>{d.reviewDecision}</span> : null}
         {typeof d.additions === "number" ? (
           <span className={fstats}>
@@ -93,7 +95,7 @@ export function PrModal({ pr, onClose }: { pr: PullRequest; onClose: () => void 
         </div>
       ) : null}
       <pre className="m-0 max-h-[40vh] overflow-auto rounded-lg border border-line bg-bg-1 p-3 font-[inherit] text-[12.5px] break-words whitespace-pre-wrap text-fg">
-        {(d as PullRequest & { body?: string }).body?.trim() || "(本文なし)"}
+        {(d as PullRequest & { body?: string }).body?.trim() || m.noBody}
       </pre>
     </Modal>
   );

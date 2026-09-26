@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useT } from "../i18n";
 import type { TidyItem, TidyPlan } from "../lib/types";
 import { useActions } from "../state/actions";
 import { btn, dialogDesc, dim, hint, miniPill } from "./classes";
@@ -31,6 +32,7 @@ export function TidyModal({
   onClose: () => void;
 }) {
   const act = useActions();
+  const m = useT().tidyModal;
   const [picked, setPicked] = useState<Set<string>>(
     () => new Set(plan.items.filter((it) => it.remove).map(keyOf)),
   );
@@ -57,41 +59,39 @@ export function TidyModal({
   const kept = plan.items.filter((it) => !it.remove);
   const chosen = candidates.filter(isOn);
   const groups: { title: string; items: TidyItem[] }[] = [
-    { title: `${plan.main} を早送り`, items: candidates.filter((it) => it.kind === "fastForward") },
     {
-      title: "削除する worktree",
+      title: m.groupFastForward(plan.main),
+      items: candidates.filter((it) => it.kind === "fastForward"),
+    },
+    {
+      title: m.groupWorktrees,
       items: candidates.filter((it) => it.kind === "worktree" || it.kind === "prune"),
     },
-    { title: "削除するブランチ", items: candidates.filter((it) => it.kind === "branch") },
+    { title: m.groupBranches, items: candidates.filter((it) => it.kind === "branch") },
   ];
 
   return (
     <Modal
-      title="ブランチと worktree を整理"
+      title={m.title}
       width={620}
       onClose={onClose}
       footer={
         <>
-          <span className={`${hint} flex-1`}>
-            消すのは選んだものだけです。判定後に動いたブランチ / worktree は消しません。
-          </span>
+          <span className={`${hint} flex-1`}>{m.footerHint}</span>
           <button className={btn("ghost")} onClick={onClose}>
-            キャンセル
+            {m.cancel}
           </button>
           <button
             className={btn("danger")}
             disabled={chosen.length === 0}
             onClick={() => act.tidyApply(dir, chosen)}
           >
-            {chosen.length} 件を整理
+            {m.apply(chosen.length)}
           </button>
         </>
       }
     >
-      <p className={dialogDesc}>
-        {plan.upstream} への取り込みと、マージ済み PR の head (SHA まで一致するもの)
-        を基準に判定しました。
-      </p>
+      <p className={dialogDesc}>{m.basis(plan.upstream)}</p>
       {plan.ghNote ? (
         <p className={`${dialogDesc} text-amber`}>
           <Icon name="github" size={12} /> {plan.ghNote}
@@ -99,7 +99,7 @@ export function TidyModal({
       ) : null}
 
       {candidates.length === 0 ? (
-        <p className="m-0 py-3 text-center text-[13px] text-fg-dim">整理するものはありません</p>
+        <p className="m-0 py-3 text-center text-[13px] text-fg-dim">{m.nothing}</p>
       ) : (
         groups
           .filter((g) => g.items.length > 0)
@@ -123,9 +123,9 @@ export function TidyModal({
                       </span>
                       <em className={hint}>
                         {isBlocked
-                          ? `${shortPath(it.requires ?? "")} を残すため削除できません`
+                          ? m.blocked(shortPath(it.requires ?? ""))
                           : it.requires
-                            ? `${it.reason} / worktree ${shortPath(it.requires)} の削除後に消します`
+                            ? m.afterWorktree(it.reason, shortPath(it.requires))
                             : it.reason}
                       </em>
                     </span>
@@ -144,13 +144,13 @@ export function TidyModal({
       {kept.length > 0 ? (
         <details className="mt-3">
           <summary className="cursor-pointer text-[12px] font-semibold text-fg-dim">
-            残すもの ({kept.length})
+            {m.kept(kept.length)}
           </summary>
           <ul className="m-0 mt-1 list-none p-0">
             {kept.map((it) => (
               <li key={keyOf(it)} className="flex gap-2 px-1.5 py-0.5 text-[12px]">
                 <span className="min-w-0 flex-1 font-mono break-all text-fg-dim">
-                  {it.kind === "branch" ? "" : "worktree "}
+                  {it.kind === "branch" ? "" : m.worktreePrefix}
                   {nameOf(it)}
                 </span>
                 <em className={dim}>{it.reason}</em>

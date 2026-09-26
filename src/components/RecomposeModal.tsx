@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { t, useT } from "../i18n";
 import { generateRecomposePlan, type RecomposeRound } from "../lib/ai";
 import { api } from "../lib/api";
 import { recomposeBranchName } from "../lib/recompose";
@@ -49,6 +50,7 @@ export function RecomposeModal({
   const [resetDefault, setResetDefault] = useState(true);
   /** 閉じた後やブランチを変えた後に届いた結果を捨てるための連番 */
   const seq = useRef(0);
+  const m = useT().recomposeModal;
 
   const selected = options.find((b) => b.name === branch);
   const compose = branch === defaultBranch;
@@ -79,7 +81,7 @@ export function RecomposeModal({
         if (stale()) return;
         setCtx(c);
         setPlan(null);
-        if (!c.files.length) throw new Error(`${c.baseRef} との分岐点から変更がありません`);
+        if (!c.files.length) throw new Error(t().recomposeModal.noChanges(c.baseRef));
       }
       setBusy("plan");
       const next = await generateRecomposePlan(s.aiCliModel, c, nextRounds);
@@ -124,7 +126,7 @@ export function RecomposeModal({
 
   return (
     <Modal
-      title={compose ? "compose: 変更を新しいブランチに切り出す" : "recompose: ブランチを整理"}
+      title={compose ? m.titleCompose : m.titleRecompose}
       width={720}
       onClose={() => {
         seq.current++;
@@ -132,30 +134,24 @@ export function RecomposeModal({
       }}
       footer={
         <>
-          <span className={`${hint} flex-1`}>
-            中身は変えず、コミットだけを組み直します。コミットフックは実行されません。
-          </span>
+          <span className={`${hint} flex-1`}>{m.footerHint}</span>
           <button className={btn("ghost")} onClick={onClose}>
-            キャンセル
+            {m.cancel}
           </button>
           <button className={btn("primary")} disabled={!ready} onClick={execute}>
             <Icon name="layers" size={13} />
-            このプランで実行
+            {m.execute}
           </button>
         </>
       }
     >
-      <p className={dialogDesc}>
-        {compose
-          ? `${defaultBranch} 上の未プッシュのコミットと作業中の変更を、AI がまとまりのある単位のコミットに分け、新しいブランチに積みます。`
-          : `ブランチの変更 (チェックアウト中なら未コミットの変更も) を AI がまとまりのある単位のコミットに組み直し、新しいブランチに積みます。`}
-      </p>
+      <p className={dialogDesc}>{compose ? m.descCompose(defaultBranch) : m.descRecompose}</p>
 
       {/* 1. ブランチ */}
       <div className="flex items-center gap-2">
         <select
           className="h-[30px] min-w-0 flex-1 rounded-md border border-line bg-bg-1 px-[9px] font-mono text-[12.5px] text-fg outline-none focus:border-accent"
-          aria-label="ブランチ"
+          aria-label={m.branch}
           value={branch}
           disabled={Boolean(busy)}
           onChange={(e) => {
@@ -166,7 +162,7 @@ export function RecomposeModal({
           {options.map((b) => (
             <option key={b.name} value={b.name}>
               {b.name}
-              {b.isHead ? " (チェックアウト中)" : ""}
+              {b.isHead ? m.checkedOut : ""}
             </option>
           ))}
         </select>
@@ -177,33 +173,33 @@ export function RecomposeModal({
             setRounds([]);
             void makePlan([], true);
           }}
-          title={plan ? "変更を集め直し、コメントを捨てて最初から立て直す" : undefined}
+          title={plan ? m.restartTitle : undefined}
         >
           <Icon name="sparkle" size={13} />
-          {plan ? "最初から作り直す" : "プランを作成"}
+          {plan ? m.restart : m.makePlan}
         </button>
       </div>
       {otherWorktree ? (
-        <p className={`${hint} mt-1.5 mb-0`}>
-          {otherWorktree} でチェックアウト中のため、そこの未コミットの変更は含まれません。
-        </p>
+        <p className={`${hint} mt-1.5 mb-0`}>{m.otherWorktree(otherWorktree)}</p>
       ) : null}
 
       {ctx ? (
         <p className={`${hint} mt-2 mb-0`}>
-          {ctx.baseRef} との分岐点 <span className="font-mono">{ctx.base.slice(0, 7)}</span> から{" "}
-          {ctx.files.length} ファイル / 既存のコミット {ctx.commits.length} 件
-          {ctx.includesWorktree ? " + 未コミットの変更" : ""}
-          {ctx.truncated ? " (差分が大きいため一部だけを AI に渡しています)" : ""}
+          {m.summary({
+            baseRef: ctx.baseRef,
+            base: <span className="font-mono">{ctx.base.slice(0, 7)}</span>,
+            files: ctx.files.length,
+            commits: ctx.commits.length,
+            worktree: ctx.includesWorktree,
+          })}
+          {ctx.truncated ? m.truncated : ""}
         </p>
       ) : null}
 
       {busy ? (
         <div className="flex items-center gap-2 py-6 text-[12.5px] text-fg-dim">
           <Spinner />
-          {busy === "context"
-            ? "変更を集めています…"
-            : "Claude Code がコミットプランを作成しています…"}
+          {busy === "context" ? m.collecting : m.planning}
         </div>
       ) : null}
 
@@ -217,8 +213,8 @@ export function RecomposeModal({
       {plan && ctx && !busy ? (
         <>
           <h3 className={SECTION_H3}>
-            コミットプラン ({plan.commits.length} 件)
-            {rounds.length ? <span className={hint}> ・ 再プラン {rounds.length} 回目</span> : null}
+            {m.planHeading(plan.commits.length)}
+            {rounds.length ? <span className={hint}>{m.replanCount(rounds.length)}</span> : null}
           </h3>
           <ol className="m-0 flex list-none flex-col gap-1.5 p-0">
             {plan.commits.map((c, i) => {
@@ -260,12 +256,12 @@ export function RecomposeModal({
           </ol>
 
           {/* 3. コメントして再プラン */}
-          <h3 className={SECTION_H3}>修正したいところがあればコメント</h3>
+          <h3 className={SECTION_H3}>{m.commentHeading}</h3>
           <textarea
             className={`${fieldInput} resize-y text-[12.5px]`}
             rows={2}
             value={comment}
-            placeholder="例: テストは対応する機能のコミットにまとめて / メッセージは英語で"
+            placeholder={m.commentPlaceholder}
             onChange={(e) => setComment(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -282,14 +278,14 @@ export function RecomposeModal({
               title="⌘Enter"
             >
               <Icon name="sparkle" size={11} />
-              コメントして再プラン
+              {m.replan}
             </button>
           </div>
 
           {/* 4. 実行の設定 */}
-          <h3 className={SECTION_H3}>実行</h3>
+          <h3 className={SECTION_H3}>{m.executeHeading}</h3>
           <label className={field}>
-            <span className={fieldLabel}>新しいブランチ名{ctx.compose ? " (AI の提案)" : ""}</span>
+            <span className={fieldLabel}>{ctx.compose ? m.newBranchNameAi : m.newBranchName}</span>
             <input
               className={`${fieldInput} font-mono text-[12.5px]`}
               value={newBranch}
@@ -311,10 +307,8 @@ export function RecomposeModal({
                     onChange={(e) => setResetDefault(e.target.checked)}
                   />
                   <span>
-                    {ctx.branch} を {ctx.baseRef} との分岐点に戻す
-                    <em className={`${hint} block`}>
-                      切り出した未プッシュのコミットを {ctx.branch} から取り除きます
-                    </em>
+                    {m.resetDefault(ctx.branch, ctx.baseRef)}
+                    <em className={`${hint} block`}>{m.resetDefaultHint(ctx.branch)}</em>
                   </span>
                 </label>
               ) : null
@@ -328,19 +322,15 @@ export function RecomposeModal({
                   onChange={(e) => setDeleteOriginal(e.target.checked)}
                 />
                 <span>
-                  recompose 後に元のローカルブランチ {ctx.branch} を削除
+                  {m.deleteOriginal(ctx.branch)}
                   <em className={`${hint} block`}>
-                    {otherWorktree
-                      ? "別の worktree でチェックアウト中のため削除できません"
-                      : "リモートのブランチには触れません"}
+                    {otherWorktree ? m.deleteBlocked : m.remoteUntouched}
                   </em>
                 </span>
               </label>
             )}
             {ctx.isHead ? (
-              <p className={`${hint} m-0`}>
-                実行後は {newBranch.trim() || "新しいブランチ"} に切り替わります。
-              </p>
+              <p className={`${hint} m-0`}>{m.switchTo(newBranch.trim() || m.newBranchFallback)}</p>
             ) : null}
           </div>
         </>

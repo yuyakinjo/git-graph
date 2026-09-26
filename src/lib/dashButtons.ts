@@ -15,41 +15,38 @@ export type DashGroup = (typeof DASH_GROUPS)[number];
 export const DASH_BARS = [...DASH_GROUPS, "recent"] as const;
 export type DashBar = (typeof DASH_BARS)[number];
 
+/** 表示名は i18n の dashButtons 辞書 (`m.dashButtons[id]`) から描画時に引く。 */
 export const DASH_BUTTONS = {
   // ---- git
-  fetch: { group: "git", label: "フェッチ", icon: "fetch" },
-  pull: { group: "git", label: "プル", icon: "pull" },
-  push: { group: "git", label: "プッシュ", icon: "push" },
-  branch: { group: "git", label: "ブランチ", icon: "branch" },
-  stash: { group: "git", label: "スタッシュ", icon: "stash" },
-  stashPop: { group: "git", label: "pop", icon: "pull" },
-  worktree: { group: "git", label: "worktree", icon: "worktree" },
-  stageToggle: {
-    group: "git",
-    label: "すべてステージ・すべてアンステージ",
-    icon: "plus",
-  },
-  commit: { group: "git", label: "コミット", icon: "commit" },
+  fetch: { group: "git", icon: "fetch" },
+  pull: { group: "git", icon: "pull" },
+  push: { group: "git", icon: "push" },
+  branch: { group: "git", icon: "branch" },
+  stash: { group: "git", icon: "stash" },
+  stashPop: { group: "git", icon: "pull" },
+  worktree: { group: "git", icon: "worktree" },
+  stageToggle: { group: "git", icon: "plus" },
+  commit: { group: "git", icon: "commit" },
   // ---- github
-  prCreate: { group: "github", label: "PR 作成", icon: "pr" },
-  prCurrent: { group: "github", label: "このブランチの PR", icon: "external" },
-  prList: { group: "github", label: "PR 一覧", icon: "pr" },
-  ghRepo: { group: "github", label: "リポジトリ", icon: "github" },
-  ghActions: { group: "github", label: "Actions", icon: "clock" },
-  ghIssues: { group: "github", label: "Issues", icon: "external" },
+  prCreate: { group: "github", icon: "pr" },
+  prCurrent: { group: "github", icon: "external" },
+  prList: { group: "github", icon: "pr" },
+  ghRepo: { group: "github", icon: "github" },
+  ghActions: { group: "github", icon: "clock" },
+  ghIssues: { group: "github", icon: "external" },
   // ---- ai (Claude Code で生成してから確認ダイアログを開く)
-  aiCommit: { group: "ai", label: "AI でコミット", icon: "commit" },
-  aiAmend: { group: "ai", label: "AI で amend", icon: "amend" },
-  aiPrCreate: { group: "ai", label: "AI で PR 作成", icon: "pr" },
+  aiCommit: { group: "ai", icon: "commit" },
+  aiAmend: { group: "ai", icon: "amend" },
+  aiPrCreate: { group: "ai", icon: "pr" },
   /** 既定ブランチでは compose に表示が変わる */
-  recompose: { group: "ai", label: "recompose", icon: "layers" },
+  recompose: { group: "ai", icon: "layers" },
   // ---- custom (複合・派生操作)
-  tidy: { group: "custom", label: "tidy", icon: "sweep" },
-  pullRebase: { group: "custom", label: "プル (rebase)", icon: "pull" },
-  forcePush: { group: "custom", label: "強制プッシュ", icon: "push" },
-  worktreePrune: { group: "custom", label: "worktree 整理", icon: "sweep" },
-  remoteCreate: { group: "custom", label: "GitHub に作成", icon: "remote" },
-} as const satisfies Record<string, { group: DashGroup; label: string; icon: string }>;
+  tidy: { group: "custom", icon: "sweep" },
+  pullRebase: { group: "custom", icon: "pull" },
+  forcePush: { group: "custom", icon: "push" },
+  worktreePrune: { group: "custom", icon: "sweep" },
+  remoteCreate: { group: "custom", icon: "remote" },
+} as const satisfies Record<string, { group: DashGroup; icon: string }>;
 
 export type DashButtonId = keyof typeof DASH_BUTTONS;
 

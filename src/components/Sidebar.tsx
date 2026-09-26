@@ -14,6 +14,7 @@ import { useStore } from "../state/store";
 import { checkDot, dim, iconBtn, miniPill } from "./classes";
 import { Icon, type MenuItem } from "./ui";
 import { useMenu } from "./ui-context";
+import { useT } from "../i18n";
 
 const SIDE_HEADER =
   "group flex h-7 shrink-0 cursor-pointer items-center gap-1.5 px-2 text-[10.5px] font-bold tracking-[0.06em] text-fg-dim uppercase select-none hover:text-fg";
@@ -168,6 +169,7 @@ function Section({
   toggle: (k: string) => void;
   drag: SectionDrag;
 }) {
+  const m = useT();
   const open = isOpen(id);
   const indicator = drag.indicator(id);
   return (
@@ -186,7 +188,7 @@ function Section({
       ) : null}
       <header
         className={SIDE_HEADER}
-        title="ドラッグで並べ替え"
+        title={m.sidebar.dragToReorder}
         {...drag.headerProps(id)}
         onClick={() => {
           if (!drag.consumeClick()) toggle(id);
@@ -217,6 +219,7 @@ const headRefOf = (b: BranchInfo) =>
 
 function BranchItem({ b, label, depth = 0 }: { b: BranchInfo; label?: string; depth?: number }) {
   const s = useStore();
+  const m = useT();
   const act = useActions();
   const openMenu = useMenu();
   const last = label ?? b.name.split("/").slice(-1)[0];
@@ -233,16 +236,22 @@ function BranchItem({ b, label, depth = 0 }: { b: BranchInfo; label?: string; de
     : [
         {
           label: b.isHead
-            ? `プル (↓${behind})`
+            ? m.sidebar.branch.pull(behind)
             : diverged
-              ? `早送りできません (↑${b.ahead} ↓${behind})`
-              : `upstream へ早送り (↓${behind})`,
+              ? m.sidebar.branch.cannotFastForward(b.ahead, behind)
+              : m.sidebar.branch.fastForward(behind),
           icon: "pull",
           disabled: diverged,
           onClick: () => act.pullBranch(b),
         },
         ...(b.isHead
-          ? [{ label: "リベースして pull", icon: "pull", onClick: () => act.pullBranch(b, true) }]
+          ? [
+              {
+                label: m.sidebar.branch.pullRebase,
+                icon: "pull",
+                onClick: () => act.pullBranch(b, true),
+              },
+            ]
           : []),
         { separator: true },
       ];
@@ -259,7 +268,7 @@ function BranchItem({ b, label, depth = 0 }: { b: BranchInfo; label?: string; de
     b.kind === "local" && (!isDefault || b.isHead)
       ? [
           {
-            label: isDefault ? "compose…" : "recompose…",
+            label: isDefault ? m.sidebar.branch.compose : m.sidebar.branch.recompose,
             icon: "layers",
             disabled: isDefault && !composeMode,
             onClick: () => act.recompose(b.name),
@@ -272,35 +281,40 @@ function BranchItem({ b, label, depth = 0 }: { b: BranchInfo; label?: string; de
     openMenu(e, [
       ...pullItems,
       {
-        label: "チェックアウト",
+        label: m.sidebar.branch.checkout,
         icon: "branch",
         disabled: b.isHead,
         onClick: () => (b.kind === "remote" ? act.checkoutRemote(b.name) : act.checkout(b.name)),
       },
-      { label: "ここからブランチを作成", icon: "plus", onClick: () => act.createBranch(b.name) },
+      {
+        label: m.sidebar.branch.createBranchHere,
+        icon: "plus",
+        onClick: () => act.createBranch(b.name),
+      },
       ...(pr
         ? [
             {
-              label: `PR #${pr.number} をブラウザで開く`,
+              label: m.sidebar.branch.openPrInBrowser(pr.number),
               icon: "github",
               onClick: () => act.webOpen(pr.url),
             },
           ]
         : []),
       {
-        label: "worktree を追加",
+        label: m.sidebar.branch.addWorktree,
         icon: "worktree",
         onClick: () => act.worktreeAdd(),
       },
       ...recomposeItems,
       { separator: true },
       {
-        label: "名前をコピー",
+        label: m.sidebar.branch.copyName,
         icon: "copy",
         onClick: () => navigator.clipboard.writeText(b.name).catch(() => undefined),
       },
       {
-        label: b.kind === "remote" ? "リモートブランチを削除" : "ブランチを削除",
+        label:
+          b.kind === "remote" ? m.sidebar.branch.deleteRemoteBranch : m.sidebar.branch.deleteBranch,
         icon: "trash",
         danger: true,
         disabled: b.isHead,
@@ -326,7 +340,7 @@ function BranchItem({ b, label, depth = 0 }: { b: BranchInfo; label?: string; de
       {pr ? (
         <button
           className={PR_LINK}
-          title={`PR #${pr.number} を GitHub で開く\n${pr.title}`}
+          title={m.sidebar.branch.openPrOnGitHub(pr.number, pr.title)}
           onClick={(e) => {
             e.stopPropagation();
             act.webOpen(pr.url);
@@ -338,11 +352,11 @@ function BranchItem({ b, label, depth = 0 }: { b: BranchInfo; label?: string; de
       ) : null}
       <span className={sideLabel(b.isHead)}>{last}</span>
       {b.worktreePath && !b.isHead ? (
-        <span className={miniPill()} title={`worktree: ${b.worktreePath}`}>
+        <span className={miniPill()} title={m.sidebar.branch.worktreeAt(b.worktreePath)}>
           <Icon name="worktree" size={10} />
         </span>
       ) : null}
-      {b.gone ? <span className={miniPill("warn")}>gone</span> : null}
+      {b.gone ? <span className={miniPill("warn")}>{m.sidebar.branch.gone}</span> : null}
       {b.ahead ? <span className={miniPill("ahead")}>↑{b.ahead}</span> : null}
       {b.behind ? <span className={miniPill("behind")}>↓{b.behind}</span> : null}
     </div>
@@ -437,6 +451,7 @@ function BranchFolder({
 
 function PrItem({ pr, onOpen }: { pr: PullRequest; onOpen: (pr: PullRequest) => void }) {
   const act = useActions();
+  const m = useT();
   const openMenu = useMenu();
   const checks = pr.statusCheckRollup ?? [];
   const failed = checks.some((c) => c.conclusion === "FAILURE" || c.state === "FAILURE");
@@ -453,11 +468,16 @@ function PrItem({ pr, onOpen }: { pr: PullRequest; onOpen: (pr: PullRequest) => 
       onContextMenu={(e) => {
         e.preventDefault();
         openMenu(e, [
-          { label: "詳細を表示", icon: "pr", onClick: () => onOpen(pr) },
-          { label: "ブラウザで開く", icon: "external", onClick: () => act.prOpen(pr) },
-          { label: "チェックアウト", icon: "branch", onClick: () => act.prCheckout(pr) },
+          { label: m.sidebar.pr.showDetails, icon: "pr", onClick: () => onOpen(pr) },
+          { label: m.sidebar.pr.openInBrowser, icon: "external", onClick: () => act.prOpen(pr) },
+          { label: m.sidebar.pr.checkout, icon: "branch", onClick: () => act.prCheckout(pr) },
           { separator: true },
-          { label: "マージ", icon: "merge", danger: true, onClick: () => act.prMerge(pr) },
+          {
+            label: m.sidebar.pr.merge,
+            icon: "merge",
+            danger: true,
+            onClick: () => act.prMerge(pr),
+          },
         ]);
       }}
     >
@@ -467,7 +487,7 @@ function PrItem({ pr, onOpen }: { pr: PullRequest; onOpen: (pr: PullRequest) => 
       <span className={sideLabel()}>
         <em className={dim}>#{pr.number}</em> {pr.title}
       </span>
-      {pr.isDraft ? <span className={miniPill()}>draft</span> : null}
+      {pr.isDraft ? <span className={miniPill()}>{m.sidebar.pr.draft}</span> : null}
       <span className={checkDot(dot)} />
     </div>
   );
@@ -475,6 +495,7 @@ function PrItem({ pr, onOpen }: { pr: PullRequest; onOpen: (pr: PullRequest) => 
 
 export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
   const s = useStore();
+  const m = useT();
   const act = useActions();
   const openMenu = useMenu();
   const { isOpen, toggle } = useSections();
@@ -494,7 +515,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
     local: (
       <Section
         id="local"
-        title="ローカル"
+        title={m.sidebar.sections.local}
         icon="branch"
         count={locals.length}
         isOpen={isOpen}
@@ -504,14 +525,14 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
           <>
             <button
               className={iconBtn({ tiny: true })}
-              title="マージ済みのブランチと worktree を整理"
+              title={m.sidebar.tidy}
               onClick={() => act.tidy()}
             >
               <Icon name="sweep" size={13} />
             </button>
             <button
               className={iconBtn({ tiny: true })}
-              title="ブランチを作成"
+              title={m.sidebar.createBranch}
               onClick={() => act.createBranch()}
             >
               <Icon name="plus" size={13} />
@@ -525,7 +546,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
     remote: (
       <Section
         id="remote"
-        title="リモート"
+        title={m.sidebar.sections.remote}
         icon="remote"
         count={remotes.length}
         isOpen={isOpen}
@@ -535,7 +556,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
           noRemote ? (
             <button
               className={iconBtn({ tiny: true })}
-              title="GitHub にリポジトリを作成"
+              title={m.sidebar.createGitHubRepo}
               onClick={() => act.remoteCreate()}
             >
               <Icon name="plus" size={13} />
@@ -543,7 +564,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
           ) : (
             <button
               className={iconBtn({ tiny: true })}
-              title="フェッチ"
+              title={m.sidebar.fetch}
               onClick={() => act.fetch()}
             >
               <Icon name="fetch" size={13} />
@@ -553,12 +574,12 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
       >
         {noRemote ? (
           <>
-            <div className={SIDE_NOTE}>リモートリポジトリが未設定です</div>
+            <div className={SIDE_NOTE}>{m.sidebar.noRemote}</div>
             <button
               className={`${SIDE_NOTE} block w-full cursor-pointer border-0 bg-none pt-0 text-left text-accent`}
               onClick={() => act.remoteCreate()}
             >
-              GitHub にリポジトリを作成する
+              {m.sidebar.createGitHubRepoLink}
             </button>
           </>
         ) : (
@@ -569,7 +590,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
     pr: (
       <Section
         id="pr"
-        title="プルリクエスト"
+        title={m.sidebar.sections.pr}
         icon="pr"
         count={s.prs.length}
         isOpen={isOpen}
@@ -578,7 +599,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         action={
           <button
             className={iconBtn({ tiny: true })}
-            title="PR を作成"
+            title={m.sidebar.createPr}
             onClick={() => act.prCreate()}
           >
             <Icon name="plus" size={13} />
@@ -586,13 +607,13 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         }
       >
         {!s.gh?.installed ? (
-          <div className={SIDE_NOTE}>gh CLI が未インストールです</div>
+          <div className={SIDE_NOTE}>{m.sidebar.ghNotInstalled}</div>
         ) : !s.gh.authenticated ? (
-          <div className={SIDE_NOTE}>gh auth login が必要です</div>
+          <div className={SIDE_NOTE}>{m.sidebar.ghNeedsAuth}</div>
         ) : !s.gh.repo ? (
-          <div className={SIDE_NOTE}>GitHub リポジトリではありません</div>
+          <div className={SIDE_NOTE}>{m.sidebar.notGitHubRepo}</div>
         ) : s.prs.length === 0 ? (
-          <div className={SIDE_NOTE}>オープンな PR はありません</div>
+          <div className={SIDE_NOTE}>{m.sidebar.noOpenPrs}</div>
         ) : (
           s.prs.map((pr) => <PrItem key={pr.number} pr={pr} onOpen={onOpenPr} />)
         )}
@@ -601,20 +622,24 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
     stash: (
       <Section
         id="stash"
-        title="スタッシュ"
+        title={m.sidebar.sections.stash}
         icon="stash"
         count={s.stashes.length}
         isOpen={isOpen}
         toggle={toggle}
         drag={drag}
         action={
-          <button className={iconBtn({ tiny: true })} title="stash" onClick={() => act.stashPush()}>
+          <button
+            className={iconBtn({ tiny: true })}
+            title={m.sidebar.stash.push}
+            onClick={() => act.stashPush()}
+          >
             <Icon name="plus" size={13} />
           </button>
         }
       >
         {s.stashes.length === 0 ? (
-          <div className={SIDE_NOTE}>スタッシュはありません</div>
+          <div className={SIDE_NOTE}>{m.sidebar.stash.empty}</div>
         ) : (
           s.stashes.map((st) => {
             const current = s.selection.kind === "stash" && s.selection.refname === st.name;
@@ -629,23 +654,23 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
                   e.preventDefault();
                   openMenu(e, [
                     {
-                      label: "apply",
+                      label: m.sidebar.stash.apply,
                       icon: "check",
                       onClick: () => act.stashApply(st, false),
                     },
                     {
-                      label: "pop",
+                      label: m.sidebar.stash.pop,
                       icon: "stash",
                       onClick: () => act.stashApply(st, true),
                     },
                     {
-                      label: "名前を変更",
+                      label: m.sidebar.stash.rename,
                       icon: "pencil",
                       onClick: () => act.stashRename(st),
                     },
                     { separator: true },
                     {
-                      label: "drop",
+                      label: m.sidebar.stash.drop,
                       icon: "trash",
                       danger: true,
                       onClick: () => act.stashDrop(st),
@@ -669,7 +694,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
     worktree: (
       <Section
         id="worktree"
-        title="worktree"
+        title={m.sidebar.sections.worktree}
         icon="worktree"
         count={s.worktrees.length}
         isOpen={isOpen}
@@ -678,7 +703,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
         action={
           <button
             className={iconBtn({ tiny: true })}
-            title="worktree を追加"
+            title={m.sidebar.worktree.add}
             onClick={() => act.worktreeAdd()}
           >
             <Icon name="plus" size={13} />
@@ -695,19 +720,19 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
               e.preventDefault();
               openMenu(e, [
                 {
-                  label: "この worktree を開く",
+                  label: m.sidebar.worktree.open,
                   icon: "folder",
                   disabled: wt.isCurrent,
                   onClick: () => s.openRepo(wt.path),
                 },
                 {
-                  label: "パスをコピー",
+                  label: m.sidebar.worktree.copyPath,
                   icon: "copy",
                   onClick: () => navigator.clipboard.writeText(wt.path).catch(() => undefined),
                 },
                 { separator: true },
                 {
-                  label: "worktree を削除",
+                  label: m.sidebar.worktree.remove,
                   icon: "trash",
                   danger: true,
                   disabled: wt.isMain || wt.isCurrent,
@@ -723,7 +748,9 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
               {wt.branch ?? wt.head.slice(0, 7)}
               {wt.isMain ? <em className={dim}> (main)</em> : null}
             </span>
-            {wt.prunable ? <span className={miniPill("warn")}>prunable</span> : null}
+            {wt.prunable ? (
+              <span className={miniPill("warn")}>{m.sidebar.worktree.prunable}</span>
+            ) : null}
           </div>
         ))}
         {s.worktrees.some((w) => w.prunable) ? (
@@ -731,7 +758,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
             className={`${SIDE_NOTE} block w-full cursor-pointer border-0 bg-none text-left text-accent`}
             onClick={() => act.worktreePrune()}
           >
-            使われていない worktree を整理する
+            {m.sidebar.worktree.prune}
           </button>
         ) : null}
       </Section>
@@ -739,7 +766,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
     tag: (
       <Section
         id="tag"
-        title="タグ"
+        title={m.sidebar.sections.tag}
         icon="tag"
         count={s.tags.length}
         isOpen={isOpen}
@@ -756,15 +783,15 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
             onContextMenu={(e) => {
               e.preventDefault();
               openMenu(e, [
-                { label: "チェックアウト", icon: "tag", onClick: () => act.checkout(t.name) },
+                { label: m.sidebar.tag.checkout, icon: "tag", onClick: () => act.checkout(t.name) },
                 { separator: true },
                 {
-                  label: "名前をコピー",
+                  label: m.sidebar.tag.copyName,
                   icon: "copy",
                   onClick: () => navigator.clipboard.writeText(t.name).catch(() => undefined),
                 },
                 {
-                  label: "タグを削除",
+                  label: m.sidebar.tag.remove,
                   icon: "trash",
                   danger: true,
                   onClick: () => act.deleteTag(t.name),
@@ -778,7 +805,7 @@ export function Sidebar({ onOpenPr }: { onOpenPr: (pr: PullRequest) => void }) {
             <span className={sideLabel()}>{t.name}</span>
           </div>
         ))}
-        {s.tags.length === 0 ? <div className={SIDE_NOTE}>タグはありません</div> : null}
+        {s.tags.length === 0 ? <div className={SIDE_NOTE}>{m.sidebar.tag.empty}</div> : null}
       </Section>
     ),
   };

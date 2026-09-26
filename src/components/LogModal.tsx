@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useT } from "../i18n";
 import { useInterval } from "../lib/effects";
 import { appLogs, formatEntry, formatLogs, logTime, mergeLogs } from "../lib/log";
 import { useStore } from "../state/store";
@@ -14,6 +15,7 @@ const POLL_MS = 1500;
  */
 export function LogModal() {
   const s = useStore();
+  const m = useT().logModal;
   const [errorsOnly, setErrorsOnly] = useState(false);
   useInterval(() => void s.reloadLogs(), POLL_MS);
 
@@ -32,7 +34,7 @@ export function LogModal() {
 
   return (
     <Modal
-      title="ログ"
+      title={m.title}
       width={900}
       onClose={s.closeLogs}
       footer={
@@ -43,23 +45,23 @@ export function LogModal() {
               checked={errorsOnly}
               onChange={(e) => setErrorsOnly(e.target.checked)}
             />
-            エラーのみ ({errors})
+            {m.errorsOnly(errors)}
           </label>
           <button className={btn("ghost")} onClick={() => void s.clearLogs()}>
             <Icon name="trash" size={13} />
-            クリア
+            {m.clear}
           </button>
           <CopyButton
             text={() => header() + formatLogs(shown)}
-            title={`表示中の ${shown.length} 件をコピー`}
+            title={m.copyShown(shown.length)}
             className={btn("primary")}
-            label="すべてコピー"
+            label={m.copyAll}
           />
         </>
       }
     >
       {shown.length === 0 ? (
-        <p className="m-0 py-6 text-center text-[12.5px] text-fg-faint">ログはまだありません</p>
+        <p className="m-0 py-6 text-center text-[12.5px] text-fg-faint">{m.empty}</p>
       ) : (
         <ul className="m-0 flex list-none flex-col p-0 font-mono text-[11.5px]">
           {shown
@@ -89,7 +91,7 @@ export function LogModal() {
                   ) : null}
                 </div>
                 <span className="flex-none opacity-0 group-hover:opacity-100">
-                  <CopyButton text={formatEntry(e)} title="この行をコピー" size={12} />
+                  <CopyButton text={formatEntry(e)} title={m.copyLine} size={12} />
                 </span>
               </li>
             ))}

@@ -1,3 +1,93 @@
-export const ja = {};
+import type { DashBar } from "../../lib/dashButtons";
 
-export const en: typeof ja = {};
+export const ja = {
+  /** バーの名前 */
+  bars: {
+    git: "git",
+    github: "GitHub",
+    ai: "AI",
+    custom: "カスタム",
+    recent: "最近使った操作",
+  } satisfies Record<DashBar, string>,
+  ariaLabel: "ダッシュパネル",
+  notGitHubRepo: "GitHub リポジトリではありません",
+  createBranch: "ブランチを作成",
+  unstageAll: "すべてアンステージ",
+  unstageAllTitle: "ステージ済みの変更をすべてアンステージ",
+  stageAll: "すべてステージ",
+  stageAllTitle: "変更をすべてステージ (git add -A)",
+  noChanges: "変更はありません",
+  commitStaged: (n: number) => `ステージ済みの ${n} 件をコミット`,
+  commitAll: "すべての変更をステージしてコミット",
+  aiCommitStaged: (n: number) =>
+    `ステージ済みの ${n} 件から Claude Code でメッセージを生成してコミット`,
+  aiCommitAll: "すべての変更から Claude Code でメッセージを生成してコミット",
+  aiAmend: "直前のコミット (+ ステージ済み) から Claude Code でメッセージを生成して修正",
+  noCommits: "コミットがありません",
+  aiPrCreate: "差分とコミットから Claude Code でタイトルと本文を生成して PR 作成",
+  /** recompose ボタンの表示名 (モードごと) */
+  recomposeLabel: { compose: "作成", recompose: "組み直し" },
+  recomposeNothingOnDefault: "既定ブランチに未プッシュのコミットも作業中の変更もありません",
+  recomposeNoBranch: "チェックアウト中のブランチがありません (または操作の途中です)",
+  composeTitle:
+    "未プッシュのコミットと作業中の変更を、Claude Code が立てたプランで新しいブランチに切り出す",
+  recomposeTitle:
+    "ブランチの変更を Claude Code が立てたプランでコミットし直し、新しいブランチに積む",
+  noPrForBranch: "このブランチの PR はありません",
+  tidyTitle: "マージ済みのブランチとワークツリーを整理",
+  remoteCreateTitle: "GitHub に新規リポジトリを作って origin に登録",
+  barToggle: (bar: string) => `${bar} バー`,
+  hidePanel: "パネルを隠す",
+  clearHistory: "履歴を消去",
+  resetToDefault: "既定に戻す",
+  barIconTitle: (bar: string) => `${bar} (クリックでボタンを選ぶ)`,
+  dragToReorder: (title: string) =>
+    title ? `${title} (ドラッグで並べ替え)` : "ドラッグで並べ替え",
+  emptyBar: "右クリックでボタンを追加",
+  dragToMove: "ドラッグで移動",
+};
+
+export const en: typeof ja = {
+  bars: {
+    git: "git",
+    github: "GitHub",
+    ai: "AI",
+    custom: "Custom",
+    recent: "Recent",
+  },
+  ariaLabel: "Dash panel",
+  notGitHubRepo: "Not a GitHub repository",
+  createBranch: "Create branch",
+  unstageAll: "Unstage All",
+  unstageAllTitle: "Unstage all staged changes",
+  stageAll: "Stage All",
+  stageAllTitle: "Stage all changes (git add -A)",
+  noChanges: "No changes",
+  commitStaged: (n) => `Commit ${n} staged ${n === 1 ? "change" : "changes"}`,
+  commitAll: "Stage all changes and commit",
+  aiCommitStaged: (n) =>
+    `Generate a message with Claude Code from ${n} staged ${n === 1 ? "change" : "changes"} and commit`,
+  aiCommitAll: "Generate a message with Claude Code from all changes and commit",
+  aiAmend: "Generate a message with Claude Code from the last commit (+ staged) and amend",
+  noCommits: "No commits yet",
+  aiPrCreate:
+    "Generate a title and description with Claude Code from the diff and commits, then create a PR",
+  recomposeLabel: { compose: "Compose", recompose: "Recompose" },
+  recomposeNothingOnDefault: "No unpushed commits or working changes on the default branch",
+  recomposeNoBranch: "No branch checked out (or an operation is in progress)",
+  composeTitle:
+    "Split unpushed commits and working changes into a new branch using a plan from Claude Code",
+  recomposeTitle:
+    "Recommit the branch's changes using a plan from Claude Code and stack them on a new branch",
+  noPrForBranch: "No PR for this branch",
+  tidyTitle: "Clean up merged branches and worktrees",
+  remoteCreateTitle: "Create a new GitHub repository and add it as origin",
+  barToggle: (bar) => `${bar} Bar`,
+  hidePanel: "Hide Panel",
+  clearHistory: "Clear History",
+  resetToDefault: "Reset to Default",
+  barIconTitle: (bar) => `${bar} (click to choose buttons)`,
+  dragToReorder: (title) => (title ? `${title} (drag to reorder)` : "Drag to reorder"),
+  emptyBar: "Right-click to add buttons",
+  dragToMove: "Drag to move",
+};

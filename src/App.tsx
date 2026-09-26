@@ -13,6 +13,7 @@ import { TitleBar } from "./components/TitleBar";
 import { StatusBar, Toolbar } from "./components/Toolbar";
 import { btn, iconBtn } from "./components/classes";
 import { CopyButton, Icon, ProgressBar, Spinner } from "./components/ui";
+import { useT } from "./i18n";
 import { api } from "./lib/api";
 import { useWindowEvent } from "./lib/effects";
 import type { PullRequest } from "./lib/types";
@@ -68,6 +69,7 @@ function usePaneWidth(initial: number, key: string, min: number, max: number, in
 function Welcome() {
   const s = useStore();
   const act = useActions();
+  const m = useT().app;
   return (
     <div className="flex flex-1 items-center justify-center bg-[radial-gradient(circle_at_30%_10%,#1d2735_0%,var(--color-bg-1)_60%)]">
       <div className="w-120 max-w-[88vw] text-center">
@@ -80,12 +82,12 @@ function Welcome() {
           />
         </h1>
         <button className={btn("primary", "big")} onClick={() => act.openFolder()}>
-          <Icon name="folder" size={16} /> リポジトリを開く
+          <Icon name="folder" size={16} /> {m.openRepo}
         </button>
         {s.recent.length ? (
           <div className="mt-6.5 text-left">
             <h2 className="mx-0 mt-0 mb-1.5 text-[11px] tracking-[0.06em] text-fg-faint uppercase">
-              最近開いたリポジトリ
+              {m.recentRepos}
             </h2>
             {s.recent.map((p) => (
               <div key={p} className="flex items-center gap-1">
@@ -101,7 +103,7 @@ function Welcome() {
                 </button>
                 <button
                   className={iconBtn({ tiny: true })}
-                  title="一覧から削除"
+                  title={m.removeFromList}
                   onClick={() => s.removeRecent(p)}
                 >
                   <Icon name="x" size={12} />
@@ -144,6 +146,7 @@ const TOAST_ICON: Record<string, string> = {
 
 function Toasts() {
   const s = useStore();
+  const m = useT().app;
   return (
     <div className="fixed right-4 bottom-9 z-90 flex max-w-130 flex-col gap-2.5">
       {s.toasts.map((t) => (
@@ -167,7 +170,7 @@ function Toasts() {
           </div>
           <CopyButton
             text={t.detail ? `${t.title}\n${t.detail}` : t.title}
-            title="メッセージをコピー"
+            title={m.copyMessage}
             className={`${iconBtn({ tiny: true })} -mt-1 -mr-1.5 flex-none`}
           />
         </div>

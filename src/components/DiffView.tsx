@@ -1,4 +1,5 @@
 import type { ThemedToken } from "shiki";
+import { useT } from "../i18n";
 import type { DiffLine } from "../lib/diff";
 import { isCode } from "../lib/diff";
 
@@ -52,9 +53,10 @@ export function DiffView({
   tokens: ThemedToken[][] | null;
   loading?: boolean;
 }) {
-  if (loading) return <div className={DIFF_EMPTY}>読み込み中...</div>;
-  if (text === null) return <div className={DIFF_EMPTY}>ファイルを選択すると差分を表示します</div>;
-  if (!lines.length) return <div className={DIFF_EMPTY}>表示できる差分がありません</div>;
+  const m = useT().diffView;
+  if (loading) return <div className={DIFF_EMPTY}>{m.loading}</div>;
+  if (text === null) return <div className={DIFF_EMPTY}>{m.selectFile}</div>;
+  if (!lines.length) return <div className={DIFF_EMPTY}>{m.noDiff}</div>;
 
   return (
     <div className="flex-1 overflow-auto pb-3 font-mono text-[11.5px] leading-[1.55]">

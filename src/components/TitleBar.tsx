@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useT } from "../i18n";
 import { useStore } from "../state/store";
 import { RepoPicker } from "./RepoPicker";
 import { miniPill } from "./classes";
@@ -31,6 +32,7 @@ function tabLabels(tabs: string[]): Record<string, string> {
 export function TitleBar() {
   const s = useStore();
   const openMenu = useMenu();
+  const m = useT().titleBar;
   const [picker, setPicker] = useState<{ x: number; y: number } | null>(null);
   // 新しいリポジトリを開いている間は、読み込みが終わる前から仮のタブを並べる
   const tabs = useMemo(
@@ -62,14 +64,14 @@ export function TitleBar() {
     e.preventDefault();
     openMenu(e, [
       {
-        label: "パスをコピー",
+        label: m.copyPath,
         icon: "copy",
         onClick: () => navigator.clipboard.writeText(path).catch(() => undefined),
       },
       { separator: true },
-      { label: "タブを閉じる", icon: "x", onClick: () => s.closeTab(path) },
+      { label: m.closeTab, icon: "x", onClick: () => s.closeTab(path) },
       {
-        label: "他のタブを閉じる",
+        label: m.closeOtherTabs,
         icon: "x",
         disabled: s.tabs.length < 2,
         onClick: () => s.closeTabs(s.tabs.filter((p) => p !== path)),
@@ -118,20 +120,22 @@ export function TitleBar() {
                   <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
                     {headLabel}
                   </span>
-                  {s.repo.isLinkedWorktree ? <span className={miniPill()}>worktree</span> : null}
+                  {s.repo.isLinkedWorktree ? (
+                    <span className={miniPill()}>{m.worktree}</span>
+                  ) : null}
                 </span>
               ) : null}
               {s.tabDirty[path] ? (
                 <span
                   className="h-1.5 w-1.5 flex-none rounded-full bg-amber"
-                  title="未コミットの変更あり"
+                  title={m.uncommittedChanges}
                 />
               ) : null}
               <button
                 className={`flex h-4.5 w-4.5 flex-none cursor-pointer items-center justify-center rounded-[5px] border-0 bg-transparent p-0 text-fg-faint group-hover:opacity-100 hover:bg-bg-3 hover:text-fg ${
                   active ? "opacity-100" : "opacity-0"
                 }`}
-                title="タブを閉じる"
+                title={m.closeTab}
                 onClick={(e) => {
                   e.stopPropagation();
                   s.closeTab(path);
@@ -144,7 +148,7 @@ export function TitleBar() {
         })}
         <button
           className="mx-0.5 mt-0 mb-0.5 flex h-6.5 w-6.5 flex-none cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-fg-dim hover:bg-bg-3 hover:text-fg"
-          title="リポジトリを開く"
+          title={m.openRepo}
           onClick={openPicker}
         >
           <Icon name="plus" size={13} />
@@ -153,7 +157,7 @@ export function TitleBar() {
       <div className="min-w-6 flex-1 self-stretch" data-tauri-drag-region />
       <button
         className="mr-1 mb-0.5 flex h-6.5 w-6.5 flex-none cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-fg-dim hover:bg-bg-3 hover:text-fg"
-        title="ログ (Cmd Shift L)"
+        title={m.logs}
         onClick={s.openLogs}
       >
         <Icon name="log" size={14} />
@@ -161,7 +165,7 @@ export function TitleBar() {
       {/* 右端のロゴは設定の入口を兼ねる */}
       <button
         className="mr-2.5 mb-0.5 flex h-6.5 flex-none cursor-pointer items-center rounded-md border-0 bg-transparent px-1.5 hover:bg-bg-3"
-        title="設定 (Cmd ,)"
+        title={m.settings}
         onClick={s.openSettings}
       >
         <img className="block h-5.5 w-auto" src="/logo-long.svg" alt="" draggable={false} />

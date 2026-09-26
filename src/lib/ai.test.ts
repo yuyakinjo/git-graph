@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { parsePrDescription } from "./ai";
+import { setLocale } from "../i18n";
+import { commitSystem, parsePrDescription } from "./ai";
 
 describe("parsePrDescription", () => {
   test("1 行目をタイトル、残りを本文に分ける", () => {
@@ -15,5 +16,14 @@ describe("parsePrDescription", () => {
 
   test("本文が無ければ空文字", () => {
     expect(parsePrDescription("  タイトルだけ  ")).toEqual({ title: "タイトルだけ", body: "" });
+  });
+});
+
+describe("commitSystem", () => {
+  test("手掛かりが無いときの言語は表示言語に合わせる", () => {
+    expect(commitSystem()).toContain("write in Japanese");
+    setLocale("en");
+    expect(commitSystem()).toContain("write in English");
+    expect(commitSystem()).not.toContain("Japanese");
   });
 });

@@ -7,6 +7,7 @@ import { renamedStashMessage, splitStashMessage, uniqueStashName } from "../lib/
 import { useDialogs } from "../components/ui-context";
 import type { RecomposeMode } from "../lib/recompose";
 import { useStore } from "./store";
+import { t } from "../i18n";
 import type { FormField } from "../components/ui";
 import type {
   BranchInfo,
@@ -18,6 +19,9 @@ import type {
   TidyResult,
   WorktreeInfo,
 } from "../lib/types";
+
+/** 呼んだ時点の言語の文言 (useMemo の外で言語が変わっても追従する) */
+const msg = () => t().actions;
 
 export function useActions() {
   const s = useStore();
@@ -36,23 +40,23 @@ export function useActions() {
 
     // ---------------------------------------------------------- 1. checkout
     const checkout = (target: string, label = target) =>
-      s.run(`${label} をチェックアウト`, () => api.checkout(dir, target), {
+      s.run(msg().run.checkout(label), () => api.checkout(dir, target), {
         successDetail: false,
       });
 
     const checkoutRemote = (remoteBranch: string) =>
-      s.run(`${remoteBranch} をチェックアウト`, () => api.checkoutRemote(dir, remoteBranch), {
+      s.run(msg().run.checkout(remoteBranch), () => api.checkoutRemote(dir, remoteBranch), {
         successDetail: false,
       });
 
     const createBranch = async (startPoint?: string) => {
       const res = await dialogs.form({
-        title: "ブランチを作成",
-        description: startPoint ? `分岐元: ${startPoint}` : undefined,
+        title: msg().createBranch.title,
+        description: startPoint ? msg().createBranch.startPoint(startPoint) : undefined,
         fields: [
           {
             name: "name",
-            label: "ブランチ名",
+            label: msg().common.branchName,
             type: "text",
             required: true,
             mono: true,
@@ -60,16 +64,16 @@ export function useActions() {
           },
           {
             name: "checkout",
-            label: "作成後にチェックアウトする",
+            label: msg().createBranch.checkout,
             type: "checkbox",
             value: true,
           },
         ],
-        submitLabel: "作成",
+        submitLabel: msg().common.create,
       });
       if (!res) return;
       await s.run(
-        `ブランチ ${res.name} を作成`,
+        msg().run.createBranch(String(res.name)),
         () => api.createBranch(dir, String(res.name).trim(), startPoint, Boolean(res.checkout)),
         { successDetail: false },
       );
@@ -78,60 +82,67 @@ export function useActions() {
     const deleteBranch = async (b: BranchInfo) => {
       if (b.kind === "remote") {
         const ok = await dialogs.confirm({
-          title: "リモートブランチを削除",
-          message: `${b.name} をリモートから削除します。元に戻せません。`,
-          confirmLabel: "削除",
+          title: msg().deleteBranch.remoteTitle,
+          message: msg().deleteBranch.remoteMessage(b.name),
+          confirmLabel: msg().common.delete,
           danger: true,
         });
         if (!ok) return;
-        await s.run(`${b.name} を削除`, () => api.deleteRemoteBranch(dir, b.name));
+        await s.run(msg().run.deleteBranch(b.name), () => api.deleteRemoteBranch(dir, b.name));
         return;
       }
       const ok = await dialogs.confirm({
-        title: "ブランチを削除",
-        message: `ローカルブランチ ${b.name} を削除します。`,
-        confirmLabel: "削除",
+        title: msg().deleteBranch.title,
+        message: msg().deleteBranch.message(b.name),
+        confirmLabel: msg().common.delete,
         danger: true,
       });
       if (!ok) return;
-      const done = await s.run(`${b.name} を削除`, () => api.deleteBranch(dir, b.name, false), {
-        successDetail: false,
-      });
+      const done = await s.run(
+        msg().run.deleteBranch(b.name),
+        () => api.deleteBranch(dir, b.name, false),
+        {
+          successDetail: false,
+        },
+      );
       if (!done) {
         const force = await dialogs.confirm({
-          title: "強制削除しますか?",
-          message: `${b.name} は未マージのコミットを含んでいる可能性があります。-D で強制削除します。`,
-          confirmLabel: "強制削除",
+          title: msg().common.forceDeleteTitle,
+          message: msg().deleteBranch.forceMessage(b.name),
+          confirmLabel: msg().common.forceDelete,
           danger: true,
         });
-        if (force) await s.run(`${b.name} を強制削除`, () => api.deleteBranch(dir, b.name, true));
+        if (force)
+          await s.run(msg().run.forceDeleteBranch(b.name), () =>
+            api.deleteBranch(dir, b.name, true),
+          );
       }
     };
 
     const deleteTag = async (name: string) => {
       const remote = s.repo?.remotes[0];
       const res = await dialogs.form({
-        title: "タグを削除",
-        description: `タグ ${name} を削除します。`,
+        title: msg().deleteTag.title,
+        description: msg().deleteTag.description(name),
         fields: remote
           ? [
               {
                 name: "remote",
-                label: `リモート (${remote}) からも削除する`,
+                label: msg().deleteTag.alsoRemote(remote),
                 type: "checkbox",
                 value: false,
               },
             ]
           : [],
-        submitLabel: "削除",
+        submitLabel: msg().common.delete,
         danger: true,
       });
       if (!res) return;
-      const done = await s.run(`タグ ${name} を削除`, () => api.deleteTag(dir, name), {
+      const done = await s.run(msg().run.deleteTag(name), () => api.deleteTag(dir, name), {
         successDetail: false,
       });
       if (done && remote && res.remote) {
-        await s.run(`タグ ${name} を ${remote} から削除`, () =>
+        await s.run(msg().run.deleteRemoteTag(name, remote), () =>
           api.deleteRemoteTag(dir, remote, name),
         );
       }
@@ -141,37 +152,37 @@ export function useActions() {
     /** 確認せずにすぐスタッシュする。名前は日時から重ならないように付ける (あとで変更できる) */
     const stashPush = async () => {
       if (!s.dirty) {
-        s.toast({ kind: "info", title: "スタッシュする変更がありません" });
+        s.toast({ kind: "info", title: msg().stash.nothingToStash });
         return;
       }
       const name = uniqueStashName(s.stashes.map((st) => st.message));
-      await s.run(`「${name}」としてスタッシュ`, () => api.stashPush(dir, name, true), {
+      await s.run(msg().run.stashPush(name), () => api.stashPush(dir, name, true), {
         successDetail: false,
       });
     };
 
     const stashRename = async (st: StashInfo) => {
       const res = await dialogs.form({
-        title: "スタッシュの名前を変更",
+        title: msg().stash.renameTitle,
         description: st.name,
         width: 480,
         action: {
-          label: "AI で生成",
-          busyLabel: "生成中…",
+          label: msg().common.aiGenerate,
+          busyLabel: msg().common.aiGenerating,
           icon: "sparkle",
-          title: "スタッシュの中身から Claude Code で名前を生成",
+          title: msg().stash.aiTitle,
           run: async (values) => {
             try {
               const ctx = await api.stashContext(dir, st.name);
               if (!ctx.diff.trim()) {
-                s.toast({ kind: "info", title: "スタッシュに差分がありません" });
+                s.toast({ kind: "info", title: msg().stash.noDiff });
                 return;
               }
               return { name: await generateStashName(s.aiCliModel, ctx, String(values.name)) };
             } catch (e) {
               s.toast({
                 kind: "error",
-                title: "スタッシュの名前を生成できませんでした",
+                title: msg().stash.aiFailed,
                 detail: String(e),
               });
             }
@@ -180,40 +191,44 @@ export function useActions() {
         fields: [
           {
             name: "name",
-            label: "名前",
+            label: msg().stash.name,
             type: "text",
             required: true,
             value: splitStashMessage(st.message).name,
           },
         ],
-        submitLabel: "変更",
+        submitLabel: msg().stash.rename,
       });
       if (!res) return;
       const message = renamedStashMessage(st.message, String(res.name));
       if (message === st.message) return;
-      await s.run(`${st.name} の名前を変更`, () => api.stashRename(dir, st.name, message), {
+      await s.run(msg().run.stashRename(st.name), () => api.stashRename(dir, st.name, message), {
         successDetail: false,
       });
     };
 
     const stashApply = (st: StashInfo, pop: boolean) =>
-      s.run(`${st.name} を${pop ? "ポップ" : "適用"}`, () => api.stashApply(dir, st.name, pop));
+      s.run(pop ? msg().run.stashPop(st.name) : msg().run.stashApply(st.name), () =>
+        api.stashApply(dir, st.name, pop),
+      );
 
     const stashDrop = async (st: StashInfo) => {
       const ok = await dialogs.confirm({
-        title: "スタッシュを破棄",
-        message: `${st.name} (${st.message}) を削除します。元に戻せません。`,
-        confirmLabel: "破棄",
+        title: msg().stash.dropTitle,
+        message: msg().stash.dropMessage(st.name, st.message),
+        confirmLabel: msg().stash.drop,
         danger: true,
       });
-      if (ok) await s.run(`${st.name} を破棄`, () => api.stashDrop(dir, st.name));
+      if (ok) await s.run(msg().run.stashDrop(st.name), () => api.stashDrop(dir, st.name));
     };
 
     // ---------------------------------------------------------- 3. pull / fetch
-    const fetch = () => s.run("フェッチ", () => api.fetch(dir, true), { silentSuccess: true });
+    const fetch = () => s.run(msg().run.fetch, () => api.fetch(dir, true), { silentSuccess: true });
 
     const pull = async (rebase = false) => {
-      await s.run(rebase ? "リベースして pull" : "プル", () => api.pull(dir, rebase, s.dirty));
+      await s.run(rebase ? msg().run.pullRebase : msg().run.pull, () =>
+        api.pull(dir, rebase, s.dirty),
+      );
     };
 
     /**
@@ -222,35 +237,35 @@ export function useActions() {
      */
     const pullBranch = async (b: BranchInfo, rebase = false) => {
       if (b.isHead) return pull(rebase);
-      await s.run(`${b.name} を ${b.upstream} に早送り`, () => api.fastForward(dir, b.name));
+      await s.run(msg().run.fastForward(b.name, b.upstream), () => api.fastForward(dir, b.name));
     };
 
     // ---------------------------------------------------------- 4-5. add / commit
     const stage = (paths: string[]) =>
-      s.run("ステージ", () => api.stage(dir, paths), { silentSuccess: true });
+      s.run(msg().run.stage, () => api.stage(dir, paths), { silentSuccess: true });
     const stageAll = () =>
-      s.run("すべてステージ", () => api.stageAll(dir), { silentSuccess: true });
+      s.run(msg().run.stageAll, () => api.stageAll(dir), { silentSuccess: true });
     const unstage = (paths: string[]) =>
-      s.run("アンステージ", () => api.unstage(dir, paths), {
+      s.run(msg().run.unstage, () => api.unstage(dir, paths), {
         silentSuccess: true,
       });
     const unstageAll = () =>
-      s.run("すべてアンステージ", () => api.unstageAll(dir), {
+      s.run(msg().run.unstageAll, () => api.unstageAll(dir), {
         silentSuccess: true,
       });
 
     const discard = async (paths: string[]) => {
       const ok = await dialogs.confirm({
-        title: "変更を破棄",
+        title: msg().discard.title,
         message:
           paths.length === 1
-            ? `${paths[0]} の変更を破棄します。元に戻せません。`
-            : `${paths.length} 件のファイルの変更を破棄します。元に戻せません。`,
-        confirmLabel: "破棄",
+            ? msg().discard.messageOne(paths[0])
+            : msg().discard.messageMany(paths.length),
+        confirmLabel: msg().discard.confirm,
         danger: true,
       });
       if (ok)
-        await s.run("変更を破棄", () => api.discard(dir, paths), {
+        await s.run(msg().run.discard, () => api.discard(dir, paths), {
           successDetail: false,
         });
     };
@@ -260,9 +275,13 @@ export function useActions() {
       if (staged === 0 && !amend) {
         await api.stageAll(dir).catch(() => undefined);
       }
-      return s.run(amend ? "コミットを修正" : "コミット", () => api.commit(dir, message, amend), {
-        successDetail: false,
-      });
+      return s.run(
+        amend ? msg().run.amend : msg().run.commit,
+        () => api.commit(dir, message, amend),
+        {
+          successDetail: false,
+        },
+      );
     };
 
     /**
@@ -272,20 +291,20 @@ export function useActions() {
     const commitPrompt = async (opts: { ai?: boolean; amend?: boolean } = {}) => {
       const staged = s.status?.staged.length ?? 0;
       const res = await dialogs.form({
-        title: opts.amend ? "コミットを修正" : "コミット",
+        title: opts.amend ? msg().commit.amendTitle : msg().commit.title,
         description: opts.amend
           ? staged > 0
-            ? `ステージ済みの ${staged} 件を加えて直前のコミットを修正します`
-            : "直前のコミットのメッセージを修正します"
+            ? msg().commit.amendWithStaged(staged)
+            : msg().commit.amendMessageOnly
           : staged > 0
-            ? `ステージ済みの ${staged} 件をコミットします`
-            : "ステージ済みが無いため、すべての変更をステージしてコミットします",
+            ? msg().commit.commitStaged(staged)
+            : msg().commit.commitAll,
         width: 560,
         action: {
-          label: "AI で生成",
-          busyLabel: "生成中…",
+          label: msg().common.aiGenerate,
+          busyLabel: msg().common.aiGenerating,
           icon: "sparkle",
-          title: "次のコミットに入る差分から Claude Code でメッセージを生成",
+          title: msg().commit.aiTitle,
           autoRun: opts.ai,
           run: async (values) => {
             try {
@@ -293,7 +312,7 @@ export function useActions() {
               if (!ctx.diff.trim()) {
                 s.toast({
                   kind: "info",
-                  title: "コミットする差分がありません",
+                  title: msg().commit.noDiff,
                 });
                 return;
               }
@@ -303,7 +322,7 @@ export function useActions() {
             } catch (e) {
               s.toast({
                 kind: "error",
-                title: "コミットメッセージを生成できませんでした",
+                title: msg().commit.aiFailed,
                 detail: String(e),
               });
             }
@@ -312,19 +331,19 @@ export function useActions() {
         fields: [
           {
             name: "message",
-            label: "コミットメッセージ",
+            label: msg().commit.message,
             type: "textarea",
             rows: 5,
             required: true,
           },
           {
             name: "amend",
-            label: "直前のコミットを修正 (--amend)",
+            label: msg().commit.amend,
             type: "checkbox",
             value: Boolean(opts.amend),
           },
         ],
-        submitLabel: "コミット",
+        submitLabel: msg().commit.submit,
       });
       if (!res) return;
       await commit(String(res.message), Boolean(res.amend));
@@ -336,54 +355,54 @@ export function useActions() {
       if (!head) {
         s.toast({
           kind: "error",
-          title: "detached HEAD のためプッシュできません",
+          title: msg().push.detached,
         });
         return;
       }
       const remote = s.repo?.remotes[0] ?? "origin";
       if (!head.upstream) {
         const ok = await dialogs.confirm({
-          title: "上流ブランチを設定してプッシュ",
-          message: `${head.name} の上流が未設定です。${remote} に -u 付きでプッシュします。`,
-          confirmLabel: "プッシュ",
+          title: msg().push.setUpstreamTitle,
+          message: msg().push.setUpstreamMessage(head.name, remote),
+          confirmLabel: msg().push.submit,
         });
         if (!ok) return;
-        await s.run("プッシュ", () =>
+        await s.run(msg().run.push, () =>
           api.push(dir, { remote, branch: head.name, setUpstream: true }),
         );
         return;
       }
       if (head.behind > 0 && !opts.force) {
         const res = await dialogs.form({
-          title: "リモートに新しいコミットがあります",
-          description: `${head.name} は ${head.behind} コミット遅れています。どうしますか?`,
+          title: msg().push.behindTitle,
+          description: msg().push.behindDescription(head.name, head.behind),
           fields: [
             {
               name: "how",
-              label: "操作",
+              label: msg().push.how,
               type: "select",
               value: "pull",
               options: [
-                { value: "pull", label: "先に pull してからプッシュ" },
-                { value: "force", label: "強制プッシュ (--force-with-lease)" },
+                { value: "pull", label: msg().push.pullFirst },
+                { value: "force", label: msg().push.forceWithLease },
               ],
             },
           ],
-          submitLabel: "続行",
+          submitLabel: msg().push.continue,
         });
         if (!res) return;
         if (res.how === "pull") {
-          const ok = await s.run("プル", () => api.pull(dir, false, s.dirty));
+          const ok = await s.run(msg().run.pull, () => api.pull(dir, false, s.dirty));
           if (!ok) return;
-          await s.run("プッシュ", () => api.push(dir, { remote, branch: head.name }));
+          await s.run(msg().run.push, () => api.push(dir, { remote, branch: head.name }));
           return;
         }
-        await s.run("強制プッシュ", () =>
+        await s.run(msg().run.forcePush, () =>
           api.push(dir, { remote, branch: head.name, forceWithLease: true }),
         );
         return;
       }
-      await s.run("プッシュ", () =>
+      await s.run(msg().run.push, () =>
         api.push(dir, {
           remote,
           branch: head.name,
@@ -395,9 +414,9 @@ export function useActions() {
     const forcePush = async () => {
       const head = s.headBranch;
       const ok = await dialogs.confirm({
-        title: "強制プッシュ",
-        message: `${head?.name ?? "HEAD"} を --force-with-lease でプッシュします。リモートの履歴が書き換わります。`,
-        confirmLabel: "強制プッシュ",
+        title: msg().push.forceTitle,
+        message: msg().push.forceMessage(head?.name ?? "HEAD"),
+        confirmLabel: msg().push.forceConfirm,
         danger: true,
       });
       if (ok) await push({ force: true });
@@ -408,24 +427,23 @@ export function useActions() {
       const home = await api.homeDir().catch(() => "");
       const parent = s.repo ? s.repo.root.slice(0, s.repo.root.lastIndexOf("/")) : home;
       const res = await dialogs.form({
-        title: "worktree を追加",
-        description:
-          "別ディレクトリに作業ツリーを作り、同じリポジトリの別ブランチを並行して扱えます。",
+        title: msg().worktree.addTitle,
+        description: msg().worktree.addDescription,
         width: 560,
         fields: [
           {
             name: "mode",
-            label: "ブランチ",
+            label: msg().worktree.branch,
             type: "select",
             value: "new",
             options: [
-              { value: "new", label: "新しいブランチを作成する" },
-              { value: "existing", label: "既存のブランチを使う" },
+              { value: "new", label: msg().worktree.newBranch },
+              { value: "existing", label: msg().worktree.existingBranch },
             ],
           },
           {
             name: "branch",
-            label: "ブランチ名",
+            label: msg().common.branchName,
             type: "text",
             required: true,
             mono: true,
@@ -433,32 +451,32 @@ export function useActions() {
           },
           {
             name: "base",
-            label: "分岐元 (新規作成時)",
+            label: msg().worktree.base,
             type: "select",
             value: s.repo?.headBranch ?? "",
             options: localBranchOptions(),
           },
           {
             name: "path",
-            label: "作成先ディレクトリ",
+            label: msg().worktree.path,
             type: "dirpath",
             required: true,
             value: `${parent}/${s.repo?.name ?? "repo"}-worktree`,
-            hint: "存在しないパスを指定してください",
+            hint: msg().worktree.pathHint,
           },
           {
             name: "open",
-            label: "作成後にこの worktree を開く",
+            label: msg().worktree.open,
             type: "checkbox",
             value: true,
           },
         ],
-        submitLabel: "追加",
+        submitLabel: msg().worktree.add,
       });
       if (!res) return;
       const isNew = res.mode === "new";
       const path = String(res.path).trim();
-      const ok = await s.run("worktree を追加", () =>
+      const ok = await s.run(msg().run.worktreeAdd, () =>
         api.worktreeAdd(
           dir,
           path,
@@ -472,27 +490,32 @@ export function useActions() {
 
     const worktreeRemove = async (wt: WorktreeInfo) => {
       const ok = await dialogs.confirm({
-        title: "worktree を削除",
-        message: `${wt.path} を削除します。未コミットの変更がある場合は強制削除が必要です。`,
-        confirmLabel: "削除",
+        title: msg().worktree.removeTitle,
+        message: msg().worktree.removeMessage(wt.path),
+        confirmLabel: msg().common.delete,
         danger: true,
       });
       if (!ok) return;
-      const done = await s.run("worktree を削除", () => api.worktreeRemove(dir, wt.path, false), {
-        successDetail: false,
-      });
+      const done = await s.run(
+        msg().run.worktreeRemove,
+        () => api.worktreeRemove(dir, wt.path, false),
+        {
+          successDetail: false,
+        },
+      );
       if (!done) {
         const force = await dialogs.confirm({
-          title: "強制削除しますか?",
-          message: `${wt.path} に未コミットの変更が残っています。--force で削除します。`,
-          confirmLabel: "強制削除",
+          title: msg().common.forceDeleteTitle,
+          message: msg().worktree.forceMessage(wt.path),
+          confirmLabel: msg().common.forceDelete,
           danger: true,
         });
-        if (force) await s.run("worktree を強制削除", () => api.worktreeRemove(dir, wt.path, true));
+        if (force)
+          await s.run(msg().run.worktreeForceRemove, () => api.worktreeRemove(dir, wt.path, true));
       }
     };
 
-    const worktreePrune = () => s.run("worktree を整理", () => api.worktreePrune(dir));
+    const worktreePrune = () => s.run(msg().run.worktreePrune, () => api.worktreePrune(dir));
 
     // ---------------------------------------------------------- 6.5. tidy
     /**
@@ -502,7 +525,7 @@ export function useActions() {
     const tidy = async () => {
       const got: { plan?: TidyPlan } = {};
       const ok = await s.run(
-        "整理対象を確認",
+        msg().run.tidyPlan,
         async () => {
           got.plan = await api.tidyPlan(dir);
           return "";
@@ -514,15 +537,15 @@ export function useActions() {
 
     const tidyLabel = (r: Pick<TidyResult, "kind" | "target">) =>
       r.kind === "fastForward"
-        ? `${r.target} を早送り`
+        ? msg().tidyResult.fastForward(r.target)
         : r.kind === "branch"
-          ? `ブランチ ${r.target}`
-          : `worktree ${r.target}`;
+          ? msg().tidyResult.branch(r.target)
+          : msg().tidyResult.worktree(r.target);
 
     const tidyApply = async (target: string, items: TidyItem[]) => {
       s.setTidy(null);
       if (!items.length) return;
-      await s.run(`${items.length} 件を整理`, async () => {
+      await s.run(msg().run.tidyApply(items.length), async () => {
         const results = await api.tidyApply(
           target,
           items.map(({ kind, target, sha }) => ({ kind, target, sha })),
@@ -544,7 +567,10 @@ export function useActions() {
 
     const recomposeApply = async (target: string, mode: RecomposeMode, op: RecomposeOp) => {
       s.setRecompose(null);
-      await s.run(`${mode}: ${op.newBranch}`, () => api.recomposeApply(target, op));
+      await s.run(
+        mode === "compose" ? msg().run.compose(op.newBranch) : msg().run.recompose(op.newBranch),
+        () => api.recomposeApply(target, op),
+      );
     };
 
     // ---------------------------------------------------------- 7.5. remote
@@ -557,7 +583,7 @@ export function useActions() {
       if (s.repo.remotes.length > 0) {
         s.toast({
           kind: "info",
-          title: "リモートは設定済みです",
+          title: msg().remote.alreadySet,
           detail: s.repo.remotes.join(", "),
         });
         return;
@@ -565,16 +591,16 @@ export function useActions() {
       if (!s.gh?.installed) {
         s.toast({
           kind: "error",
-          title: "gh CLI が見つかりません",
-          detail: "brew install gh でインストールしてください",
+          title: msg().common.ghMissing,
+          detail: msg().common.ghMissingDetail,
         });
         return;
       }
       if (!s.gh.authenticated) {
         s.toast({
           kind: "error",
-          title: "gh CLI が未認証です",
-          detail: "gh auth login を実行してください",
+          title: msg().common.ghUnauthenticated,
+          detail: msg().common.ghUnauthenticatedDetail,
         });
         return;
       }
@@ -589,7 +615,7 @@ export function useActions() {
         ? [
             {
               name: "owner",
-              label: "オーナー",
+              label: msg().remote.owner,
               type: "select",
               value: owners[0],
               options: owners.map((o) => ({ value: o, label: o })),
@@ -600,7 +626,7 @@ export function useActions() {
         ...ownerField,
         {
           name: "name",
-          label: "リポジトリ名",
+          label: msg().remote.repoName,
           type: "text",
           required: true,
           mono: true,
@@ -608,38 +634,38 @@ export function useActions() {
         },
         {
           name: "visibility",
-          label: "公開範囲",
+          label: msg().remote.visibility,
           type: "select",
           value: "private",
           options: [
-            { value: "private", label: "Private" },
-            { value: "public", label: "Public" },
-            { value: "internal", label: "Internal (org のみ)" },
+            { value: "private", label: msg().remote.private },
+            { value: "public", label: msg().remote.public },
+            { value: "internal", label: msg().remote.internal },
           ],
         },
-        { name: "description", label: "説明 (任意)", type: "text" },
+        { name: "description", label: msg().remote.description, type: "text" },
         {
           name: "push",
-          label: "作成後に現在のブランチをプッシュする",
+          label: msg().remote.pushAfter,
           type: "checkbox",
           value: hasCommits,
-          hint: hasCommits ? undefined : "コミットが無いためプッシュできません",
+          hint: hasCommits ? undefined : msg().remote.noCommits,
         },
       ];
 
       const res = await dialogs.form({
-        title: "GitHub にリポジトリを作成",
-        description: "作成した GitHub リポジトリを origin として登録します。",
+        title: msg().remote.title,
+        description: msg().remote.formDescription,
         width: 560,
         fields,
-        submitLabel: "作成",
+        submitLabel: msg().common.create,
       });
       if (!res) return;
 
       const owner = String(res.owner ?? "").trim();
       const name = String(res.name).trim();
       const full = owner ? `${owner}/${name}` : name;
-      await s.run("GitHub リポジトリを作成", () =>
+      await s.run(msg().run.ghRepoCreate, () =>
         api.ghRepoCreate(dir, {
           name: full,
           visibility: String(res.visibility ?? "private"),
@@ -657,34 +683,34 @@ export function useActions() {
       if (!head) {
         s.toast({
           kind: "error",
-          title: "detached HEAD では PR を作成できません",
+          title: msg().pr.detached,
         });
         return;
       }
       if (!s.gh?.installed) {
         s.toast({
           kind: "error",
-          title: "gh CLI が見つかりません",
-          detail: "brew install gh でインストールしてください",
+          title: msg().common.ghMissing,
+          detail: msg().common.ghMissingDetail,
         });
         return;
       }
       if (!s.gh.authenticated) {
         s.toast({
           kind: "error",
-          title: "gh CLI が未認証です",
-          detail: "gh auth login を実行してください",
+          title: msg().common.ghUnauthenticated,
+          detail: msg().common.ghUnauthenticatedDetail,
         });
         return;
       }
       if (!head.upstream) {
         const ok = await dialogs.confirm({
-          title: "ブランチをプッシュします",
-          message: `${head.name} はまだリモートにありません。先に push -u してから PR を作成します。`,
-          confirmLabel: "プッシュして続行",
+          title: msg().pr.pushTitle,
+          message: msg().pr.pushMessage(head.name),
+          confirmLabel: msg().common.pushAndContinue,
         });
         if (!ok) return;
-        const pushed = await s.run("プッシュ", () =>
+        const pushed = await s.run(msg().run.push, () =>
           api.push(dir, {
             remote: s.repo?.remotes[0] ?? "origin",
             branch: head.name,
@@ -694,12 +720,12 @@ export function useActions() {
         if (!pushed) return;
       } else if (head.ahead > 0) {
         const ok = await dialogs.confirm({
-          title: "未プッシュのコミットがあります",
-          message: `${head.name} に ${head.ahead} 件の未プッシュコミットがあります。先にプッシュしますか?`,
-          confirmLabel: "プッシュして続行",
+          title: msg().pr.unpushedTitle,
+          message: msg().pr.unpushedMessage(head.name, head.ahead),
+          confirmLabel: msg().common.pushAndContinue,
         });
         if (ok) {
-          const pushed = await s.run("プッシュ", () =>
+          const pushed = await s.run(msg().run.push, () =>
             api.push(dir, {
               remote: s.repo?.remotes[0] ?? "origin",
               branch: head.name,
@@ -728,16 +754,14 @@ export function useActions() {
       ].map((v) => ({ value: v, label: v }));
 
       const res = await dialogs.form({
-        title: "プルリクエストを作成",
+        title: msg().pr.createTitle,
         description: `${s.gh.repo ?? ""} — ${head.name} → ${s.gh.defaultBranch ?? "base"}`,
         width: 640,
         action: {
-          label: "AI で生成",
-          busyLabel: "生成中…",
+          label: msg().common.aiGenerate,
+          busyLabel: msg().common.aiGenerating,
           icon: "sparkle",
-          title: template
-            ? "PR テンプレートに沿って、差分から Claude Code でタイトルと本文を生成"
-            : "差分とコミットから Claude Code でタイトルと本文を生成",
+          title: template ? msg().pr.aiTitleTemplate : msg().pr.aiTitle,
           autoRun: opts.ai,
           run: async (values) => {
             try {
@@ -749,7 +773,7 @@ export function useActions() {
               if (!ctx.diff.trim()) {
                 s.toast({
                   kind: "info",
-                  title: "マージ先との差分がありません",
+                  title: msg().pr.noDiff,
                 });
                 return;
               }
@@ -757,7 +781,7 @@ export function useActions() {
             } catch (e) {
               s.toast({
                 kind: "error",
-                title: "PR の説明を生成できませんでした",
+                title: msg().pr.aiFailed,
                 detail: String(e),
               });
             }
@@ -766,14 +790,14 @@ export function useActions() {
         fields: [
           {
             name: "title",
-            label: "タイトル",
+            label: msg().pr.title,
             type: "text",
             required: true,
             value: defaultTitle,
           },
           {
             name: "body",
-            label: "本文",
+            label: msg().pr.body,
             type: "textarea",
             rows: 10,
             markdown: true,
@@ -781,23 +805,23 @@ export function useActions() {
           },
           {
             name: "base",
-            label: "マージ先 (base)",
+            label: msg().pr.base,
             type: "select",
             value: s.gh.defaultBranch ?? baseOptions[0]?.value ?? "",
             options: baseOptions,
           },
           {
             name: "draft",
-            label: "ドラフトとして作成",
+            label: msg().pr.draft,
             type: "checkbox",
             value: false,
           },
         ],
-        submitLabel: "作成",
+        submitLabel: msg().common.create,
       });
       if (!res) return;
 
-      s.toast({ kind: "info", title: "PR を作成しています..." });
+      s.toast({ kind: "info", title: msg().pr.creating });
       try {
         const out = await api.prCreate(dir, {
           title: String(res.title),
@@ -810,7 +834,7 @@ export function useActions() {
         const url = out.match(/https?:\/\/\S+/)?.[0];
         s.toast({
           kind: "success",
-          title: "PR を作成しました",
+          title: msg().pr.created,
           detail: url ?? out,
         });
         await s.refresh({ silent: true });
@@ -819,14 +843,14 @@ export function useActions() {
       } catch (e) {
         s.toast({
           kind: "error",
-          title: "PR の作成に失敗しました",
+          title: msg().pr.createFailed,
           detail: String(e),
         });
       }
     };
 
     const prCheckout = (pr: PullRequest) =>
-      s.run(`PR #${pr.number} をチェックアウト`, () => api.prCheckout(dir, pr.number));
+      s.run(msg().run.prCheckout(pr.number), () => api.prCheckout(dir, pr.number));
 
     const prOpen = (pr: PullRequest) => openUrl(pr.url).catch(() => undefined);
 
@@ -835,32 +859,32 @@ export function useActions() {
 
     const prMerge = async (pr: PullRequest) => {
       const res = await dialogs.form({
-        title: `PR #${pr.number} をマージ`,
+        title: msg().pr.mergeTitle(pr.number),
         description: pr.title,
         fields: [
           {
             name: "method",
-            label: "マージ方法",
+            label: msg().pr.mergeMethod,
             type: "select",
             value: "squash",
             options: [
-              { value: "squash", label: "Squash and merge" },
-              { value: "merge", label: "Create a merge commit" },
-              { value: "rebase", label: "Rebase and merge" },
+              { value: "squash", label: msg().pr.squash },
+              { value: "merge", label: msg().pr.mergeCommit },
+              { value: "rebase", label: msg().pr.rebase },
             ],
           },
           {
             name: "deleteBranch",
-            label: "マージ後にブランチを削除",
+            label: msg().pr.deleteBranch,
             type: "checkbox",
             value: true,
           },
         ],
-        submitLabel: "マージ",
+        submitLabel: msg().pr.merge,
         danger: true,
       });
       if (!res) return;
-      const ok = await s.run(`PR #${pr.number} をマージ`, () =>
+      const ok = await s.run(msg().run.prMerge(pr.number), () =>
         api.prMerge(dir, pr.number, String(res.method), Boolean(res.deleteBranch)),
       );
       if (ok) await s.refreshPrs();

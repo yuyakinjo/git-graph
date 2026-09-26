@@ -1,6 +1,7 @@
 import { ZOOM_MAX, ZOOM_MIN, ZOOM_PRESETS, ZOOM_STEP, clampZoom, zoomLabel } from "../lib/zoom";
 import { useActions } from "../state/actions";
 import { useStore } from "../state/store";
+import { useT } from "../i18n";
 import { iconBtn } from "./classes";
 import { Icon, Spinner } from "./ui";
 import { useDialogs, useMenu } from "./ui-context";
@@ -32,23 +33,24 @@ export function Toolbar({
   const s = useStore();
   const act = useActions();
   const openMenu = useMenu();
+  const m = useT().toolbar;
   const head = s.headBranch;
 
   const pullMenu = (e: React.MouseEvent) =>
     openMenu(e, [
-      { label: "プル (merge)", icon: "pull", onClick: () => act.pull(false) },
-      { label: "プル (rebase)", icon: "pull", onClick: () => act.pull(true) },
+      { label: m.pullMerge, icon: "pull", onClick: () => act.pull(false) },
+      { label: m.pullRebase, icon: "pull", onClick: () => act.pull(true) },
       { separator: true },
-      { label: "フェッチ (--prune)", icon: "fetch", onClick: () => act.fetch() },
+      { label: m.fetchPrune, icon: "fetch", onClick: () => act.fetch() },
       { separator: true },
-      { label: "マージ済みを整理 (tidy)…", icon: "sweep", onClick: () => act.tidy() },
+      { label: m.tidyMerged, icon: "sweep", onClick: () => act.tidy() },
     ]);
 
   const pushMenu = (e: React.MouseEvent) =>
     openMenu(e, [
-      { label: "プッシュ", icon: "push", onClick: () => act.push() },
+      { label: m.push, icon: "push", onClick: () => act.push() },
       {
-        label: "強制プッシュ (--force-with-lease)",
+        label: m.forcePush,
         icon: "push",
         danger: true,
         onClick: () => act.forcePush(),
@@ -57,15 +59,15 @@ export function Toolbar({
 
   const stashMenu = (e: React.MouseEvent) =>
     openMenu(e, [
-      { label: "stash", icon: "stash", onClick: () => act.stashPush() },
+      { label: m.stash, icon: "stash", onClick: () => act.stashPush() },
       {
-        label: "pop",
+        label: m.stashPop,
         icon: "pull",
         disabled: s.stashes.length === 0,
         onClick: () => s.stashes[0] && act.stashApply(s.stashes[0], true),
       },
       {
-        label: "apply",
+        label: m.stashApply,
         icon: "check",
         disabled: s.stashes.length === 0,
         onClick: () => s.stashes[0] && act.stashApply(s.stashes[0], false),
@@ -84,7 +86,7 @@ export function Toolbar({
           title="git fetch --all --prune"
         >
           <Icon name="fetch" />
-          <span>フェッチ</span>
+          <span>{m.fetch}</span>
         </button>
         <div className="flex items-center">
           <button
@@ -94,7 +96,7 @@ export function Toolbar({
             title="git pull"
           >
             <Icon name="pull" />
-            <span>プル</span>
+            <span>{m.pull}</span>
             {head?.behind ? <em className={TOOL_BADGE}>{head.behind}</em> : null}
           </button>
           <button className={CARET} disabled={disabled} onClick={pullMenu}>
@@ -109,7 +111,7 @@ export function Toolbar({
             title="git push"
           >
             <Icon name="push" />
-            <span>プッシュ</span>
+            <span>{m.push}</span>
             {head?.ahead ? <em className={TOOL_BADGE_ACCENT}>{head.ahead}</em> : null}
           </button>
           <button className={CARET} disabled={disabled} onClick={pushMenu}>
@@ -123,10 +125,10 @@ export function Toolbar({
           className={TOOL}
           disabled={disabled}
           onClick={() => act.createBranch()}
-          title="ブランチを作成"
+          title={m.createBranch}
         >
           <Icon name="branch" />
-          <span>ブランチ</span>
+          <span>{m.branch}</span>
         </button>
         <div className="flex items-center">
           <button
@@ -136,7 +138,7 @@ export function Toolbar({
             title="git stash push"
           >
             <Icon name="stash" />
-            <span>スタッシュ</span>
+            <span>{m.stash}</span>
             {s.stashes.length ? <em className={TOOL_BADGE}>{s.stashes.length}</em> : null}
           </button>
           <button className={CARET} disabled={disabled} onClick={stashMenu}>
@@ -150,7 +152,7 @@ export function Toolbar({
           title="git worktree add"
         >
           <Icon name="worktree" />
-          <span>worktree</span>
+          <span>{m.worktree}</span>
         </button>
         <button
           className={TOOL}
@@ -159,7 +161,7 @@ export function Toolbar({
           title="gh pr create"
         >
           <Icon name="pr" />
-          <span>PR 作成</span>
+          <span>{m.prCreate}</span>
         </button>
       </div>
 
@@ -171,14 +173,14 @@ export function Toolbar({
         ) : null}
         <button
           className={iconBtn({ active: dashOpen })}
-          title={`ダッシュパネル: ${dashOpen ? "表示" : "非表示"}`}
+          title={m.dashPanel(dashOpen)}
           onClick={onToggleDash}
         >
           <Icon name="bolt" size={15} className={dashOpen ? "text-bolt" : undefined} />
         </button>
         <button
           className={iconBtn()}
-          title="再読み込み"
+          title={m.reload}
           disabled={!s.repo}
           onClick={() => s.refresh({ withGh: true })}
         >
@@ -194,22 +196,23 @@ function ZoomStatus() {
   const s = useStore();
   const openMenu = useMenu();
   const dialogs = useDialogs();
+  const m = useT().toolbar;
 
   const ask = async () => {
     const r = await dialogs.form({
-      title: "表示倍率",
-      description: `${ZOOM_MIN * 100}〜${ZOOM_MAX * 100} の範囲で指定します。`,
+      title: m.zoom,
+      description: m.zoomRange(ZOOM_MIN * 100, ZOOM_MAX * 100),
       fields: [
         {
           name: "percent",
-          label: "倍率 (%)",
+          label: m.zoomPercent,
           type: "text",
           value: String(Math.round(s.zoom * 100)),
           required: true,
           mono: true,
         },
       ],
-      submitLabel: "適用",
+      submitLabel: m.apply,
       width: 320,
     });
     const percent = Number(
@@ -223,9 +226,9 @@ function ZoomStatus() {
 
   const menu = (e: React.MouseEvent) =>
     openMenu(e, [
-      { label: "拡大 (Cmd +)", icon: "plus", onClick: () => s.setZoom(s.zoom + ZOOM_STEP) },
-      { label: "縮小 (Cmd -)", icon: "minus", onClick: () => s.setZoom(s.zoom - ZOOM_STEP) },
-      { label: "100% に戻す (Cmd 0)", icon: "fetch", onClick: () => s.setZoom(1) },
+      { label: m.zoomIn, icon: "plus", onClick: () => s.setZoom(s.zoom + ZOOM_STEP) },
+      { label: m.zoomOut, icon: "minus", onClick: () => s.setZoom(s.zoom - ZOOM_STEP) },
+      { label: m.zoomReset, icon: "fetch", onClick: () => s.setZoom(1) },
       { separator: true },
       ...ZOOM_PRESETS.map((z) => ({
         label: zoomLabel(z),
@@ -233,13 +236,13 @@ function ZoomStatus() {
         onClick: () => s.setZoom(z),
       })),
       { separator: true },
-      { label: "倍率を入力…", icon: "amend", onClick: ask },
+      { label: m.zoomInput, icon: "amend", onClick: ask },
     ]);
 
   return (
     <button
       className={`${SB_ITEM} h-5 cursor-pointer rounded border-0 bg-transparent px-1.5 text-[11px] text-fg-dim tabular-nums hover:bg-bg-3`}
-      title="表示倍率 (Cmd + / Cmd - / Cmd 0)"
+      title={m.zoomTitle}
       onClick={menu}
     >
       <Icon name="search" size={11} /> {zoomLabel(s.zoom)}
@@ -250,13 +253,14 @@ function ZoomStatus() {
 export function StatusBar() {
   const s = useStore();
   const act = useActions();
+  const m = useT().toolbar;
   const ghUrl = s.gh?.url ?? null;
   return (
     <footer className="flex h-6 flex-none items-center gap-3.5 bg-bg-0 px-3 text-[11px] text-fg-dim">
       {s.gh?.repo ? (
         <button
           className={`${SB_ITEM} h-5 cursor-pointer rounded border-0 bg-transparent px-1.5 text-[11px] text-fg-dim hover:bg-bg-3 hover:text-fg disabled:cursor-default`}
-          title={ghUrl ? `GitHub で開く: ${ghUrl}` : s.gh.repo}
+          title={ghUrl ? m.openOnGitHub(ghUrl) : s.gh.repo}
           disabled={!ghUrl}
           onClick={() => ghUrl && act.webOpen(ghUrl)}
         >
@@ -264,12 +268,12 @@ export function StatusBar() {
           {s.gh.login ? ` (${s.gh.login})` : ""}
         </button>
       ) : s.gh && !s.gh.installed ? (
-        <span className={`${SB_ITEM} text-amber`}>gh CLI 未検出</span>
+        <span className={`${SB_ITEM} text-amber`}>{m.ghMissing}</span>
       ) : null}
       <span className={`${SB_ITEM} flex-1`} />
       <ZoomStatus />
-      {s.graph ? <span className={SB_ITEM}>{s.graph.commits.length} コミット</span> : null}
-      {s.stashes.length ? <span className={SB_ITEM}>スタッシュ {s.stashes.length}</span> : null}
+      {s.graph ? <span className={SB_ITEM}>{m.commits(s.graph.commits.length)}</span> : null}
+      {s.stashes.length ? <span className={SB_ITEM}>{m.stashes(s.stashes.length)}</span> : null}
       {s.repo?.headHash ? (
         <span className={`${SB_ITEM} font-mono text-[12px]`} title="HEAD">
           {s.repo.headHash.slice(0, 7)}
@@ -277,8 +281,10 @@ export function StatusBar() {
       ) : null}
       {s.status ? (
         <span className={SB_ITEM}>
-          {s.dirty ? `変更 ${s.status.staged.length + s.status.unstaged.length}` : "クリーン"}
-          {s.status.conflicts.length ? ` / 衝突 ${s.status.conflicts.length}` : ""}
+          {m.workingState(
+            s.dirty ? s.status.staged.length + s.status.unstaged.length : null,
+            s.status.conflicts.length,
+          )}
         </span>
       ) : null}
     </footer>
