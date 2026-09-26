@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useWindowEvent } from "../lib/effects";
 import {
   DASH_BARS,
@@ -464,6 +464,20 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
 
   // ウィンドウを縮めても画面外に取り残さない
   useWindowEvent("resize", () => setPos((p) => (p ? place(p) : p)));
+  // 保存した位置が今のウィンドウの外 (前回はもっと大きい画面だった等) でも、出したときに画面内へ戻す
+  const attach = useCallback((el: HTMLDivElement | null) => {
+    ref.current = el;
+    if (!el) return;
+    setPos((p) => {
+      if (!p) return p;
+      const next = clampDashPos(
+        p,
+        { w: el.offsetWidth, h: el.offsetHeight },
+        { w: window.innerWidth, h: window.innerHeight },
+      );
+      return next.x === p.x && next.y === p.y ? p : next;
+    });
+  }, []);
 
   // ダイアログ (フォーム / 確認) を開いている間は隠す
   if (dialogs.open) return null;
@@ -475,7 +489,7 @@ export function DashPanel({ onHide }: { onHide: () => void }) {
 
   return (
     <div
-      ref={ref}
+      ref={attach}
       role="toolbar"
       aria-label="ダッシュパネル"
       className="fixed z-50 flex flex-col items-start gap-2"
