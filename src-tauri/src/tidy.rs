@@ -9,6 +9,7 @@ use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::i18n::Msg;
 use crate::repo;
 use crate::sh;
 
@@ -91,7 +92,7 @@ fn merged_prs(dir: &str) -> Result<HashMap<String, Vec<MergedPr>>, String> {
         ],
     )?;
     let list: Value =
-        serde_json::from_str(&raw).map_err(|e| format!("gh の出力を解析できません: {e}"))?;
+        serde_json::from_str(&raw).map_err(|e| Msg::GhParseFailed { err: e.to_string() }.text())?;
     let mut map: HashMap<String, Vec<MergedPr>> = HashMap::new();
     for pr in list.as_array().into_iter().flatten() {
         let (Some(name), Some(number), Some(oid)) = (
@@ -130,13 +131,17 @@ pub fn plan(dir: &str, fetch: bool) -> Result<TidyPlan, String> {
         Ok(m) => (m, None),
         Err(e) => (
             HashMap::new(),
-            Some(format!("マージ済み PR を取得できないため、{upstream} への取り込みだけで判定しています ({e})")),
+            Some(
+                Msg::MergedPrsUnavailable {
+                    upstream: upstream.clone(),
+                    err: e,
+                }
+                .text(),
+            ),
         ),
     };
     if !has_upstream && gh_note.is_some() {
-        return Err(format!(
-            "{upstream} が見つからず、gh も使えないため判定できません"
-        ));
+        return Err(Msg::CannotJudge { upstream }.into());
     }
 
     let trees = repo::worktree_list(dir)?;
@@ -164,7 +169,11 @@ pub fn plan(dir: &str, fetch: bool) -> Result<TidyPlan, String> {
                 target: main.clone(),
                 sha: main_sha.clone(),
                 remove: true,
-                reason: format!("{upstream} より {behind} コミット遅れている"),
+                reason: Msg::BehindUpstream {
+                    upstream: upstream.clone(),
+                    n: behind.parse().unwrap_or_default(),
+                }
+                .text(),
                 pr_number: None,
                 requires: None,
                 branch: None,
@@ -193,23 +202,30 @@ pub fn plan(dir: &str, fetch: bool) -> Result<TidyPlan, String> {
             branch: wt.branch.clone(),
         };
         let verdict = if wt.prunable {
-            item(true, "ディレクトリが存在しない".into(), None)
+            item(true, Msg::DirMissing.text(), None)
         } else if wt.is_current {
-            item(false, "今開いている worktree".into(), None)
+            item(false, Msg::CurrentWorktree.text(), None)
         } else if wt.locked {
-            item(false, "ロックされている".into(), None)
+            item(false, Msg::Locked.text(), None)
         } else if !text(&wt.path, &["status", "--porcelain"]).is_empty() {
-            item(false, "未コミットの変更がある".into(), None)
+            item(false, Msg::UncommittedChanges.text(), None)
         } else if has_upstream && is_ancestor(dir, &wt.head, &upstream) {
-            item(true, format!("HEAD が {upstream} に取り込み済み"), None)
+            item(
+                true,
+                Msg::HeadMergedInto {
+                    upstream: upstream.clone(),
+                }
+                .text(),
+                None,
+            )
         } else if let Some(n) = wt
             .branch
             .as_ref()
             .and_then(|b| covering_pr(dir, prs.get(b), &wt.head))
         {
-            item(true, format!("PR #{n} がマージ済み"), Some(n))
+            item(true, Msg::PrMerged { n }.text(), Some(n))
         } else {
-            item(false, "未マージのコミットがある".into(), None)
+            item(false, Msg::UnmergedCommits.text(), None)
         };
         if verdict.remove {
             removable_trees.insert(wt.path.clone());
@@ -249,9 +265,17 @@ pub fn plan(dir: &str, fetch: bool) -> Result<TidyPlan, String> {
                 branch: None,
             };
         let (merged, pr) = if has_upstream && is_ancestor(dir, sha, &upstream) {
-            (Some(format!("{upstream} に取り込み済み")), None)
+            (
+                Some(
+                    Msg::MergedInto {
+                        upstream: upstream.clone(),
+                    }
+                    .text(),
+                ),
+                None,
+            )
         } else if let Some(n) = covering_pr(dir, prs.get(name), sha) {
-            (Some(format!("PR #{n} がマージ済み")), Some(n))
+            (Some(Msg::PrMerged { n }.text()), Some(n))
         } else {
             (None, None)
         };
@@ -260,25 +284,25 @@ pub fn plan(dir: &str, fetch: bool) -> Result<TidyPlan, String> {
             (None, _) => match prs.get(name).and_then(|v| v.first()) {
                 Some(old) => item(
                     false,
-                    format!(
-                        "PR #{} はマージ済みだが、その後のコミットがある",
-                        old.number
-                    ),
+                    Msg::PrMergedWithLaterCommits { n: old.number }.text(),
                     Some(old.number),
                     None,
                 ),
-                None => item(
-                    false,
-                    "マージされた PR がなく、main にも未取り込み".into(),
-                    None,
-                    None,
-                ),
+                None => item(false, Msg::NoMergedPrNotInMain.text(), None, None),
             },
             (Some(reason), None) => item(true, reason, pr, None),
             (Some(reason), Some(wt)) if removable_trees.contains(&wt.path) => {
                 item(true, reason, pr, Some(wt.path.clone()))
             }
-            (Some(_), Some(wt)) => item(false, format!("{} でチェックアウト中", wt.path), pr, None),
+            (Some(_), Some(wt)) => item(
+                false,
+                Msg::CheckedOutAt {
+                    path: wt.path.clone(),
+                }
+                .text(),
+                pr,
+                None,
+            ),
         };
         items.push(verdict);
     }
@@ -310,7 +334,7 @@ fn fast_forward(
 ) -> Result<String, String> {
     let now = text(dir, &["rev-parse", &format!("refs/heads/{}", op.target)]);
     if now != op.sha {
-        return Err("判定後にブランチが動いたため中止しました".into());
+        return Err(Msg::BranchMovedSinceCheck.into());
     }
     match trees
         .iter()
@@ -331,7 +355,7 @@ fn fast_forward(
 
 fn remove_worktree(dir: &str, op: &TidyOp) -> Result<String, String> {
     if text(&op.target, &["rev-parse", "HEAD"]) != op.sha {
-        return Err("判定後に HEAD が動いたため中止しました".into());
+        return Err(Msg::HeadMovedSinceCheck.into());
     }
     // --force は付けない: 未コミットの変更が生じていれば git が拒否する
     sh::git_log(dir, &["worktree", "remove", &op.target])
@@ -348,7 +372,7 @@ fn delete_branch(dir: &str, op: &TidyOp) -> Result<String, String> {
         ],
     );
     if now != op.sha {
-        return Err("判定後にブランチが動いたため中止しました".into());
+        return Err(Msg::BranchMovedSinceCheck.into());
     }
     // マージ済みかどうかは plan で SHA まで確認済み。squash マージは -d が通らないので -D
     sh::git_log(dir, &["branch", "-D", &op.target])
@@ -390,7 +414,10 @@ pub fn apply(dir: &str, ops: Vec<TidyOp>) -> Result<Vec<TidyResult>, String> {
         out.push(match blocked {
             Some(wt) => result(
                 op,
-                Err(format!("{} でチェックアウト中のため残しました", wt.path)),
+                Err(Msg::KeptCheckedOut {
+                    path: wt.path.clone(),
+                }
+                .into()),
             ),
             None => result(op, delete_branch(dir, op)),
         });

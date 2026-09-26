@@ -8,10 +8,17 @@ use crate::applog;
 use crate::avatar;
 use crate::github;
 use crate::graph;
+use crate::i18n::Msg;
 use crate::recompose;
 use crate::repo;
 use crate::sh;
 use crate::tidy;
+
+/// 表示言語 ("ja" / "en") を切り替える。以降のメッセージがその言語になる。
+#[tauri::command]
+pub fn set_locale(locale: String) {
+    crate::i18n::set_locale(&locale);
+}
 
 // ------------------------------------------------------------------ 読み取り
 
@@ -144,7 +151,7 @@ pub fn git_commit(dir: String, message: String, amend: bool) -> Result<String, S
     }
     if message.trim().is_empty() {
         if !amend {
-            return Err("コミットメッセージを入力してください".into());
+            return Err(Msg::CommitMessageRequired.into());
         }
         args.push("--no-edit".into());
     } else {
@@ -184,7 +191,12 @@ pub fn git_pull(dir: String, rebase: bool, autostash: bool) -> Result<String, St
 /// 分岐しているブランチを黙って壊す心配がない。
 #[tauri::command]
 pub fn git_fast_forward(dir: String, branch: String) -> Result<String, String> {
-    let missing = || format!("{branch} に upstream が設定されていません");
+    let missing = || {
+        Msg::NoUpstream {
+            branch: branch.clone(),
+        }
+        .text()
+    };
     let remote = sh::git(
         &dir,
         &["config", "--get", &format!("branch.{branch}.remote")],
@@ -291,7 +303,7 @@ pub fn git_delete_branch(dir: String, name: String, force: bool) -> Result<Strin
 pub fn git_delete_remote_branch(dir: String, remote_branch: String) -> Result<String, String> {
     let (remote, branch) = remote_branch
         .split_once('/')
-        .ok_or("リモートブランチ名が不正です")?;
+        .ok_or_else(|| Msg::InvalidRemoteBranch.text())?;
     sh::git_log(&dir, &["push", remote, "--delete", branch])
 }
 
@@ -348,13 +360,18 @@ pub fn git_stash_drop(dir: String, refname: String) -> Result<String, String> {
 pub fn git_stash_rename(dir: String, refname: String, message: String) -> Result<String, String> {
     let message = message.trim();
     if message.is_empty() {
-        return Err("名前を入力してください".into());
+        return Err(Msg::NameRequired.into());
     }
     let index: usize = refname
         .strip_prefix("stash@{")
         .and_then(|s| s.strip_suffix('}'))
         .and_then(|s| s.parse().ok())
-        .ok_or_else(|| format!("stash の参照が不正です: {refname}"))?;
+        .ok_or_else(|| {
+            Msg::InvalidStashRef {
+                refname: refname.clone(),
+            }
+            .text()
+        })?;
     let list = sh::git(&dir, &["stash", "list", "--format=%H%x1f%gs"])?;
     let mut top: Vec<(String, String)> = list
         .lines()
@@ -363,7 +380,7 @@ pub fn git_stash_rename(dir: String, refname: String, message: String) -> Result
         .take(index + 1)
         .collect();
     if top.len() <= index {
-        return Err(format!("{refname} が見つかりません"));
+        return Err(Msg::StashNotFound { refname }.into());
     }
 
     // 外した分は古い方から積み直すと元の並びに戻る
@@ -382,7 +399,11 @@ pub fn git_stash_rename(dir: String, refname: String, message: String) -> Result
     }
     top[index].1 = message.to_string();
     restore(&top)?;
-    Ok(format!("{refname} の名前を「{message}」に変更しました"))
+    Ok(Msg::StashRenamed {
+        refname,
+        message: message.to_string(),
+    }
+    .text())
 }
 
 #[derive(serde::Serialize)]
@@ -568,7 +589,7 @@ fn avatar_cache_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let dir = app
         .path()
         .app_cache_dir()
-        .map_err(|e| format!("キャッシュディレクトリを特定できません: {e}"))?;
+        .map_err(|e| Msg::CacheDirUnknown { err: e.to_string() }.text())?;
     Ok(dir.join("avatars.json"))
 }
 
@@ -735,7 +756,7 @@ pub fn pr_context(
     let base_ref = [remote_base.as_str(), base.as_str()]
         .into_iter()
         .find(|r| sh::git(&dir, &["rev-parse", "--verify", "-q", r]).is_ok())
-        .ok_or_else(|| format!("マージ先のブランチ {base} が見つかりません"))?
+        .ok_or_else(|| Msg::BaseBranchNotFound { base: base.clone() }.text())?
         .to_string();
 
     let range = format!("{base_ref}...{head}");

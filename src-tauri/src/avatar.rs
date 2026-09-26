@@ -16,6 +16,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::i18n::Msg;
 use crate::sh;
 
 /// 解決できた URL を信用する期間 (30 日)
@@ -161,11 +162,13 @@ fn skipped_dirs() -> &'static Mutex<std::collections::HashSet<String>> {
 fn name_with_owner(dir: &str) -> Result<(String, String), String> {
     let raw = sh::gh(dir, &["repo", "view", "--json", "nameWithOwner"])?;
     let v: Value =
-        serde_json::from_str(&raw).map_err(|e| format!("gh の出力を解析できません: {e}"))?;
+        serde_json::from_str(&raw).map_err(|e| Msg::GhParseFailed { err: e.to_string() }.text())?;
     let full = v["nameWithOwner"]
         .as_str()
-        .ok_or("GitHub リポジトリではありません")?;
-    let (owner, name) = full.split_once('/').ok_or("リポジトリ名が不正です")?;
+        .ok_or_else(|| Msg::NotGithubRepo.text())?;
+    let (owner, name) = full
+        .split_once('/')
+        .ok_or_else(|| Msg::InvalidRepoName.text())?;
     Ok((owner.to_string(), name.to_string()))
 }
 
@@ -190,7 +193,7 @@ fn resolve_chunk(
 
     let raw = sh::gh(dir, &["api", "graphql", "-f", &format!("query={q}")])?;
     let v: Value =
-        serde_json::from_str(&raw).map_err(|e| format!("gh の出力を解析できません: {e}"))?;
+        serde_json::from_str(&raw).map_err(|e| Msg::GhParseFailed { err: e.to_string() }.text())?;
     let repo = &v["data"]["repository"];
 
     let mut out = Vec::with_capacity(items.len());
@@ -224,7 +227,7 @@ pub fn resolve(
     let mut todo: Vec<(String, String)> = Vec::new();
 
     {
-        let mut c = cache().lock().map_err(|_| "キャッシュを読めません")?;
+        let mut c = cache().lock().map_err(|_| Msg::CacheLockFailed.text())?;
         ensure_loaded(&mut c, cache_path);
         for q in &queries {
             let email = norm(&q.email);
@@ -285,7 +288,7 @@ pub fn resolve(
         }
     }
 
-    let mut c = cache().lock().map_err(|_| "キャッシュを読めません")?;
+    let mut c = cache().lock().map_err(|_| Msg::CacheLockFailed.text())?;
     for (email, entry) in resolved {
         result.insert(email.clone(), entry.url.clone());
         c.entries.insert(email, entry);
@@ -297,12 +300,13 @@ pub fn resolve(
 
 /// キャッシュを捨てる (設定画面から呼ぶ用)
 pub fn clear(cache_path: &Path) -> Result<(), String> {
-    let mut c = cache().lock().map_err(|_| "キャッシュを読めません")?;
+    let mut c = cache().lock().map_err(|_| Msg::CacheLockFailed.text())?;
     c.entries.clear();
     c.loaded_from = Some(cache_path.to_path_buf());
     c.dirty = false;
     if cache_path.exists() {
-        std::fs::remove_file(cache_path).map_err(|e| format!("キャッシュを削除できません: {e}"))?;
+        std::fs::remove_file(cache_path)
+            .map_err(|e| Msg::CacheDeleteFailed { err: e.to_string() }.text())?;
     }
     Ok(())
 }

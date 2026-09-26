@@ -15,6 +15,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 use crate::commands::truncate_diff;
+use crate::i18n::Msg;
 use crate::repo;
 use crate::sh;
 
@@ -119,7 +120,8 @@ impl TempIndex {
             std::process::id()
         ));
         if let Some(src) = seed.filter(|p| p.exists()) {
-            std::fs::copy(src, &path).map_err(|e| format!("一時 index を作れません: {e}"))?;
+            std::fs::copy(src, &path)
+                .map_err(|e| Msg::TempIndexFailed { err: e.to_string() }.text())?;
         }
         Ok(Self {
             dir: dir.to_string(),
@@ -184,10 +186,14 @@ fn changed_files(dir: &str, base: &str, tree: &str) -> Result<Vec<ChangedFile>, 
 pub fn context(dir: &str, branch: &str) -> Result<RecomposeContext, String> {
     let info = repo::info(dir)?;
     if info.state != "clean" {
-        return Err(format!("{} の途中のため実行できません", info.state));
+        return Err(Msg::MidOperation { state: info.state }.into());
     }
-    let tip = rev(dir, &format!("refs/heads/{branch}"))
-        .ok_or_else(|| format!("ブランチ {branch} が見つかりません"))?;
+    let tip = rev(dir, &format!("refs/heads/{branch}")).ok_or_else(|| {
+        Msg::BranchNotFound {
+            branch: branch.to_string(),
+        }
+        .text()
+    })?;
     let default_branch = info.default_branch.clone();
     let is_head = info.head_branch.as_deref() == Some(branch);
     let compose = branch == default_branch;
@@ -199,13 +205,18 @@ pub fn context(dir: &str, branch: &str) -> Result<RecomposeContext, String> {
     } else if compose || rev(dir, &format!("refs/heads/{default_branch}")).is_some() {
         default_branch.clone()
     } else {
-        return Err(format!(
-            "既定ブランチ {default_branch} が見つからないため、分岐点を決められません"
-        ));
+        return Err(Msg::DefaultBranchMissing {
+            branch: default_branch,
+        }
+        .into());
     };
     let base = text(dir, &["merge-base", &base_ref, &tip]);
     if base.is_empty() {
-        return Err(format!("{branch} と {base_ref} に共通の祖先がありません"));
+        return Err(Msg::NoCommonAncestor {
+            branch: branch.to_string(),
+            base: base_ref,
+        }
+        .into());
     }
 
     let tip_tree = tree_of(dir, &tip);
@@ -273,18 +284,18 @@ fn expand_paths(
     let mut out = vec![];
     for (i, c) in commits.iter().enumerate() {
         if c.message.trim().is_empty() {
-            return Err(format!("{} 番目のコミットにメッセージがありません", i + 1));
+            return Err(Msg::CommitMissingMessage { n: i + 1 }.into());
         }
         if c.paths.is_empty() {
-            return Err(format!("{} 番目のコミットにファイルがありません", i + 1));
+            return Err(Msg::CommitMissingFiles { n: i + 1 }.into());
         }
         let mut paths = vec![];
         for p in &c.paths {
             let f = by_path
                 .get(p.as_str())
-                .ok_or_else(|| format!("変更のないファイルがプランに含まれています: {p}"))?;
+                .ok_or_else(|| Msg::UnchangedFileInPlan { path: p.clone() }.text())?;
             if !used.insert(f.path.as_str()) {
-                return Err(format!("{p} が複数のコミットに含まれています"));
+                return Err(Msg::FileInMultipleCommits { path: p.clone() }.into());
             }
             paths.push(f.path.clone());
             if let Some(orig) = &f.orig_path {
@@ -299,10 +310,10 @@ fn expand_paths(
         .filter(|p| !used.contains(p))
         .collect();
     if !missing.is_empty() {
-        return Err(format!(
-            "プランに含まれていない変更があります: {}",
-            missing.join(", ")
-        ));
+        return Err(Msg::ChangesNotInPlan {
+            paths: missing.join(", "),
+        }
+        .into());
     }
     Ok(out)
 }
@@ -337,7 +348,7 @@ fn build_commits(dir: &str, op: &RecomposeOp, groups: &[Vec<String>]) -> Result<
         )?;
     }
     if tree_of(dir, &parent) != op.tree {
-        return Err("組み直した結果が元の内容と一致しないため中止しました".into());
+        return Err(Msg::RecomposeMismatch.into());
     }
     Ok(parent)
 }
@@ -345,22 +356,19 @@ fn build_commits(dir: &str, op: &RecomposeOp, groups: &[Vec<String>]) -> Result<
 pub fn apply(dir: &str, op: RecomposeOp) -> Result<String, String> {
     let info = repo::info(dir)?;
     if info.state != "clean" {
-        return Err(format!("{} の途中のため実行できません", info.state));
+        return Err(Msg::MidOperation { state: info.state }.into());
     }
     let new_branch = op.new_branch.trim().to_string();
     if !sh::exec(dir, "git", &["check-ref-format", "--branch", &new_branch])?.ok() {
-        return Err(format!("ブランチ名として使えません: {new_branch}"));
+        return Err(Msg::InvalidBranchName { name: new_branch }.into());
     }
     if rev(dir, &format!("refs/heads/{new_branch}")).is_some() {
-        return Err(format!("ブランチ {new_branch} は既に存在します"));
+        return Err(Msg::BranchExists { name: new_branch }.into());
     }
 
     // プランを立てた後に動いていないか
     if rev(dir, &format!("refs/heads/{}", op.branch)).as_deref() != Some(op.tip.as_str()) {
-        return Err(format!(
-            "プラン作成後に {} が動いたため中止しました",
-            op.branch
-        ));
+        return Err(Msg::BranchMovedSincePlan { branch: op.branch }.into());
     }
     let is_head = info.head_branch.as_deref() == Some(op.branch.as_str());
     let now_tree = if is_head {
@@ -369,29 +377,28 @@ pub fn apply(dir: &str, op: RecomposeOp) -> Result<String, String> {
         tree_of(dir, &op.tip)
     };
     if now_tree != op.tree {
-        return Err("プラン作成後にファイルが変更されたため中止しました".into());
+        return Err(Msg::FilesChangedSincePlan.into());
     }
     let compose = op.branch == info.default_branch;
     if op.reset_default && !(compose && is_head) {
-        return Err(
-            "既定ブランチを戻せるのは、既定ブランチをチェックアウトしているときだけです".into(),
-        );
+        return Err(Msg::ResetDefaultRequiresHead.into());
     }
     if op.delete_original && compose {
-        return Err("既定ブランチは削除できません".into());
+        return Err(Msg::CannotDeleteDefault.into());
     }
 
     let files = changed_files(dir, &op.base, &op.tree)?;
     if files.is_empty() {
-        return Err("組み直す変更がありません".into());
+        return Err(Msg::NothingToRecompose.into());
     }
     let groups = expand_paths(&files, &op.commits)?;
     let last = build_commits(dir, &op, &groups)?;
 
-    let mut log = vec![format!(
-        "{new_branch} に {} 件のコミットを作成しました",
-        op.commits.len()
-    )];
+    let mut log = vec![Msg::CommitsCreated {
+        branch: new_branch.clone(),
+        n: op.commits.len(),
+    }
+    .text()];
     sh::git_log(dir, &["branch", "--no-track", &new_branch, &last])?;
 
     if is_head {
@@ -408,18 +415,28 @@ pub fn apply(dir: &str, op: RecomposeOp) -> Result<String, String> {
             ],
         )?;
         sh::git_log(dir, &["reset", "-q"])?;
-        log.push(format!("{new_branch} に切り替えました"));
+        log.push(
+            Msg::SwitchedTo {
+                branch: new_branch.clone(),
+            }
+            .text(),
+        );
     }
 
     if op.delete_original {
         match sh::git_log(dir, &["branch", "-D", &op.branch]) {
-            Ok(_) => log.push(format!("{} を削除しました", op.branch)),
+            Ok(_) => log.push(
+                Msg::BranchDeleted {
+                    branch: op.branch.clone(),
+                }
+                .text(),
+            ),
             Err(e) => {
-                return Err(format!(
-                    "{}\n{} を削除できませんでした: {e}",
-                    log.join("\n"),
-                    op.branch
-                ))
+                let msg = Msg::BranchDeleteFailed {
+                    branch: op.branch.clone(),
+                    err: e,
+                };
+                return Err(format!("{}\n{}", log.join("\n"), msg.text()));
             }
         }
     }
@@ -438,13 +455,18 @@ pub fn apply(dir: &str, op: RecomposeOp) -> Result<String, String> {
                 &op.tip,
             ],
         ) {
-            Ok(_) => log.push(format!("{} を分岐点に戻しました", op.branch)),
+            Ok(_) => log.push(
+                Msg::BranchResetToBase {
+                    branch: op.branch.clone(),
+                }
+                .text(),
+            ),
             Err(e) => {
-                return Err(format!(
-                    "{}\n{} を戻せませんでした: {e}",
-                    log.join("\n"),
-                    op.branch
-                ))
+                let msg = Msg::BranchResetFailed {
+                    branch: op.branch.clone(),
+                    err: e,
+                };
+                return Err(format!("{}\n{}", log.join("\n"), msg.text()));
             }
         }
     }
